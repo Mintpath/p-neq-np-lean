@@ -470,10 +470,46 @@ private theorem danglingEndpoints_card_even_general
     omega
   exact ⟨K - D2.card, by omega⟩
 
-def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n))
-    (M : PerfectMatching (danglingEndpoints S H)) : Prop :=
-  ∀ p ∈ M.pairs,
-    (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2
+/-! ### Path-component normal form (hamiltonian_route.tex Lemma, lines 275-361)
+
+Let H be a Hamiltonian cycle on [n] and S a balanced interior frontier
+with c_S(H) = 0. Then:
+(1) Every connected component of L_S(H) is a simple path (possibly single vertex).
+(2) Every path-component with ≥1 edge has exactly two endpoints of left-degree 1.
+    Both are boundary vertices.
+(3) Internal vertices (left-degree 2) don't affect the boundary multigraph.
+(4) Isolated vertices (left-degree 0) are boundary iff incident to both sides.
+(5) No component is disjoint from B_S unless it's an isolated vertex with no left edges.
+(6) The L-edges of the boundary multigraph are exactly the pairs of π_S(H). -/
+
+private lemma leftSubgraph_max_degree_two
+    (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) (v : Fin n) :
+    vertexDegreeIn n (leftSubgraph S H) v ≤ 2 := by
+  have h := leftDeg_add_rightDeg_eq_two S H hH v
+  show leftDegreeAt S H v ≤ 2
+  omega
+
+private lemma leftSubgraph_component_is_path
+    (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (hRight : (rightSubgraph S H).Nonempty)
+    (comp : Finset (Edge n)) (hcomp : comp ⊆ leftSubgraph S H)
+    (hne : comp.Nonempty)
+    (h2reg : ∀ v : Fin n, vertexDegreeIn n comp v ≤ 2) :
+    ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+  sorry
+
+private lemma path_component_has_two_deg1_vertices
+    (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (comp : Finset (Edge n)) (hcomp : comp ⊆ leftSubgraph S H)
+    (hne : comp.Nonempty)
+    (hpath : ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hconn : IsConnectedEdgeSet n comp) :
+    ∃ u v : Fin n, u ≠ v ∧
+      vertexDegreeIn n comp u = 1 ∧ vertexDegreeIn n comp v = 1 ∧
+      u ∈ danglingEndpoints S H ∧ v ∈ danglingEndpoints S H ∧
+      (edgeSetToGraph n comp).Reachable u v ∧
+      (∀ w : Fin n, vertexDegreeIn n comp w = 1 → w = u ∨ w = v) := by
+  sorry
 
 private lemma deg1_unique_partner
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
@@ -496,6 +532,11 @@ private lemma deg1_components_pair_into_matching
       ∀ p ∈ M.pairs,
         (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2 := by
   sorry
+
+def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n))
+    (M : PerfectMatching (danglingEndpoints S H)) : Prop :=
+  ∀ p ∈ M.pairs,
+    (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2
 
 private theorem exists_structural_pathPairing
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :

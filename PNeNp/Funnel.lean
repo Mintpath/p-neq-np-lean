@@ -37,34 +37,34 @@ section ConsecutiveBlocks
 
 private theorem consecutive_blocks_from_ham_cycle_ax (n : ℕ) (hn : n ≥ 4) :
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
-    ∃ (cycle : Fin n → Fin n),
-      Function.Bijective cycle ∧
-      ∀ i : Fin n, Sym2.mk (cycle i, cycle (cycleFin (i.val + 1) n (by omega))) ∈ H := by
-  intro H hH
-  have hn_pos : n > 0 := by omega
-  have hReg := hH.twoRegular
-  have hConn := hH.connected
-  have hSpan := hH.spanning
-  have hNoLoops := hH.noLoops
-  have cycle_extraction : ∀ (n' : ℕ) (hn'_pos : n' > 0) (E : Finset (Edge n')),
-      (∀ v : Fin n', vertexDegreeIn n' E v = 2) →
-      IsConnectedEdgeSet n' E →
-      (∀ e ∈ E, ¬e.IsDiag) →
-      n' ≥ 3 →
-      ∃ (f : Fin n' → Fin n'), Function.Bijective f ∧
-        ∀ i : Fin n', Sym2.mk (f i, f (cycleFin (i.val + 1) n' hn'_pos)) ∈ E := by
-    intro n' hn'_pos E hReg' hConn' hNL' _hn'
-    exact sorry
-  have hn_pos' : n > 0 := by omega
-  have h := cycle_extraction n hn_pos' H hReg hConn hNoLoops (by omega)
-  obtain ⟨f, hBij, hEdges⟩ := h
-  exact ⟨f, hBij, fun i => by convert hEdges i using 2⟩
+    ∃ (tuples : Finset (Fin n × Fin n × Fin n × Fin n)),
+      tuples.card = n ∧
+      (∀ t ∈ tuples,
+        let (p, a, b, q) := t
+        Sym2.mk (p, a) ∈ H ∧ Sym2.mk (a, b) ∈ H ∧ Sym2.mk (b, q) ∈ H ∧
+        vertexDegreeIn n H a = 2 ∧ vertexDegreeIn n H b = 2) ∧
+      (∀ t ∈ tuples,
+        let (p, a, b, q) := t
+        let H' := (H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))
+          |>.cons (Sym2.mk (p, b)) (by sorry)
+          |>.cons (Sym2.mk (a, q)) (by sorry)
+        IsHamCycle n H') := by
+  sorry
 
 private theorem consecutive_blocks_from_ham_cycle :
   ∀ (n : ℕ) (H : Finset (Edge n)), IsHamCycle n H → (hn : n ≥ 4) →
-    ∃ (cycle : Fin n → Fin n),
-      Function.Bijective cycle ∧
-      ∀ i : Fin n, Sym2.mk (cycle i, cycle (cycleFin (i.val + 1) n (by omega))) ∈ H :=
+    ∃ (tuples : Finset (Fin n × Fin n × Fin n × Fin n)),
+      tuples.card = n ∧
+      (∀ t ∈ tuples,
+        let (p, a, b, q) := t
+        Sym2.mk (p, a) ∈ H ∧ Sym2.mk (a, b) ∈ H ∧ Sym2.mk (b, q) ∈ H ∧
+        vertexDegreeIn n H a = 2 ∧ vertexDegreeIn n H b = 2) ∧
+      (∀ t ∈ tuples,
+        let (p, a, b, q) := t
+        let H' := (H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))
+          |>.cons (Sym2.mk (p, b)) (by sorry)
+          |>.cons (Sym2.mk (a, q)) (by sorry)
+        IsHamCycle n H') :=
   fun n H hH hn => consecutive_blocks_from_ham_cycle_ax n hn H hH
 
 private theorem ham_cycle_image_card_eq_n :
@@ -123,26 +123,10 @@ theorem consecutiveBlocksRealize
       ∀ t ∈ tuples,
         let (p, a, b, q) := t
         Sym2.mk (p, a) ∈ H ∧ Sym2.mk (a, b) ∈ H ∧ Sym2.mk (b, q) ∈ H := by
-  classical
-  have hRegular := hH.twoRegular
-  have hSpanning := hH.spanning
-  have hNoLoops := hH.noLoops
-  have hn_pos : n > 0 := by omega
-  suffices ∃ (cycle : Fin n → Fin n),
-      Function.Bijective cycle ∧
-      ∀ i : Fin n, Sym2.mk (cycle i, cycle (cycleFin (i.val + 1) n hn_pos)) ∈ H by
-    obtain ⟨cycle, hBij, hEdges⟩ := this
-    refine ⟨Finset.univ.image fun (i : Fin n) =>
-      (cycle i,
-       cycle (cycleFin (i.val + 1) n hn_pos),
-       cycle (cycleFin (i.val + 2) n hn_pos),
-       cycle (cycleFin (i.val + 3) n hn_pos)), ?_, ?_⟩
-    · exact ham_cycle_image_card_eq_n n cycle hBij hn
-    · intro t ht
-      simp only [Finset.mem_image, Finset.mem_univ, true_and] at ht
-      obtain ⟨i, rfl⟩ := ht
-      exact consecutive_block_edges_in_ham_cycle n H cycle hn_pos hEdges i
-  exact consecutive_blocks_from_ham_cycle n H hH hn
+  obtain ⟨tuples, hCard, hEdgesDeg, _⟩ := consecutive_blocks_from_ham_cycle n H hH hn
+  exact ⟨tuples, hCard, fun t ht => by
+    obtain ⟨h1, h2, h3, _, _⟩ := hEdgesDeg t ht
+    exact ⟨h1, h2, h3⟩⟩
 
 end ConsecutiveBlocks
 
@@ -155,37 +139,19 @@ noncomputable def cleanDegreeVisibleCount (S : Frontier n)
     v ∈ boundaryVertices S).card
 
 private theorem degree_visible_supply_linear_density_ax :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n)),
-    S.isBalanced → IsHamCycle n H → n ≥ 4 →
+  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n))
+    (polylogBound : ℕ),
+    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound →
+    IsHamCycle n H → H ∈ restrictedHamCycles n ρ → n ≥ 4 →
     (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n := by
-  intro n S ρ H hBal hHam hn4
-  have hReg := hHam.twoRegular
-  have hSpan := hHam.spanning
-  unfold cleanDegreeVisibleCount
-  have vertex_degree_split : ∀ v : Fin n,
-      leftDegreeAt S H v + rightDegreeAt S H v = 2 :=
-    leftDeg_add_rightDeg_eq_two S H hHam
-  have boundary_large : (Finset.univ.filter fun v : Fin n =>
-      leftDegreeAt S H v = 1 ∧ rightDegreeAt S H v = 1 ∧
-      v ∈ boundaryVertices S).card ≥ n / 8 := by
-    have degree_one_one_count : (Finset.univ.filter fun v : Fin n =>
-        leftDegreeAt S H v = 1 ∧ rightDegreeAt S H v = 1).card ≥ n / 4 := by
-      have total_left_deg : (Finset.univ.filter fun v : Fin n =>
-          leftDegreeAt S H v = 1).card ≥ n / 2 := by
-        exact sorry
-      exact sorry
-    exact sorry
-  have h_cast : (↑(n / 8) : ℝ) ≥ 1 / 8 * ↑n := by
-    exact sorry
-  calc (↑(Finset.univ.filter fun v : Fin n =>
-        leftDegreeAt S H v = 1 ∧ rightDegreeAt S H v = 1 ∧
-        v ∈ boundaryVertices S).card : ℝ)
-      ≥ ↑(n / 8) := by exact_mod_cast boundary_large
-    _ ≥ 1 / 8 * ↑n := h_cast
+  intro n S ρ H polylogBound hBal hcons hm hHam hHres hn4
+  sorry
 
 private theorem degree_visible_supply_linear_density :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n)),
-    S.isBalanced → IsHamCycle n H → n ≥ 4 →
+  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n))
+    (polylogBound : ℕ),
+    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound →
+    IsHamCycle n H → H ∈ restrictedHamCycles n ρ → n ≥ 4 →
     (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n :=
   degree_visible_supply_linear_density_ax
 
@@ -198,14 +164,11 @@ theorem degreeVisibleBlockSupply
       ∀ H ∈ restrictedHamCycles n ρ,
         ↑(cleanDegreeVisibleCount S ρ H) ≥ c₀ * ↑n := by
   refine ⟨1 / 8, by positivity, fun H hH => ?_⟩
+  have hHmem := hH
   simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH
   obtain ⟨_, _, hHam⟩ := hH
-  have hBal := hS
-  unfold Frontier.isBalanced at hBal
-  obtain ⟨hL, hR⟩ := hBal
-  have hReg := hHam.twoRegular
   suffices h : (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n by linarith
-  exact degree_visible_supply_linear_density S ρ H hS hHam hn
+  exact degree_visible_supply_linear_density S ρ H polylogBound hS hcons hm hHam hHmem hn
 
 end DegreeVisibleSupply
 
@@ -833,24 +796,23 @@ private theorem surviving_card_ge {n q : ℕ}
   omega
 
 private theorem multi_carrier_suppression_child :
-  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q)
-    (η : Fin q → Bool), n ≥ 2 * q →
+  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q),
+    n ≥ 2 * q →
     ∃ (child : MultiCarrierAdmissible (n - 2 * q) q),
       (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
             (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
       (backgroundRestriction child).size = (backgroundRestriction ext.mca).size := by
-  intro n q ext η hn
+  intro n q ext hn
   exact sorry
 
 theorem multiCarrierSuppression {q : ℕ}
     (ext : MultiCarrierExtension n q)
-    (η : Fin q → Bool)
     (hn : n ≥ 2 * q) :
     ∃ (child : MultiCarrierAdmissible (n - 2 * q) q),
       (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
             (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
       (backgroundRestriction child).size = (backgroundRestriction ext.mca).size :=
-  multi_carrier_suppression_child ext η hn
+  multi_carrier_suppression_child ext hn
 
 end MultiCarrierSuppression
 
@@ -997,6 +959,18 @@ private noncomputable def patternToListPattern {q : ℕ}
     Fin (extensionBlocksList ext).length → Bool :=
   fun i => η ⟨i.val, by
     have := extensionBlocksList_length ext; omega⟩
+
+private theorem suppression_bijection_card :
+  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q) (η : Fin q → Bool),
+    n ≥ 2 * q →
+    ∀ (child : MultiCarrierAdmissible (n - 2 * q) q),
+      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
+            (child.carriers i).endpt2.val = (ext.blocks i).q.val) →
+      (patternHamCycles ext.mca.ρ (extensionBlocksList ext)
+        (patternToListPattern ext η)).card =
+      (restrictedHamCycles (n - 2 * q) child.ρ).card := by
+  intro n q ext η hn child hCarr
+  exact sorry
 
 set_option maxHeartbeats 800000 in
 private theorem blocks_all_degree_visible {n q : ℕ}
@@ -1229,24 +1203,31 @@ section FormulaLowerBound
 
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
+    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
+    CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     protocolPartitionNumber I S ≤ F.size := by
-  intro n m F hFormula S I
+  intro n m F hFormula toInput hDecides S I
   classical
   unfold protocolPartitionNumber
   exact sorry
 
 private theorem aho_ullman_yannakakis_formula_partition_bound :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
+    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
+    CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     protocolPartitionNumber I S ≤ F.size :=
   aho_ullman_yannakakis_formula_partition_bound_ax
 
 theorem ahoUllmanYannakakis {m : ℕ}
-    (F : BooleanCircuit m) (_hF : F.isFormula) (S : Frontier n)
+    (F : BooleanCircuit m) (_hF : F.isFormula)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (_hDecides : CircuitDecidesHAM F toInput)
+    (S : Frontier n)
     (I : Finset (Finset (Edge n))) :
     protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound F _hF S I
+  aho_ullman_yannakakis_formula_partition_bound F _hF toInput _hDecides S I
 
 private theorem rectangle_isolation_from_cross_pattern :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
@@ -1381,11 +1362,13 @@ private theorem packing_gives_exponential_partition {n : ℕ}
 private theorem formula_size_from_isolation :
   ∀ {n : ℕ},
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
+    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
+    CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
-  intro n m F hF S I hIso
-  have hAUY := ahoUllmanYannakakis F hF S I
+  intro n m F hF toInput hDecides S I hIso
+  have hAUY := ahoUllmanYannakakis F hF toInput hDecides S I
   have hPart := funnel_partition_count S I hIso
   omega
 
@@ -1461,7 +1444,7 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
   have hSize₀ : ρ₀.size ≤ q := by unfold Restriction.size ρ₀; simp
   obtain ⟨I, hIcard, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ q hSize₀
     q hq_pos (le_refl q)
-  have hFge := formula_size_from_isolation m F hF S I hIso
+  have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :

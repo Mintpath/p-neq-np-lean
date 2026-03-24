@@ -156,6 +156,10 @@ end DegreeChangeCriterion
 
 section DegreeVisibilityBias
 
+def Frontier.isDensityBalanced {n : ℕ} (S : Frontier n) : Prop :=
+  2 * S.leftEdges.card ≤ (allEdges n).card + 1 ∧
+  2 * S.rightEdges.card ≤ (allEdges n).card + 1
+
 open Classical in
 noncomputable def monochromaticToggleFraction (S : Frontier n)
     (H : Finset (Edge n)) : ℝ :=
@@ -172,11 +176,11 @@ noncomputable def monochromaticToggleFraction (S : Frontier n)
   else 0
 
 private theorem degree_visibility_bias_bounds_ax :
-  ∀ {n : ℕ} (S : Frontier n), S.isBalanced → n ≥ 4 →
+  ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
-    1 / 8 ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 := by
-  intro n S hbal hn H hH
+    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
+    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) := by
+  intro n S _hbal hn H _hH
   constructor
   · unfold monochromaticToggleFraction
     sorry
@@ -184,16 +188,16 @@ private theorem degree_visibility_bias_bounds_ax :
     sorry
 
 private theorem degree_visibility_bias_bounds :
-  ∀ {n : ℕ} (S : Frontier n), S.isBalanced → n ≥ 4 →
+  ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
-    1 / 8 ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 :=
+    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
+    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
   degree_visibility_bias_bounds_ax
 
-theorem degreeVisibilityBias (S : Frontier n) (hS : S.isBalanced)
+theorem degreeVisibilityBias (S : Frontier n) (hS : S.isDensityBalanced)
     (hn : n ≥ 4) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
-    1 / 8 ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 :=
+    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
+    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
   degree_visibility_bias_bounds S hS hn H hH
 
 end DegreeVisibilityBias

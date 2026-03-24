@@ -26,10 +26,13 @@ end ProtocolPartitionTree
 section AUYCharacterization
 
 theorem auy_characterization
-    {m : ℕ} (F : BooleanCircuit m) (hF : F.isFormula) (S : Frontier n)
+    {m : ℕ} (F : BooleanCircuit m) (hF : F.isFormula)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hDecides : CircuitDecidesHAM F toInput)
+    (S : Frontier n)
     (I : Finset (Finset (Edge n))) :
     protocolPartitionNumber I S ≤ F.size :=
-  ahoUllmanYannakakis F hF S I
+  ahoUllmanYannakakis F hF toInput hDecides S I
 
 end AUYCharacterization
 

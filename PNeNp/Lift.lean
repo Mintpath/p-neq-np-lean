@@ -118,13 +118,7 @@ axiom buildMonotoneLift_gatewise_correct {m : ℕ}
 
 end MonotoneLiftProperties
 
-section ProtocolPartition
-
-noncomputable def protocolPartitionNumber
-    (I : Finset (Finset (Edge n))) (S : Frontier n) : ℕ :=
-  I.card
-
-end ProtocolPartition
+/-! protocolPartitionNumber is defined in Funnel.lean (paper-faithful: sInf of rectangle covers) -/
 
 section GammaRecurrence
 

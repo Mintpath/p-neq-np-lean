@@ -493,12 +493,24 @@ noncomputable def backgroundRestriction {q : ℕ}
   ⟨mca.ρ.forcedPresent \ (Finset.univ.image fun i => (mca.carriers i).toEdge),
    mca.ρ.forcedAbsent⟩
 
+/-! ### Protocol-partition number (hamiltonian_route.tex Definition, lines 1725-1732)
+
+pp₁(I, S) is the minimum number of monochromatic 1-rectangles needed to
+cover all elements of I. A 1-rectangle is a subset R ⊆ I such that for
+all H₀, H₁ ∈ R, the mixed graph mixedGraph S H₁ H₀ is a Hamiltonian cycle
+(i.e., they lie in the same combinatorial rectangle of the communication matrix). -/
+
+def IsOneRectangle (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (R : Finset (Finset (Edge n))) : Prop :=
+  R ⊆ I ∧ ∀ H₀ ∈ R, ∀ H₁ ∈ R, IsHamCycle n (mixedGraph S H₁ H₀)
+
 open Classical in
 noncomputable def protocolPartitionNumber
     (I : Finset (Finset (Edge n))) (S : Frontier n) : ℕ :=
-  (I.filter fun H₀ =>
-    ∀ H₁ ∈ I, H₀ ≠ H₁ →
-      ¬IsHamCycle n (mixedGraph S H₁ H₀)).card
+  sInf { k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+    P.card = k ∧
+    (∀ R ∈ P, IsOneRectangle I S R) ∧
+    (∀ H ∈ I, ∃ R ∈ P, H ∈ R) }
 
 noncomputable def Gamma (q N : ℕ) : ℕ :=
   if q = 0 then 1
@@ -1285,19 +1297,60 @@ private theorem gamma_one_exponential (n : ℕ) (hn : n ≥ 5) :
   have hGPos := gamma_pos 1 (n - 2 * 1)
   linarith
 
-private theorem funnel_partition_count {n : ℕ}
+/-! ### Cross-pattern rectangle isolation → pp₁ lower bound
+(hamiltonian_route.tex lines 1776, 1786-1791)
+
+By rectangle isolation, different patterns can't share a 1-rectangle.
+So pp₁ ≥ number of isolated pattern classes.
+
+The paper's combining step:
+  |F| ≥ pp₁(HAM_n, S_χ) ≥ 2^q · Γ_q(n − 2q) ≥ 2^{Ω(n)}
+-/
+
+private lemma mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) : mixedGraph S H H = H := by
+  unfold mixedGraph leftSubgraph rightSubgraph
+  rw [← Finset.inter_union_distrib_left, S.partition]
+  exact Finset.inter_eq_left.mpr (fun e he => by
+    simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
+    exact hH.noLoops e he)
+
+private theorem isolated_patterns_force_pp_lower_bound {n : ℕ}
     (S : Frontier n) (I : Finset (Finset (Edge n)))
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
     (hIsolated : ∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
       ¬IsHamCycle n (mixedGraph S H₁ H₀)) :
     protocolPartitionNumber I S ≥ I.card := by
-  classical
   unfold protocolPartitionNumber
-  have : I.filter (fun H₀ =>
-    ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) = I := by
-    ext H
-    simp only [Finset.mem_filter]
-    exact ⟨fun ⟨h, _⟩ => h, fun h => ⟨h, hIsolated H h⟩⟩
-  rw [this]
+  apply le_csInf
+  · refine ⟨I.card, I.image (fun H => {H}), ?_, ?_, ?_⟩
+    · simp [Finset.card_image_of_injective _ Finset.singleton_injective]
+    · intro R hR
+      simp only [Finset.mem_image] at hR
+      obtain ⟨H, hH, rfl⟩ := hR
+      refine ⟨Finset.singleton_subset_iff.mpr hH, fun H₀ hH₀ H₁ hH₁ => ?_⟩
+      rw [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁, mixedGraph_self S _ (hHam _ hH)]
+      exact hHam _ hH
+    · intro H hH
+      exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
+  · intro k ⟨P, hPcard, hRect, hCover⟩
+    rw [← hPcard]
+    have hSingleton : ∀ R ∈ P, ∀ H₀ ∈ R, ∀ H₁ ∈ R, H₀ = H₁ := by
+      intro R hR H₀ hH₀ H₁ hH₁
+      by_contra hne
+      have ⟨hRsub, hRrect⟩ := hRect R hR
+      exact hIsolated H₀ (hRsub hH₀) H₁ (hRsub hH₁) hne (hRrect H₀ hH₀ H₁ hH₁)
+    calc I.card
+        ≤ (P.biUnion id).card := by
+          apply Finset.card_le_card
+          intro H hH
+          obtain ⟨R, hR, hHR⟩ := hCover H hH
+          exact Finset.mem_biUnion.mpr ⟨R, hR, hHR⟩
+      _ ≤ ∑ R ∈ P, R.card := Finset.card_biUnion_le
+      _ ≤ ∑ _R ∈ P, 1 := Finset.sum_le_sum (fun R hR => by
+          rw [Finset.card_le_one]; exact hSingleton R hR)
+      _ = P.card := by simp
 
 private theorem packing_gives_exponential_partition {n : ℕ}
     (hn : n ≥ 4)
@@ -1307,6 +1360,7 @@ private theorem packing_gives_exponential_partition {n : ℕ}
     (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) :
     ∃ (I : Finset (Finset (Edge n))),
       I.card ≥ 2 ^ q ∧
+      (∀ H ∈ I, IsHamCycle n H) ∧
       (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
         ¬IsHamCycle n (mixedGraph S H₁ H₀)) := by
   obtain ⟨blocks, hlen, hDisj, hVis, hOpen, hPat⟩ :=
@@ -1330,7 +1384,15 @@ private theorem packing_gives_exponential_partition {n : ℕ}
       intro h; subst h; exact hne rfl
     exact rectangleIsolation S ρ blocks hDisj hVis η₀ η₁ hNeq
       (rep η₀) (rep η₁) (hRepMem η₀) (hRepMem η₁)
-  refine ⟨I, ?_, hIso⟩
+  have hIHam : ∀ H ∈ I, IsHamCycle n H := by
+    intro H hH
+    simp only [I, Finset.mem_image, Finset.mem_univ, true_and] at hH
+    obtain ⟨η, rfl⟩ := hH
+    have hMem := hRepMem η
+    unfold patternHamCycles restrictedHamCycles at hMem
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hMem
+    exact hMem.2.2
+  refine ⟨I, ?_, hIHam, hIso⟩
   have hInj : Function.Injective rep := by
     intro η₀ η₁ h
     by_contra hne
@@ -1365,11 +1427,12 @@ private theorem formula_size_from_isolation :
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
     CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+    (∀ H ∈ I, IsHamCycle n H) →
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
-  intro n m F hF toInput hDecides S I hIso
+  intro n m F hF toInput hDecides S I hHam hIso
   have hAUY := ahoUllmanYannakakis F hF toInput hDecides S I
-  have hPart := funnel_partition_count S I hIso
+  have hPart := isolated_patterns_force_pp_lower_bound S I hHam hIso
   omega
 
 private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalanced) (hn : n ≥ 4) :
@@ -1442,9 +1505,9 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
   have hCons₀ : ρ₀.consistent := by
     unfold Restriction.consistent; exact Finset.disjoint_empty_right _
   have hSize₀ : ρ₀.size ≤ q := by unfold Restriction.size ρ₀; simp
-  obtain ⟨I, hIcard, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ q hSize₀
+  obtain ⟨I, hIcard, hIHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ q hSize₀
     q hq_pos (le_refl q)
-  have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hIso
+  have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hIHam hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :

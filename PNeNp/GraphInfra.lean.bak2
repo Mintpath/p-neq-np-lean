@@ -1,0 +1,206 @@
+import PNeNp.Basic
+import Mathlib.Combinatorics.SimpleGraph.Basic
+import Mathlib.Combinatorics.SimpleGraph.Connectivity.Connected
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Fintype.Basic
+import Mathlib.Data.Sym.Sym2
+
+open Finset
+
+namespace PNeNp
+
+variable {n : ℕ}
+
+theorem finset_eq_of_subset_card_eq {α : Type*} [DecidableEq α]
+    {A B : Finset α} (h : A ⊆ B) (hc : A.card = B.card) : A = B :=
+  Finset.eq_of_subset_of_card_le h (le_of_eq hc.symm)
+
+section CycleComponentAbsorption
+
+theorem incident_edges_absorbed
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (comp : Finset (Edge n)) (hcomp_sub : comp ⊆ H)
+    (v : Fin n) (hv_deg : vertexDegreeIn n comp v = 2)
+    (e : Edge n) (he : e ∈ H) (hve : v ∈ e) : e ∈ comp := by
+  unfold vertexDegreeIn at hv_deg
+  have hH_deg := hH.twoRegular v
+  unfold vertexDegreeIn at hH_deg
+  have hsub : Finset.filter (fun e' => v ∈ e') comp ⊆
+      Finset.filter (fun e' => v ∈ e') H :=
+    Finset.filter_subset_filter _ hcomp_sub
+  have hfeq := finset_eq_of_subset_card_eq hsub (by omega)
+  have : e ∈ Finset.filter (fun e' => v ∈ e') H :=
+    Finset.mem_filter.mpr ⟨he, hve⟩
+  rw [← hfeq] at this
+  exact (Finset.mem_filter.mp this).1
+
+theorem vertex_in_cycle_comp_deg2 (comp : Finset (Edge n))
+    (hcomp_deg : ∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2)
+    (v : Fin n) (hv : ∃ e ∈ comp, v ∈ e) : vertexDegreeIn n comp v = 2 := by
+  obtain ⟨e, he, hve⟩ := hv
+  rcases hcomp_deg v with h0 | h2
+  · unfold vertexDegreeIn at h0
+    exact absurd (Finset.mem_filter.mpr ⟨he, hve⟩ : e ∈ Finset.filter (fun e' => v ∈ e') comp)
+      (by rw [Finset.card_eq_zero] at h0; rw [h0]; exact Finset.not_mem_empty _)
+  · exact h2
+
+theorem adj_absorbed
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (comp : Finset (Edge n)) (hcomp_sub : comp ⊆ H)
+    (hcomp_deg : ∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2)
+    (u w : Fin n) (hu : ∃ e ∈ comp, u ∈ e)
+    (hadj : (edgeSetToGraph n H).Adj u w) : ∃ e ∈ comp, w ∈ e := by
+  obtain ⟨_, hmem⟩ := hadj
+  have := incident_edges_absorbed H hH comp hcomp_sub u
+    (vertex_in_cycle_comp_deg2 comp hcomp_deg u hu)
+    (Sym2.mk (u, w)) hmem (Sym2.mem_mk_left u w)
+  exact ⟨Sym2.mk (u, w), this, Sym2.mem_mk_right u w⟩
+
+theorem reachable_absorbed
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (comp : Finset (Edge n)) (hcomp_sub : comp ⊆ H)
+    (hcomp_deg : ∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2)
+    (u w : Fin n) (hu : ∃ e ∈ comp, u ∈ e)
+    (hreach : (edgeSetToGraph n H).Reachable u w) : ∃ e ∈ comp, w ∈ e := by
+  obtain ⟨walk⟩ := hreach
+  induction walk with
+  | nil => exact hu
+  | @cons a b _ hadj _ ih =>
+    exact ih (adj_absorbed H hH comp hcomp_sub hcomp_deg a hu b hadj)
+
+theorem cycle_component_equals_H
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (comp : Finset (Edge n)) (hcomp_sub : comp ⊆ H)
+    (hcomp_ne : comp.Nonempty)
+    (hcomp_deg : ∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) :
+    comp = H := by
+  ext e; constructor
+  · exact fun he => hcomp_sub he
+  · intro he
+    have hnd : ¬ e.IsDiag := hH.noLoops e he
+    obtain ⟨a, b, _, rfl⟩ := Sym2.exists_ne_of_not_isDiag hnd
+    obtain ⟨e₀, he₀⟩ := hcomp_ne
+    have hnd₀ : ¬ e₀.IsDiag := hH.noLoops e₀ (hcomp_sub he₀)
+    obtain ⟨u₀, v₀, _, rfl⟩ := Sym2.exists_ne_of_not_isDiag hnd₀
+    have hu₀ : ∃ e ∈ comp, u₀ ∈ e := ⟨_, he₀, Sym2.mem_mk_left u₀ v₀⟩
+    have hconn := hH.connected
+    unfold IsConnectedEdgeSet at hconn
+    have ha_in := reachable_absorbed H hH comp hcomp_sub hcomp_deg
+      u₀ a hu₀ (hconn.preconnected u₀ a)
+    exact incident_edges_absorbed H hH comp hcomp_sub
+      a (vertex_in_cycle_comp_deg2 comp hcomp_deg a ha_in)
+      (Sym2.mk (a, b)) he (Sym2.mem_mk_left a b)
+
+end CycleComponentAbsorption
+
+section LeftDegreeOneBoundary
+
+theorem leftDeg1_boundary
+    (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (v : Fin n)
+    (hdeg : leftDegreeAt S H v = 1) : v ∈ boundaryVertices S := by
+  unfold boundaryVertices
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+  constructor
+  · unfold leftDegreeAt leftSubgraph vertexDegreeIn at hdeg
+    obtain ⟨e, he⟩ := Finset.card_pos.mp (by omega :
+      0 < (Finset.filter (fun e => v ∈ e) (H ∩ S.leftEdges)).card)
+    simp only [Finset.mem_filter, Finset.mem_inter] at he
+    exact ⟨e, he.1.2, he.2⟩
+  · have hsum := leftDeg_add_rightDeg_eq_two S H hH v
+    unfold rightDegreeAt rightSubgraph vertexDegreeIn at *
+    obtain ⟨e, he⟩ := Finset.card_pos.mp (by omega :
+      0 < (Finset.filter (fun e => v ∈ e) (H ∩ S.rightEdges)).card)
+    simp only [Finset.mem_filter, Finset.mem_inter] at he
+    exact ⟨e, he.1.2, he.2⟩
+
+theorem danglingEndpoints_eq_deg1
+    (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) :
+    danglingEndpoints S H =
+      Finset.univ.filter fun v : Fin n => leftDegreeAt S H v = 1 := by
+  ext v
+  simp only [danglingEndpoints, Finset.mem_filter, Finset.mem_univ, true_and]
+  unfold degreeProfile
+  exact ⟨fun ⟨_, h⟩ => h, fun h => ⟨leftDeg1_boundary S H hH v h, h⟩⟩
+
+end LeftDegreeOneBoundary
+
+section HandshakeLemma
+
+theorem non_diag_sym2_has_two_members (e : Edge n) (hnd : ¬ e.IsDiag) :
+    (Finset.univ.filter fun v : Fin n => v ∈ e).card = 2 := by
+  obtain ⟨a, b, hab, rfl⟩ := Sym2.exists_ne_of_not_isDiag hnd
+  have : Finset.univ.filter (fun v : Fin n => v ∈ Sym2.mk (a, b)) = {a, b} := by
+    ext v
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_insert,
+               Finset.mem_singleton, Sym2.mem_iff]
+  rw [this, Finset.card_pair hab]
+
+theorem insert_filter_degree (edges : Finset (Edge n)) (e : Edge n) (he : e ∉ edges)
+    (v : Fin n) :
+    vertexDegreeIn n (insert e edges) v =
+    vertexDegreeIn n edges v + if v ∈ e then 1 else 0 := by
+  unfold vertexDegreeIn
+  rw [Finset.filter_insert]
+  split
+  case isTrue hve =>
+    rw [Finset.card_insert_of_not_mem (fun hmem => he ((Finset.mem_filter.mp hmem).1))]
+  case isFalse _ => simp
+
+theorem sum_degrees_eq_twice_edges
+    (edges : Finset (Edge n))
+    (hnd : ∀ e ∈ edges, ¬ e.IsDiag) :
+    Finset.univ.sum (fun v : Fin n => vertexDegreeIn n edges v) = 2 * edges.card := by
+  induction edges using Finset.induction with
+  | empty =>
+    simp only [vertexDegreeIn, Finset.filter_empty, Finset.card_empty, Nat.mul_zero,
+               Finset.sum_const_zero]
+  | @insert e es he ih =>
+    have hnd_es : ∀ e' ∈ es, ¬ e'.IsDiag :=
+      fun e' he' => hnd e' (Finset.mem_insert_of_mem he')
+    have hnd_e : ¬ e.IsDiag := hnd e (Finset.mem_insert_self e es)
+    rw [Finset.card_insert_of_not_mem he]
+    simp_rw [insert_filter_degree es e he]
+    rw [Finset.sum_add_distrib, ih hnd_es]
+    have hite_sum : Finset.univ.sum (fun v : Fin n => if v ∈ e then 1 else 0) =
+        (Finset.univ.filter fun v : Fin n => v ∈ e).card := by
+      simp only [Finset.sum_ite, Finset.sum_const_zero, add_zero, Finset.sum_const,
+                 smul_eq_mul, mul_one]
+    rw [hite_sum, non_diag_sym2_has_two_members e hnd_e]; ring
+
+end HandshakeLemma
+
+section DegreeOneEvenness
+
+theorem degree_one_count_even [Fintype (Fin n)]
+    (edges : Finset (Edge n))
+    (hnd : ∀ e ∈ edges, ¬ e.IsDiag)
+    (hdeg_le2 : ∀ v : Fin n, vertexDegreeIn n edges v ≤ 2) :
+    ∃ k : ℕ, (Finset.univ.filter fun v : Fin n => vertexDegreeIn n edges v = 1).card = 2 * k := by
+  set D0 := Finset.univ.filter fun v : Fin n => vertexDegreeIn n edges v = 0
+  set D1 := Finset.univ.filter fun v : Fin n => vertexDegreeIn n edges v = 1
+  set D2 := Finset.univ.filter fun v : Fin n => vertexDegreeIn n edges v = 2
+  have hD01 : Disjoint D0 D1 := Finset.disjoint_filter.mpr (fun _ _ h0 h1 => by omega)
+  have hD02 : Disjoint D0 D2 := Finset.disjoint_filter.mpr (fun _ _ h0 h2 => by omega)
+  have hD12 : Disjoint D1 D2 := Finset.disjoint_filter.mpr (fun _ _ h1 h2 => by omega)
+  have hpart : Finset.univ = D0 ∪ D1 ∪ D2 := by
+    ext v; simp only [Finset.mem_union, Finset.mem_filter, Finset.mem_univ, true_and]
+    exact ⟨fun _ => by have := hdeg_le2 v; omega, fun _ => trivial⟩
+  have hsum := sum_degrees_eq_twice_edges edges hnd
+  rw [hpart] at hsum
+  rw [Finset.sum_union (Finset.disjoint_union_left.mpr ⟨hD02, hD12⟩)] at hsum
+  rw [Finset.sum_union hD01] at hsum
+  have hS0 : D0.sum (fun v => vertexDegreeIn n edges v) = 0 :=
+    Finset.sum_eq_zero (fun v hv => (Finset.mem_filter.mp hv).2)
+  have hS1 : D1.sum (fun v => vertexDegreeIn n edges v) = D1.card :=
+    Finset.sum_congr rfl (fun v hv => (Finset.mem_filter.mp hv).2)
+  have hS2 : D2.sum (fun v => vertexDegreeIn n edges v) = 2 * D2.card := by
+    rw [Finset.sum_congr rfl (fun v hv => (Finset.mem_filter.mp hv).2)]
+    simp [Finset.sum_const]; ring
+  rw [hS0, hS1, hS2] at hsum
+  exact ⟨edges.card - D2.card, by omega⟩
+
+end DegreeOneEvenness
+
+end PNeNp

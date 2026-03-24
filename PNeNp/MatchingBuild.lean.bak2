@@ -1,0 +1,173 @@
+import PNeNp.Basic
+import PNeNp.GraphInfra
+import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Fintype.Basic
+
+open Finset
+
+namespace PNeNp
+
+variable {n : ℕ}
+
+section ReachablePartner
+
+open Classical in
+noncomputable def findPartner (L : Finset (Edge n)) (v : Fin n)
+    (hv : vertexDegreeIn n L v = 1) : Fin n :=
+  if h : ∃ w : Fin n, w ≠ v ∧ vertexDegreeIn n L w = 1 ∧
+      (edgeSetToGraph n L).Reachable v w then
+    h.choose
+  else v
+
+end ReachablePartner
+
+section MatchingFromEvenSet
+
+open Classical in
+noncomputable def buildMatchingPairs
+    {α : Type*} [DecidableEq α] [Fintype α]
+    (U : Finset α) (heven : ∃ k, U.card = 2 * k)
+    (partner : α → α)
+    (hpartner_mem : ∀ u ∈ U, partner u ∈ U)
+    (hpartner_ne : ∀ u ∈ U, partner u ≠ u)
+    (hpartner_invol : ∀ u ∈ U, partner (partner u) = u) :
+    Finset (α × α) :=
+  (U.product U).filter fun p =>
+    p.1 ≠ p.2 ∧ (partner p.1 = p.2 ∨ partner p.2 = p.1) ∧
+    p.1 < p.2
+
+end MatchingFromEvenSet
+
+section PerfectMatchingFromPartner
+
+open Classical in
+noncomputable def perfectMatchingFromInvolution
+    {α : Type*} [DecidableEq α] [Fintype α] [LinearOrder α]
+    (U : Finset α)
+    (partner : α → α)
+    (hpartner_mem : ∀ u ∈ U, partner u ∈ U)
+    (hpartner_ne : ∀ u ∈ U, partner u ≠ u)
+    (hpartner_invol : ∀ u ∈ U, partner (partner u) = u) :
+    PerfectMatching U where
+  pairs := (U.filter fun u => u < partner u).image fun u => (u, partner u)
+  fst_mem := by
+    intro ⟨a, b⟩ hmem
+    simp only [Finset.mem_image, Finset.mem_filter] at hmem
+    obtain ⟨u, ⟨hu, _⟩, rfl, rfl⟩ := hmem
+    exact hu
+  snd_mem := by
+    intro ⟨a, b⟩ hmem
+    simp only [Finset.mem_image, Finset.mem_filter] at hmem
+    obtain ⟨u, ⟨hu, _⟩, _, rfl⟩ := hmem
+    exact hpartner_mem u hu
+  ne_pair := by
+    intro ⟨a, b⟩ hmem
+    simp only [Finset.mem_image, Finset.mem_filter] at hmem
+    obtain ⟨u, ⟨_, hlt⟩, rfl, rfl⟩ := hmem
+    exact ne_of_lt hlt
+  covers := by
+    intro u hu
+    simp only [Finset.mem_image, Finset.mem_filter, Prod.exists]
+    by_cases hlt : u < partner u
+    · exact ⟨(u, partner u), ⟨u, ⟨hu, hlt⟩, rfl⟩, Or.inl rfl⟩
+    · have hgt : partner u < u := by
+        have hne := hpartner_ne u hu
+        exact lt_of_le_of_ne (le_of_not_lt hlt) (Ne.symm hne)
+      have hpu_mem := hpartner_mem u hu
+      have hinvol := hpartner_invol u hu
+      exact ⟨(partner u, u),
+        ⟨partner u, ⟨hpu_mem, by rw [hinvol]; exact hgt⟩, rfl⟩,
+        Or.inr (by rw [hinvol])⟩
+  unique := by
+    intro u hu p₁ hp₁ p₂ hp₂ h1 h2
+    simp only [Finset.mem_image, Finset.mem_filter, Prod.exists] at hp₁ hp₂
+    obtain ⟨v₁, ⟨hv₁_mem, hv₁_lt⟩, rfl, rfl⟩ := hp₁
+    obtain ⟨v₂, ⟨hv₂_mem, hv₂_lt⟩, rfl, rfl⟩ := hp₂
+    rcases h1 with rfl | h1 <;> rcases h2 with rfl | h2
+    · rfl
+    · have : partner v₂ = v₁ := h2
+      rw [← this, hpartner_invol v₂ hv₂_mem] at hv₁_lt
+      exact absurd hv₁_lt (not_lt.mpr (le_of_lt hv₂_lt))
+    · have : partner v₁ = v₂ := h1
+      rw [← this, hpartner_invol v₁ hv₁_mem] at hv₂_lt
+      exact absurd hv₂_lt (not_lt.mpr (le_of_lt hv₁_lt))
+    · have h1' : u = partner v₁ := h1
+      have h2' : u = partner v₂ := h2
+      rw [h1'] at h2'
+      have := hpartner_invol v₁ hv₁_mem
+      have := hpartner_invol v₂ hv₂_mem
+      have : v₁ = v₂ := by
+        rw [← hpartner_invol v₁ hv₁_mem, ← hpartner_invol v₂ hv₂_mem, h2']
+      subst this; rfl
+  card_eq := by
+    set F := U.filter fun u => u < partner u
+    set G := U.filter fun u => partner u < u
+    have hpairs_card : (F.image fun u => (u, partner u)).card = F.card := by
+      apply Finset.card_image_of_injective
+      intro a b hab
+      exact (Prod.mk.inj hab).1
+    rw [hpairs_card]
+    have hFG_disjoint : Disjoint F G := by
+      rw [Finset.disjoint_filter]
+      intro u _ hlt hgt; omega
+    have hFG_union : F ∪ G = U := by
+      ext u
+      simp only [Finset.mem_union, Finset.mem_filter, F, G]
+      constructor
+      · rintro (⟨hu, _⟩ | ⟨hu, _⟩) <;> exact hu
+      · intro hu
+        have hne := hpartner_ne u hu
+        by_cases hlt : u < partner u
+        · exact Or.inl ⟨hu, hlt⟩
+        · exact Or.inr ⟨hu, lt_of_le_of_ne (le_of_not_lt hlt) (Ne.symm hne)⟩
+    have hFG_card : F.card + G.card = U.card := by
+      rw [← Finset.card_union_of_disjoint hFG_disjoint, hFG_union]
+    have hbij : F.card = G.card := by
+      have hmap : ∀ u ∈ F, partner u ∈ G := by
+        intro u hu
+        simp only [Finset.mem_filter, F, G] at hu ⊢
+        refine ⟨hpartner_mem u hu.1, ?_⟩
+        rw [hpartner_invol u hu.1]
+        exact hu.2
+      have hmap_inj : ∀ a ∈ F, ∀ b ∈ F, partner a = partner b → a = b := by
+        intro a ha b hb hab
+        have := hpartner_invol a ((Finset.mem_filter.mp ha).1)
+        have := hpartner_invol b ((Finset.mem_filter.mp hb).1)
+        rw [← hpartner_invol a ((Finset.mem_filter.mp ha).1),
+            ← hpartner_invol b ((Finset.mem_filter.mp hb).1), hab]
+      have himage_sub : F.image partner ⊆ G := by
+        intro v hv
+        simp only [Finset.mem_image] at hv
+        obtain ⟨u, hu, rfl⟩ := hv
+        exact hmap u hu
+      have himage_card : (F.image partner).card = F.card :=
+        Finset.card_image_of_injective _ hmap_inj
+      have hle : F.card ≤ G.card := by
+        calc F.card = (F.image partner).card := himage_card.symm
+          _ ≤ G.card := Finset.card_le_card himage_sub
+      have hmap_rev : ∀ u ∈ G, partner u ∈ F := by
+        intro u hu
+        simp only [Finset.mem_filter, F, G] at hu ⊢
+        refine ⟨hpartner_mem u hu.1, ?_⟩
+        rw [hpartner_invol u hu.1]
+        exact hu.2
+      have himage_sub_rev : G.image partner ⊆ F := by
+        intro v hv
+        simp only [Finset.mem_image] at hv
+        obtain ⟨u, hu, rfl⟩ := hv
+        exact hmap_rev u hu
+      have hmap_inj_rev : ∀ a ∈ G, ∀ b ∈ G, partner a = partner b → a = b := by
+        intro a ha b hb hab
+        rw [← hpartner_invol a ((Finset.mem_filter.mp ha).1),
+            ← hpartner_invol b ((Finset.mem_filter.mp hb).1), hab]
+      have himage_card_rev : (G.image partner).card = G.card :=
+        Finset.card_image_of_injective _ hmap_inj_rev
+      have hge : G.card ≤ F.card := by
+        calc G.card = (G.image partner).card := himage_card_rev.symm
+          _ ≤ F.card := Finset.card_le_card himage_sub_rev
+      omega
+    omega
+
+end PerfectMatchingFromPartner
+
+end PNeNp

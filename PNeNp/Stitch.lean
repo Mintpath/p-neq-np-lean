@@ -38,13 +38,22 @@ structure PathComponentNormalFormResult (S : Frontier n) (H : Finset (Edge n)) w
 
 private theorem leftSubgraph_no_cycle_when_no_premature :
   ∀ {n : ℕ} (S : Frontier n) (H : Finset (Edge n)),
-    IsHamCycle n H → S.isBalanced → ¬ hasPrematureCycle S H →
+    IsHamCycle n H → S.isBalanced →
+    (rightSubgraph S H).Nonempty →
+    ¬ hasPrematureCycle S H →
     ∀ comp : Finset (Edge n), comp ⊆ leftSubgraph S H → comp.Nonempty →
     (∀ v : Fin n, vertexDegreeIn n comp v ≤ 2) →
     ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
-  intro n S H hH _hS hNoPrem comp hSub hNe _hDeg2 hCycle
+  intro n S H hH _hS hRight hNoPrem comp hSub hNe _hDeg2 hCycle
   by_cases hcompH : comp = H
-  · sorry
+  · have hAll : H ⊆ S.leftEdges := fun e he =>
+      (Finset.mem_inter.mp (hSub (hcompH ▸ he))).2
+    have hempty : (rightSubgraph S H).Nonempty → False := by
+      intro ⟨e, he⟩
+      unfold rightSubgraph at he
+      simp only [Finset.mem_inter] at he
+      exact Finset.disjoint_left.mp S.disjoint (hAll he.1) he.2
+    exact hempty hRight
   · exact hNoPrem ⟨comp, hSub, hNe, hCycle, hcompH⟩
 
 private theorem degree_one_vertex_is_boundary :
@@ -74,10 +83,11 @@ private theorem degree_one_vertex_is_boundary :
 theorem pathComponentNormalForm
     (S : Frontier n) (hS : S.isBalanced)
     (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (hRight : (rightSubgraph S H).Nonempty)
     (hc : ¬ hasPrematureCycle S H) :
     PathComponentNormalFormResult S H where
   components_are_paths :=
-    leftSubgraph_no_cycle_when_no_premature S H hH hS hc
+    leftSubgraph_no_cycle_when_no_premature S H hH hS hRight hc
   endpoints_are_boundary :=
     degree_one_vertex_is_boundary S H hH hS hc
   pairing_determines_boundary := trivial

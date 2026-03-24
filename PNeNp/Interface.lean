@@ -470,16 +470,31 @@ private theorem danglingEndpoints_card_even_general
     omega
   exact ⟨K - D2.card, by omega⟩
 
+def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n))
+    (M : PerfectMatching (danglingEndpoints S H)) : Prop :=
+  ∀ p ∈ M.pairs,
+    (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2
+
+private theorem exists_structural_pathPairing
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    ∃ M : PerfectMatching (danglingEndpoints S H),
+      PathPairingReflectsComponents n S H M := by
+  sorry
+
+open Classical in
 noncomputable def pathPairingAux :
   ∀ (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H),
     PerfectMatching (danglingEndpoints S H) := fun n S H hH =>
-  trivialMatchingOnEvenSet (danglingEndpoints S H)
-    (danglingEndpoints_card_even_general n S H hH).choose
-    (danglingEndpoints_card_even_general n S H hH).choose_spec
+  (exists_structural_pathPairing n S H hH).choose
 
 noncomputable def pathPairing (S : Frontier n) (H : Finset (Edge n))
     (hH : IsHamCycle n H) : PerfectMatching (danglingEndpoints S H) :=
   pathPairingAux n S H hH
+
+theorem pathPairing_reflects_components
+    (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    PathPairingReflectsComponents n S H (pathPairing S H hH) :=
+  (exists_structural_pathPairing n S H hH).choose_spec
 
 end PathPairing
 
@@ -530,16 +545,31 @@ private theorem rightDanglingEndpoints_card_even_general
   obtain ⟨k, hk⟩ := danglingEndpoints_card_even_general n S H hH
   exact ⟨k, heq ▸ hk⟩
 
+def RightPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n))
+    (M : PerfectMatching (rightDanglingEndpoints S H)) : Prop :=
+  ∀ p ∈ M.pairs,
+    (edgeSetToGraph n (rightSubgraph S H)).Reachable p.1 p.2
+
+private theorem exists_structural_rightPairing
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    ∃ M : PerfectMatching (rightDanglingEndpoints S H),
+      RightPairingReflectsComponents n S H M := by
+  sorry
+
+open Classical in
 noncomputable def rightPairingAux :
   ∀ (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H),
     PerfectMatching (rightDanglingEndpoints S H) := fun n S H hH =>
-  trivialMatchingOnEvenSet (rightDanglingEndpoints S H)
-    (rightDanglingEndpoints_card_even_general n S H hH).choose
-    (rightDanglingEndpoints_card_even_general n S H hH).choose_spec
+  (exists_structural_rightPairing n S H hH).choose
 
 noncomputable def rightPairing (S : Frontier n) (H : Finset (Edge n))
     (hH : IsHamCycle n H) : PerfectMatching (rightDanglingEndpoints S H) :=
   rightPairingAux n S H hH
+
+theorem rightPairing_reflects_components
+    (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    RightPairingReflectsComponents n S H (rightPairing S H hH) :=
+  (exists_structural_rightPairing n S H hH).choose_spec
 
 theorem danglingEndpoints_eq_rightDanglingEndpoints
     (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
@@ -683,23 +713,6 @@ theorem mixed_degree_eq (S : Frontier n) (H H' : Finset (Edge n))
     exact this.symm
   rw [hd_eq]
   exact leftDeg_add_rightDeg_eq_two S H hH v
-
-theorem IsConnectedEdgeSet_of_boundary_connected :
-  ∀ (n : ℕ) (M : Finset (Edge n)),
-    (∀ v : Fin n, vertexDegreeIn n M v = 2) →
-    (∀ v : Fin n, ∃ e ∈ M, v ∈ e) →
-    IsConnectedEdgeSet n M →
-    IsHamCycle n M := by
-  intro n M h2reg hspan hconn
-  exact {
-    twoRegular := h2reg
-    connected := hconn
-    noLoops := by
-      intro e he hdiag
-      sorry
-
-    spanning := hspan
-  }
 
 /-! ### Stitchability connectivity: Theorem 4.3 core
 

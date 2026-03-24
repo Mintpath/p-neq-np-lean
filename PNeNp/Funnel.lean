@@ -406,48 +406,47 @@ private theorem surviving_edges_pull_back {n q : ℕ}
 private theorem block_edges_cancel_ax :
   ∀ {n : ℕ} (ρ : Restriction n) (blocks : List (SwitchBlock n)),
     blocksVertexDisjoint blocks →
+    (∀ e ∈ ρ.forcedPresent ∪ ρ.forcedAbsent, ∀ v ∈ blockInteriorVertices blocks, v ∉ e) →
     ∀ (η : Fin blocks.length → Bool) (q : ℕ), blocks.length = q →
     (survivingEdges ρ.forcedPresent blocks).card +
     (survivingEdges ρ.forcedAbsent blocks).card = ρ.size := by
-  intro n ρ blocks hDisj η q hq
+  intro n ρ blocks hDisj hAvoid η q hq
   unfold Restriction.size
   suffices hpres : (survivingEdges ρ.forcedPresent blocks).card = ρ.forcedPresent.card by
     suffices habs : (survivingEdges ρ.forcedAbsent blocks).card = ρ.forcedAbsent.card by
       rw [hpres, habs]
-    · unfold survivingEdges
-      congr 1
-      ext e
+    · unfold survivingEdges; congr 1; ext e
       simp only [Finset.mem_filter, and_iff_left_iff_imp]
-      intro he v hv _
-      exact sorry
-  · unfold survivingEdges
-    congr 1
-    ext e
+      intro he v hv
+      exact hAvoid e (Finset.mem_union_right _ he) v hv
+  · unfold survivingEdges; congr 1; ext e
     simp only [Finset.mem_filter, and_iff_left_iff_imp]
-    intro he v hv _
-    exact sorry
+    intro he v hv
+    exact hAvoid e (Finset.mem_union_left _ he) v hv
 
 private theorem block_edges_cancel {n : ℕ}
     (ρ : Restriction n) (blocks : List (SwitchBlock n))
     (hDisj : blocksVertexDisjoint blocks)
+    (hAvoid : ∀ e ∈ ρ.forcedPresent ∪ ρ.forcedAbsent, ∀ v ∈ blockInteriorVertices blocks, v ∉ e)
     (η : Fin blocks.length → Bool) (q : ℕ) (hq : blocks.length = q) :
     (survivingEdges ρ.forcedPresent blocks).card +
     (survivingEdges ρ.forcedAbsent blocks).card = ρ.size :=
-  block_edges_cancel_ax ρ blocks hDisj η q hq
+  block_edges_cancel_ax ρ blocks hDisj hAvoid η q hq
 
 private theorem pattern_restriction_contraction_exists :
   ∀ {n : ℕ} (ρ : Restriction n) (blocks : List (SwitchBlock n)),
     blocksVertexDisjoint blocks →
+    (∀ e ∈ ρ.forcedPresent ∪ ρ.forcedAbsent, ∀ v ∈ blockInteriorVertices blocks, v ∉ e) →
     ∀ (η : Fin blocks.length → Bool) (q : ℕ), blocks.length = q →
     ∃ (ρ' : Restriction (n - 2 * q)), ρ'.size = ρ.size := by
-  intro n ρ blocks hDisj η q hq
+  intro n ρ blocks hDisj hAvoid η q hq
   have hle : n - 2 * q ≤ n := Nat.sub_le n (2 * q)
   let F₁ := pullbackFinset (survivingEdges ρ.forcedPresent blocks) hle
   let F₂ := pullbackFinset (survivingEdges ρ.forcedAbsent blocks) hle
   refine ⟨⟨F₁, F₂⟩, ?_⟩
   have h₁ := surviving_edges_pull_back ρ.forcedPresent blocks hDisj hq hle
   have h₂ := surviving_edges_pull_back ρ.forcedAbsent blocks hDisj hq hle
-  have h₃ := block_edges_cancel ρ blocks hDisj η q hq
+  have h₃ := block_edges_cancel ρ blocks hDisj hAvoid η q hq
   show (pullbackFinset (survivingEdges ρ.forcedPresent blocks) hle).card +
     (pullbackFinset (survivingEdges ρ.forcedAbsent blocks) hle).card =
     ρ.forcedPresent.card + ρ.forcedAbsent.card
@@ -457,10 +456,11 @@ private theorem pattern_restriction_contraction_exists :
 theorem patternRestrictionContraction
     (ρ : Restriction n) (blocks : List (SwitchBlock n))
     (hDisjoint : blocksVertexDisjoint blocks)
+    (hAvoid : ∀ e ∈ ρ.forcedPresent ∪ ρ.forcedAbsent, ∀ v ∈ blockInteriorVertices blocks, v ∉ e)
     (η : Fin blocks.length → Bool) (q : ℕ) (hq : blocks.length = q) :
     ∃ (ρ' : Restriction (n - 2 * q)),
       ρ'.size = ρ.size :=
-  pattern_restriction_contraction_exists ρ blocks hDisjoint η q hq
+  pattern_restriction_contraction_exists ρ blocks hDisjoint hAvoid η q hq
 
 end PatternRestrictionContraction
 

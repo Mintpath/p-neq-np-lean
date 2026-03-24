@@ -101,6 +101,23 @@ end TwoOptRerouting
 
 section DegreeChangeCriterion
 
+private lemma leftSubgraph_applyTwoOpt_eq
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (e : TwoOptMove n)
+    (hmono : toggleSetMonochromatic S e)
+    (hab_in : Sym2.mk (e.a, e.b) ∈ H) (hcd_in : Sym2.mk (e.c, e.d) ∈ H) :
+    ∀ v : Fin n,
+    ((applyTwoOpt H e) ∩ S.leftEdges).filter (fun edge => v ∈ edge) =
+    (H ∩ S.leftEdges).filter (fun edge => v ∈ edge) := by
+  sorry
+
+private lemma not_monochromatic_degree_changes
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (e : TwoOptMove n)
+    (hab_in : Sym2.mk (e.a, e.b) ∈ H) (hcd_in : Sym2.mk (e.c, e.d) ∈ H)
+    (hnm : ¬ toggleSetMonochromatic S e) :
+    degreeProfile S (applyTwoOpt H e) ≠ degreeProfile S H := by
+  sorry
+
 private theorem degree_change_iff_monochromatic_ax :
   ∀ {n : ℕ} (S : Frontier n) (H : Finset (Edge n)),
     IsHamCycle n H →
@@ -109,14 +126,15 @@ private theorem degree_change_iff_monochromatic_ax :
     (degreeProfile S (applyTwoOpt H e) = degreeProfile S H ↔
      toggleSetMonochromatic S e) := by
   intro n S H hH e hab_in hcd_in
-  have hdist := e.all_distinct
   constructor
   · intro heq
-    sorry
+    by_contra hnm
+    exact not_monochromatic_degree_changes S H hH e hab_in hcd_in hnm heq
   · intro hmono
     funext v
-    unfold degreeProfile leftDegreeAt leftSubgraph vertexDegreeIn applyTwoOpt
-    sorry
+    unfold degreeProfile leftDegreeAt vertexDegreeIn leftSubgraph
+    congr 1
+    exact leftSubgraph_applyTwoOpt_eq S H e hmono hab_in hcd_in v
 
 private theorem degree_change_iff_monochromatic_proof
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n))

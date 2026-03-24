@@ -475,12 +475,20 @@ def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n
   ∀ p ∈ M.pairs,
     (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2
 
+private lemma deg1_unique_partner
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : Fin n) (hu : u ∈ danglingEndpoints S H) :
+    ∃! v, v ∈ danglingEndpoints S H ∧ v ≠ u ∧
+      (edgeSetToGraph n (leftSubgraph S H)).Reachable u v := by
+  sorry
+
 private lemma deg1_vertex_reachable_to_other_deg1
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
     (u : Fin n) (hu : u ∈ danglingEndpoints S H) :
     ∃ v ∈ danglingEndpoints S H, v ≠ u ∧
       (edgeSetToGraph n (leftSubgraph S H)).Reachable u v := by
-  sorry
+  obtain ⟨v, ⟨hv, hne, hreach⟩, _⟩ := deg1_unique_partner n S H hH u hu
+  exact ⟨v, hv, hne, hreach⟩
 
 private lemma deg1_components_pair_into_matching
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :

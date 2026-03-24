@@ -475,11 +475,26 @@ def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n
   ∀ p ∈ M.pairs,
     (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2
 
+private lemma deg1_vertex_reachable_to_other_deg1
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : Fin n) (hu : u ∈ danglingEndpoints S H) :
+    ∃ v ∈ danglingEndpoints S H, v ≠ u ∧
+      (edgeSetToGraph n (leftSubgraph S H)).Reachable u v := by
+  sorry
+
+private lemma deg1_components_pair_into_matching
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    ∃ M : PerfectMatching (danglingEndpoints S H),
+      ∀ p ∈ M.pairs,
+        (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2 := by
+  sorry
+
 private theorem exists_structural_pathPairing
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
     ∃ M : PerfectMatching (danglingEndpoints S H),
       PathPairingReflectsComponents n S H M := by
-  sorry
+  obtain ⟨M, hM⟩ := deg1_components_pair_into_matching n S H hH
+  exact ⟨M, hM⟩
 
 open Classical in
 noncomputable def pathPairingAux :
@@ -550,11 +565,26 @@ def RightPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge 
   ∀ p ∈ M.pairs,
     (edgeSetToGraph n (rightSubgraph S H)).Reachable p.1 p.2
 
+private lemma right_deg1_vertex_reachable_to_other_deg1
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : Fin n) (hu : u ∈ rightDanglingEndpoints S H) :
+    ∃ v ∈ rightDanglingEndpoints S H, v ≠ u ∧
+      (edgeSetToGraph n (rightSubgraph S H)).Reachable u v := by
+  sorry
+
+private lemma right_deg1_components_pair_into_matching
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    ∃ M : PerfectMatching (rightDanglingEndpoints S H),
+      ∀ p ∈ M.pairs,
+        (edgeSetToGraph n (rightSubgraph S H)).Reachable p.1 p.2 := by
+  sorry
+
 private theorem exists_structural_rightPairing
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
     ∃ M : PerfectMatching (rightDanglingEndpoints S H),
       RightPairingReflectsComponents n S H M := by
-  sorry
+  obtain ⟨M, hM⟩ := right_deg1_components_pair_into_matching n S H hH
+  exact ⟨M, hM⟩
 
 open Classical in
 noncomputable def rightPairingAux :

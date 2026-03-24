@@ -112,17 +112,20 @@ structure BoundaryMultigraph (n : ℕ) where
   lEdges : Finset (Fin n × Fin n)
   rEdges : Finset (Fin n × Fin n)
 
+open Classical in
 noncomputable def boundaryMultigraphOf (S : Frontier n)
     (L R : Finset (Edge n)) : BoundaryMultigraph n :=
   { vertices := boundaryVertices S
     lEdges := Finset.univ.filter fun p =>
       p.1 ∈ boundaryVertices S ∧ p.2 ∈ boundaryVertices S ∧
       p.1 ≠ p.2 ∧
-      ∃ _e ∈ L, p.1 ∈ _e ∧ p.2 ∈ _e
+      vertexDegreeIn n L p.1 = 1 ∧ vertexDegreeIn n L p.2 = 1 ∧
+      (edgeSetToGraph n L).Reachable p.1 p.2
     rEdges := Finset.univ.filter fun p =>
       p.1 ∈ boundaryVertices S ∧ p.2 ∈ boundaryVertices S ∧
       p.1 ≠ p.2 ∧
-      ∃ _e ∈ R, p.1 ∈ _e ∧ p.2 ∈ _e }
+      vertexDegreeIn n R p.1 = 1 ∧ vertexDegreeIn n R p.2 = 1 ∧
+      (edgeSetToGraph n R).Reachable p.1 p.2 }
 
 noncomputable def bmgToGraph {n : ℕ} (G : BoundaryMultigraph n) : SimpleGraph (Fin n) where
   Adj u v :=
@@ -257,10 +260,10 @@ private theorem matching_pairings_give_same_boundary_left_edges :
   ext p
   simp only [Finset.mem_filter, Finset.mem_univ, true_and]
   constructor
-  · rintro ⟨hp1, hp2, hne, e, he, hv1, hv2⟩
-    exact ⟨hp1, hp2, hne, sorry⟩
-  · rintro ⟨hp1, hp2, hne, e, he, hv1, hv2⟩
-    exact ⟨hp1, hp2, hne, sorry⟩
+  · rintro ⟨hp1, hp2, hne, hdeg1, hdeg2, hreach⟩
+    exact ⟨hp1, hp2, hne, sorry, sorry, sorry⟩
+  · rintro ⟨hp1, hp2, hne, hdeg1, hdeg2, hreach⟩
+    exact ⟨hp1, hp2, hne, sorry, sorry, sorry⟩
 
 theorem sameStateStitch_boundaryGraphEq
     (S : Frontier n) (hS : S.isBalanced)

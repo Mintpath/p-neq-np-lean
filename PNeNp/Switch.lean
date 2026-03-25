@@ -457,44 +457,129 @@ private theorem mixed_deg2_iff_left_deg_eq
   have := leftDeg_add_rightDeg_eq_two S H₁ hH₁ v
   unfold leftDegreeAt rightDegreeAt leftSubgraph rightSubgraph vertexDegreeIn at *; omega
 
-private theorem swapped_toggle_forces_same_side_ax :
-  ∀ {n : ℕ} (S : Frontier n) (H₀ H₁ : Finset (Edge n)),
-    IsHamCycle n H₀ → IsHamCycle n H₁ →
-    ∀ (v : Fin n) (e₀ e₁ : Edge n),
-    e₀ ∈ H₀ → e₀ ∉ H₁ → e₁ ∈ H₁ → e₁ ∉ H₀ →
-    v ∈ e₀ → v ∈ e₁ →
-    leftDegreeAt S H₁ v = leftDegreeAt S H₀ v →
+private lemma degree_two_filter_eq_pair {n : ℕ} (H : Finset (Edge n)) (v : Fin n)
+    (e f : Edge n) (he : e ∈ H) (hf : f ∈ H) (hve : v ∈ e) (hvf : v ∈ f)
+    (hef : e ≠ f) (hdeg : vertexDegreeIn n H v = 2) :
+    H.filter (fun g => v ∈ g) = {e, f} := by
+  have hpair : {e, f} ⊆ H.filter (fun g => v ∈ g) := by
+    intro g hg; simp only [mem_insert, mem_singleton] at hg
+    simp only [mem_filter]; rcases hg with rfl | rfl <;> exact ⟨‹_›, ‹_›⟩
+  have hcard_pair : ({e, f} : Finset (Edge n)).card = 2 := Finset.card_pair hef
+  unfold vertexDegreeIn at hdeg
+  exact Finset.eq_of_subset_of_card_le hpair (by omega) |>.symm
+
+private lemma shared_edge_same_side {n : ℕ} (S : Frontier n) (H₀ H₁ : Finset (Edge n))
+    (hH₀ : IsHamCycle n H₀) (hH₁ : IsHamCycle n H₁)
+    (v : Fin n) (e₀ e₁ f : Edge n)
+    (he₀_H₀ : e₀ ∈ H₀) (he₁_H₁ : e₁ ∈ H₁)
+    (hf_H₀ : f ∈ H₀) (hf_H₁ : f ∈ H₁)
+    (hve₀ : v ∈ e₀) (hve₁ : v ∈ e₁) (hvf : v ∈ f)
+    (he₀f : e₀ ≠ f) (he₁f : e₁ ≠ f)
+    (hleq : leftDegreeAt S H₁ v = leftDegreeAt S H₀ v) :
     (e₀ ∈ S.leftEdges ↔ e₁ ∈ S.leftEdges) := by
-  intro n S H₀ H₁ hH₀ hH₁ v e₀ e₁ he₀_in he₀_nin he₁_in he₁_nin hv₀ hv₁ hleq
   have hdeg₀ := hH₀.twoRegular v
   have hdeg₁ := hH₁.twoRegular v
-  have hlr₀ := leftDeg_add_rightDeg_eq_two S H₀ hH₀ v
-  have hlr₁ := leftDeg_add_rightDeg_eq_two S H₁ hH₁ v
-  have hreq : rightDegreeAt S H₁ v = rightDegreeAt S H₀ v := by omega
-  suffices h : (e₀ ∈ S.leftEdges ∧ e₁ ∈ S.leftEdges) ∨
-               (e₀ ∉ S.leftEdges ∧ e₁ ∉ S.leftEdges) by
-    rcases h with ⟨h1, h2⟩ | ⟨h1, h2⟩
-    · exact ⟨fun _ => h2, fun _ => h1⟩
-    · exact ⟨fun h => absurd h h1, fun h => absurd h h2⟩
-  sorry
+  have hfilt₀ := degree_two_filter_eq_pair H₀ v e₀ f he₀_H₀ hf_H₀ hve₀ hvf he₀f hdeg₀
+  have hfilt₁ := degree_two_filter_eq_pair H₁ v e₁ f he₁_H₁ hf_H₁ hve₁ hvf he₁f hdeg₁
+  unfold leftDegreeAt leftSubgraph vertexDegreeIn at hleq
+  have hrew₀ : Finset.filter (fun e => v ∈ e) (H₀ ∩ S.leftEdges) =
+      {e₀, f} ∩ S.leftEdges := by
+    ext g; simp only [mem_filter, mem_inter]
+    constructor
+    · intro ⟨⟨hgH, hgL⟩, hgv⟩
+      have : g ∈ H₀.filter (fun e => v ∈ e) := mem_filter.mpr ⟨hgH, hgv⟩
+      rw [hfilt₀] at this; exact ⟨this, hgL⟩
+    · intro ⟨hg_pair, hgL⟩
+      simp only [mem_insert, mem_singleton] at hg_pair
+      rcases hg_pair with rfl | rfl
+      · exact ⟨⟨he₀_H₀, hgL⟩, hve₀⟩
+      · exact ⟨⟨hf_H₀, hgL⟩, hvf⟩
+  have hrew₁ : Finset.filter (fun e => v ∈ e) (H₁ ∩ S.leftEdges) =
+      {e₁, f} ∩ S.leftEdges := by
+    ext g; simp only [mem_filter, mem_inter]
+    constructor
+    · intro ⟨⟨hgH, hgL⟩, hgv⟩
+      have : g ∈ H₁.filter (fun e => v ∈ e) := mem_filter.mpr ⟨hgH, hgv⟩
+      rw [hfilt₁] at this; exact ⟨this, hgL⟩
+    · intro ⟨hg_pair, hgL⟩
+      simp only [mem_insert, mem_singleton] at hg_pair
+      rcases hg_pair with rfl | rfl
+      · exact ⟨⟨he₁_H₁, hgL⟩, hve₁⟩
+      · exact ⟨⟨hf_H₁, hgL⟩, hvf⟩
+  rw [hrew₀, hrew₁] at hleq
+  by_cases hfL : f ∈ S.leftEdges
+  · simp only [Finset.inter_insert, Finset.inter_singleton, if_pos hfL] at hleq
+    split_ifs at hleq with h0 h1 <;> simp_all
+  · simp only [Finset.inter_insert, Finset.inter_singleton, if_neg hfL] at hleq
+    split_ifs at hleq with h0 h1 <;> simp_all
 
-private theorem toggle_iffs_force_monochromatic
-    {n : ℕ} (S : Frontier n) (W : SwitchBlock n)
-    (h1 : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.b) ∈ S.leftEdges)
-    (h2 : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.a, W.q) ∈ S.leftEdges)
-    (h3 : Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.b, W.q) ∈ S.leftEdges) :
-    ∀ e ∈ W.toggleEdges, edgeSide S e = edgeSide S (Sym2.mk (W.p, W.a)) := by
-  intro e he
-  unfold SwitchBlock.toggleEdges at he
-  simp only [Finset.mem_insert, Finset.mem_singleton] at he
-  unfold edgeSide
-  rcases he with rfl | rfl | rfl | rfl
-  · rfl
-  · split <;> split <;> simp_all
-  · split <;> split <;> simp_all
-  · split <;> split <;> simp_all
+private lemma mixed_graph_mem_iff {n : ℕ} (S : Frontier n) (H₀ H₁ : Finset (Edge n))
+    (e : Edge n) :
+    e ∈ mixedGraph S H₀ H₁ ↔ (e ∈ H₁ ∧ e ∈ S.leftEdges) ∨ (e ∈ H₀ ∧ e ∈ S.rightEdges) := by
+  unfold mixedGraph leftSubgraph rightSubgraph
+  simp only [mem_union, mem_inter]
 
-private theorem cross_pattern_degree_mismatch_at_block
+private lemma edge_left_or_right {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (e : Edge n) (he : e ∈ H) :
+    e ∈ S.leftEdges ∨ e ∈ S.rightEdges := by
+  have hnoloop := hH.noLoops e he
+  have hedge : e ∈ allEdges n := by
+    simp only [allEdges, mem_filter, mem_univ, true_and]; exact hnoloop
+  have := S.partition ▸ hedge
+  exact mem_union.mp this
+
+private lemma not_left_iff_right {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (e : Edge n) (he : e ∈ H) :
+    e ∉ S.leftEdges ↔ e ∈ S.rightEdges := by
+  constructor
+  · intro hnl; exact (edge_left_or_right S H hH e he).resolve_left hnl
+  · intro hr hl; exact Finset.disjoint_left.mp S.disjoint hl hr
+
+private lemma endpoint_of_sym2 {n : ℕ} (v w x y : Fin n)
+    (h : Sym2.mk (v, w) = Sym2.mk (x, y)) :
+    (v = x ∧ w = y) ∨ (v = y ∧ w = x) := by
+  have := Sym2.eq_iff.mp h; tauto
+
+private lemma sym2_ne_of_endpoints {n : ℕ} (a b c d : Fin n)
+    (h1 : a ≠ c) (h2 : a ≠ d ∨ b ≠ c) :
+    Sym2.mk (a, b) ≠ Sym2.mk (c, d) := by
+  intro heq; have := Sym2.eq_iff.mp heq; tauto
+
+private lemma triangle_closed {n : ℕ}
+    (M : Finset (Edge n)) (x y z : Fin n)
+    (_hxy : x ≠ y) (_hxz : x ≠ z) (_hyz : y ≠ z)
+    (hfilt_x : M.filter (fun g => x ∈ g) = {Sym2.mk (x, y), Sym2.mk (x, z)})
+    (hfilt_y : M.filter (fun g => y ∈ g) = {Sym2.mk (x, y), Sym2.mk (y, z)})
+    (hfilt_z : M.filter (fun g => z ∈ g) = {Sym2.mk (x, z), Sym2.mk (y, z)}) :
+    ∀ w : Fin n, (edgeSetToGraph n M).Reachable x w →
+    w = x ∨ w = y ∨ w = z := by
+  have hstep : ∀ (u w : Fin n), (u = x ∨ u = y ∨ u = z) →
+      (edgeSetToGraph n M).Adj u w → (w = x ∨ w = y ∨ w = z) := by
+    intro u w hu hadj
+    have hmem : Sym2.mk (u, w) ∈ M := hadj.2
+    have hmem_filt : Sym2.mk (u, w) ∈ M.filter (fun g => u ∈ g) :=
+      mem_filter.mpr ⟨hmem, by simp [Sym2.mem_iff]⟩
+    rcases hu with rfl | rfl | rfl
+    · rw [hfilt_x] at hmem_filt
+      simp only [mem_insert, mem_singleton] at hmem_filt
+      rcases hmem_filt with h | h <;> (have := Sym2.eq_iff.mp h; tauto)
+    · rw [hfilt_y] at hmem_filt
+      simp only [mem_insert, mem_singleton] at hmem_filt
+      rcases hmem_filt with h | h <;> (have := Sym2.eq_iff.mp h; tauto)
+    · rw [hfilt_z] at hmem_filt
+      simp only [mem_insert, mem_singleton] at hmem_filt
+      rcases hmem_filt with h | h <;> (have := Sym2.eq_iff.mp h; tauto)
+  suffices h : ∀ (u w : Fin n), (u = x ∨ u = y ∨ u = z) →
+      (edgeSetToGraph n M).Reachable u w → (w = x ∨ w = y ∨ w = z) by
+    intro w hr; exact h x w (Or.inl rfl) hr
+  intro u w hu hreach
+  obtain ⟨walk⟩ := hreach
+  induction walk with
+  | nil => exact hu
+  | @cons a b c hadj _walk ih => exact ih (hstep a b hu hadj)
+
+set_option maxHeartbeats 1600000 in
+private theorem cross_pattern_not_hamcycle
     {n : ℕ} (S : Frontier n) (ρ : Restriction n) (blocks : List (SwitchBlock n))
     (_hD : blocksVertexDisjoint blocks)
     (hV : ∀ i : Fin blocks.length, blocks[i].isDegreeVisible S)
@@ -503,7 +588,7 @@ private theorem cross_pattern_degree_mismatch_at_block
     (H₀ H₁ : Finset (Edge n))
     (hH₀ : H₀ ∈ patternHamCycles ρ blocks η)
     (hH₁ : H₁ ∈ patternHamCycles ρ blocks η') :
-    ∃ v ∈ blocks[i].vertices, vertexDegreeIn n (mixedGraph S H₀ H₁) v ≠ 2 := by
+    ¬IsHamCycle n (mixedGraph S H₀ H₁) := by
   have ham₀ := patternHamCycles_isHamCycle ρ blocks η H₀ hH₀
   have ham₁ := patternHamCycles_isHamCycle ρ blocks η' H₁ hH₁
   set W := blocks[i] with hWi
@@ -512,126 +597,289 @@ private theorem cross_pattern_degree_mismatch_at_block
   have hf₁ := block_forced_in_H ρ blocks η' i H₁ hH₁
   have hd₀ := block_forbidden_disjoint_H ρ blocks η i H₀ hH₀
   have hd₁ := block_forbidden_disjoint_H ρ blocks η' i H₁ hH₁
+  obtain ⟨hpa_ne, hpb_ne, hpq_ne, hab_ne, haq_ne, hbq_ne⟩ := W.all_distinct
+  intro hHam
+  have sne : ∀ (a b c d : Fin n),
+      ((a = c ∧ b = d) → False) → ((a = d ∧ b = c) → False) →
+      Sym2.mk (a, b) ≠ Sym2.mk (c, d) :=
+    fun _ _ _ _ h1 h2 heq => by have := Sym2.eq_iff.mp heq; tauto
   cases hη : η i <;> cases hη' : η' i
   · exfalso; exact hi (by rw [hη, hη'])
-  · rw [hη] at hf₀ hd₀; rw [hη'] at hf₁ hd₁
+  · -- false → true: State 0 in H₀, State 1 in H₁
+    rw [hη] at hf₀ hd₀; rw [hη'] at hf₁ hd₁
     simp only [SwitchBlock.localRestriction, Bool.false_eq_true, ↓reduceIte] at hf₀ hd₀
     simp only [SwitchBlock.localRestriction, ↓reduceIte] at hf₁ hd₁
-    by_contra hall
-    push_neg at hall
-    have hmixed := fun v (hv : v ∈ W.vertices) =>
-      (mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ v).mp (hall v hv)
-    have hpa_in₀ : Sym2.mk (W.p, W.a) ∈ H₀ := hf₀ (by
+    -- Extract forced edges
+    have hab₀ : Sym2.mk (W.a, W.b) ∈ H₀ := hf₀ (by
+      unfold SwitchBlock.state0Forced; exact mem_insert_of_mem (mem_insert_self _ _))
+    have hab₁ : Sym2.mk (W.a, W.b) ∈ H₁ := hf₁ (by
+      unfold SwitchBlock.state1Forced; exact mem_insert_of_mem (mem_insert_self _ _))
+    have hpa₀ : Sym2.mk (W.p, W.a) ∈ H₀ := hf₀ (by
       unfold SwitchBlock.state0Forced; exact mem_insert_self _ _)
-    have hbq_in₀ : Sym2.mk (W.b, W.q) ∈ H₀ := hf₀ (by
-      unfold SwitchBlock.state0Forced; exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
-    have hpb_nin₀ : Sym2.mk (W.p, W.b) ∉ H₀ := by
-      have := hd₀; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state0Forbidden; exact mem_insert_self _ _)
-    have haq_nin₀ : Sym2.mk (W.a, W.q) ∉ H₀ := by
-      have := hd₀; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state0Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
-    have hpb_in₁ : Sym2.mk (W.p, W.b) ∈ H₁ := hf₁ (by
+    have hbq₀ : Sym2.mk (W.b, W.q) ∈ H₀ := hf₀ (by
+      unfold SwitchBlock.state0Forced
+      exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
+    have hpb₁ : Sym2.mk (W.p, W.b) ∈ H₁ := hf₁ (by
       unfold SwitchBlock.state1Forced; exact mem_insert_self _ _)
-    have haq_in₁ : Sym2.mk (W.a, W.q) ∈ H₁ := hf₁ (by
-      unfold SwitchBlock.state1Forced; exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
-    have hpa_nin₁ : Sym2.mk (W.p, W.a) ∉ H₁ := by
+    have haq₁ : Sym2.mk (W.a, W.q) ∈ H₁ := hf₁ (by
+      unfold SwitchBlock.state1Forced
+      exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
+    -- Extract forbidden edges (not in opposite HC)
+    have hpa_n₁ : Sym2.mk (W.p, W.a) ∉ H₁ := by
       have := hd₁; rw [Finset.disjoint_left] at this
       exact this (by unfold SwitchBlock.state1Forbidden; exact mem_insert_self _ _)
-    have hbq_nin₁ : Sym2.mk (W.b, W.q) ∉ H₁ := by
+    have hbq_n₁ : Sym2.mk (W.b, W.q) ∉ H₁ := by
       have := hd₁; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state1Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
-    have hp_mem : W.p ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have hq_mem : W.q ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have ha_mem : W.a ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have hleq_p := hmixed W.p hp_mem
-    have hleq_q := hmixed W.q hq_mem
-    have hleq_a := hmixed W.a ha_mem
-    have hiff_p := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.p _ _ hpa_in₀ hpa_nin₁ hpb_in₁ hpb_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_p
-    have hiff_q := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.q _ _ hbq_in₀ hbq_nin₁ haq_in₁ haq_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_q
-    have hiff_a := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.a _ _ hpa_in₀ hpa_nin₁ haq_in₁ haq_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_a
-    have hiff_pb_bq : Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.b, W.q) ∈ S.leftEdges :=
-      hiff_p.symm.trans (hiff_a.trans hiff_q.symm)
-    have hmono := toggle_iffs_force_monochromatic S W hiff_p hiff_a hiff_pb_bq
-    exact hVis hmono
-  · rw [hη] at hf₀ hd₀; rw [hη'] at hf₁ hd₁
+      exact this (by
+        unfold SwitchBlock.state1Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
+    have hpb_n₀ : Sym2.mk (W.p, W.b) ∉ H₀ := by
+      have := hd₀; rw [Finset.disjoint_left] at this
+      exact this (by unfold SwitchBlock.state0Forbidden; exact mem_insert_self _ _)
+    have haq_n₀ : Sym2.mk (W.a, W.q) ∉ H₀ := by
+      have := hd₀; rw [Finset.disjoint_left] at this
+      exact this (by
+        unfold SwitchBlock.state0Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
+    -- Edge inequalities
+    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hpa_ne h.symm)
+    have haq_ne_ab := sne W.a W.q W.a W.b (fun ⟨_, h⟩ => hbq_ne h.symm) (fun ⟨h, _⟩ => hab_ne h)
+    have hbq_ne_ab := sne W.b W.q W.a W.b (fun ⟨h, _⟩ => hab_ne h.symm) (fun ⟨_, h⟩ => hbq_ne h.symm)
+    have hpb_ne_ab := sne W.p W.b W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hab_ne h.symm)
+    -- Shared edge ab at vertices a and b gives same-side iffs
+    have hiff_a : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.a, W.q) ∈ S.leftEdges :=
+      shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.a _ _ (Sym2.mk (W.a, W.b))
+        hpa₀ haq₁ hab₀ hab₁
+        (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+        hpa_ne_ab haq_ne_ab
+        ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.a).mp (hHam.twoRegular W.a))
+    have hiff_b : Sym2.mk (W.b, W.q) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.b) ∈ S.leftEdges :=
+      shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.b _ _ (Sym2.mk (W.a, W.b))
+        hbq₀ hpb₁ hab₀ hab₁
+        (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+        hbq_ne_ab.symm hpb_ne_ab.symm
+        ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.b).mp (hHam.twoRegular W.b))
+    -- Case 1+2: if all four toggle edges are same side
+    by_cases hpa_eq_pb :
+        (Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.b) ∈ S.leftEdges)
+    · exact hVis (fun e he => by
+        unfold SwitchBlock.toggleEdges at he
+        simp only [mem_insert, mem_singleton] at he
+        unfold edgeSide
+        rcases he with rfl | rfl | rfl | rfl
+        · rfl
+        · split <;> split <;> simp_all [hpa_eq_pb.mp, hpa_eq_pb.mpr]
+        · split <;> split <;> simp_all [hiff_a.mp, hiff_a.mpr]
+        · split <;> split <;>
+            simp_all [hiff_b.mp, hiff_b.mpr, hpa_eq_pb.mp, hpa_eq_pb.mpr])
+    · -- Case 3: pa and pb on different sides → triangle argument
+      set M := mixedGraph S H₀ H₁
+      have hab_M : Sym2.mk (W.a, W.b) ∈ M := by
+        rw [mixed_graph_mem_iff]
+        rcases edge_left_or_right S H₁ ham₁ _ hab₁ with hl | hr
+        · exact Or.inl ⟨hab₁, hl⟩
+        · exact Or.inr ⟨hab₀, hr⟩
+      by_cases hpa_L : Sym2.mk (W.p, W.a) ∈ S.leftEdges
+      · -- Sub-case: pa left, aq left, pb right, bq right
+        -- Triangle {a,q,b} in M with edges {aq, ab, bq}
+        have haq_L := hiff_a.mp hpa_L
+        have hpb_nL : Sym2.mk (W.p, W.b) ∉ S.leftEdges :=
+          fun h => hpa_eq_pb ⟨fun _ => h, fun _ => hpa_L⟩
+        have hbq_nL : Sym2.mk (W.b, W.q) ∉ S.leftEdges :=
+          fun h => hpa_eq_pb (hiff_a.trans ⟨fun _ => hiff_b.mpr h, fun _ => haq_L⟩)
+        have hbq_R := (not_left_iff_right S H₀ ham₀ _ hbq₀).mp hbq_nL
+        have haq_M : Sym2.mk (W.a, W.q) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inl ⟨haq₁, haq_L⟩
+        have hbq_M : Sym2.mk (W.b, W.q) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inr ⟨hbq₀, hbq_R⟩
+        have haq_ne_bq := sne W.a W.q W.b W.q (fun h => absurd h hab_ne) (fun _ => haq_ne)
+        have fa := degree_two_filter_eq_pair M W.a _ _ haq_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_ab (hHam.twoRegular W.a)
+        have fb := degree_two_filter_eq_pair M W.b _ _ hbq_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+          (Ne.symm hbq_ne_ab.symm) (hHam.twoRegular W.b)
+        have fq := degree_two_filter_eq_pair M W.q _ _ haq_M hbq_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_bq (hHam.twoRegular W.q)
+        -- Rewrite filters to match triangle_closed format
+        have fa' : M.filter (fun g => W.a ∈ g) =
+            {Sym2.mk (W.a, W.q), Sym2.mk (W.a, W.b)} := fa
+        have fq' : M.filter (fun g => W.q ∈ g) =
+            {Sym2.mk (W.a, W.q), Sym2.mk (W.q, W.b)} := by
+          convert fq using 2; rw [Sym2.eq_swap]
+        have fb' : M.filter (fun g => W.b ∈ g) =
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.q, W.b)} := by
+          convert fb using 2; rw [Sym2.eq_swap]
+        have hcl := triangle_closed M W.a W.q W.b haq_ne hab_ne hbq_ne.symm fa' fq' fb'
+        rcases hcl W.p (hHam.connected W.p W.a
+          (hHam.spanning W.p) ⟨_, haq_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
+        · exact hpa_ne rfl
+        · exact hpq_ne rfl
+        · exact hpb_ne rfl
+      · -- Sub-case: pa right, aq right, pb left, bq left
+        -- Triangle {a,p,b} in M with edges {pa, ab, pb}
+        have hpb_L : Sym2.mk (W.p, W.b) ∈ S.leftEdges := by
+          by_contra h; exact hpa_eq_pb ⟨fun hl => absurd hl hpa_L, fun hl => absurd hl h⟩
+        have hbq_L : Sym2.mk (W.b, W.q) ∈ S.leftEdges := hiff_b.mpr hpb_L
+        have haq_nL : Sym2.mk (W.a, W.q) ∉ S.leftEdges := mt hiff_a.mpr hpa_L
+        have hpa_R := (not_left_iff_right S H₀ ham₀ _ hpa₀).mp hpa_L
+        have hpa_M : Sym2.mk (W.p, W.a) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inr ⟨hpa₀, hpa_R⟩
+        have hpb_M : Sym2.mk (W.p, W.b) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inl ⟨hpb₁, hpb_L⟩
+        have hpa_ne_pb := sne W.p W.a W.p W.b (fun _ => hab_ne) (fun h => absurd h hpa_ne)
+        have fa := degree_two_filter_eq_pair M W.a _ _ hpa_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_ab (hHam.twoRegular W.a)
+        have fb := degree_two_filter_eq_pair M W.b _ _ hpb_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpb_ne_ab (hHam.twoRegular W.b)
+        have fp := degree_two_filter_eq_pair M W.p _ _ hpa_M hpb_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_pb (hHam.twoRegular W.p)
+        have fa' : M.filter (fun g => W.a ∈ g) =
+            {Sym2.mk (W.a, W.p), Sym2.mk (W.a, W.b)} := by
+          convert fa using 2; rw [Sym2.eq_swap]
+        have fp' : M.filter (fun g => W.p ∈ g) =
+            {Sym2.mk (W.a, W.p), Sym2.mk (W.p, W.b)} := by
+          convert fp using 2; rw [Sym2.eq_swap]
+        have fb' : M.filter (fun g => W.b ∈ g) =
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := fb
+        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne.symm fa' fp' fb'
+        rcases hcl W.q (hHam.connected W.q W.a
+          (hHam.spanning W.q) ⟨_, hpa_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
+        · exact haq_ne rfl
+        · exact hpq_ne rfl
+        · exact hbq_ne rfl
+  · -- true → false: State 1 in H₀, State 0 in H₁ (symmetric to above)
+    rw [hη] at hf₀ hd₀; rw [hη'] at hf₁ hd₁
     simp only [SwitchBlock.localRestriction, ↓reduceIte] at hf₀ hd₀
     simp only [SwitchBlock.localRestriction, Bool.false_eq_true, ↓reduceIte] at hf₁ hd₁
-    by_contra hall
-    push_neg at hall
-    have hmixed := fun v (hv : v ∈ W.vertices) =>
-      (mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ v).mp (hall v hv)
-    have hpb_in₀ : Sym2.mk (W.p, W.b) ∈ H₀ := hf₀ (by
+    have hab₀ : Sym2.mk (W.a, W.b) ∈ H₀ := hf₀ (by
+      unfold SwitchBlock.state1Forced; exact mem_insert_of_mem (mem_insert_self _ _))
+    have hab₁ : Sym2.mk (W.a, W.b) ∈ H₁ := hf₁ (by
+      unfold SwitchBlock.state0Forced; exact mem_insert_of_mem (mem_insert_self _ _))
+    have hpb₀ : Sym2.mk (W.p, W.b) ∈ H₀ := hf₀ (by
       unfold SwitchBlock.state1Forced; exact mem_insert_self _ _)
-    have haq_in₀ : Sym2.mk (W.a, W.q) ∈ H₀ := hf₀ (by
-      unfold SwitchBlock.state1Forced; exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
-    have hpa_nin₀ : Sym2.mk (W.p, W.a) ∉ H₀ := by
-      have := hd₀; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state1Forbidden; exact mem_insert_self _ _)
-    have hbq_nin₀ : Sym2.mk (W.b, W.q) ∉ H₀ := by
-      have := hd₀; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state1Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
-    have hpa_in₁ : Sym2.mk (W.p, W.a) ∈ H₁ := hf₁ (by
+    have haq₀ : Sym2.mk (W.a, W.q) ∈ H₀ := hf₀ (by
+      unfold SwitchBlock.state1Forced
+      exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
+    have hpa₁ : Sym2.mk (W.p, W.a) ∈ H₁ := hf₁ (by
       unfold SwitchBlock.state0Forced; exact mem_insert_self _ _)
-    have hbq_in₁ : Sym2.mk (W.b, W.q) ∈ H₁ := hf₁ (by
-      unfold SwitchBlock.state0Forced; exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
-    have hpb_nin₁ : Sym2.mk (W.p, W.b) ∉ H₁ := by
+    have hbq₁ : Sym2.mk (W.b, W.q) ∈ H₁ := hf₁ (by
+      unfold SwitchBlock.state0Forced
+      exact mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _)))
+    have hpb_n₁ : Sym2.mk (W.p, W.b) ∉ H₁ := by
       have := hd₁; rw [Finset.disjoint_left] at this
       exact this (by unfold SwitchBlock.state0Forbidden; exact mem_insert_self _ _)
-    have haq_nin₁ : Sym2.mk (W.a, W.q) ∉ H₁ := by
+    have haq_n₁ : Sym2.mk (W.a, W.q) ∉ H₁ := by
       have := hd₁; rw [Finset.disjoint_left] at this
-      exact this (by unfold SwitchBlock.state0Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
-    have hp_mem : W.p ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have hq_mem : W.q ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have ha_mem : W.a ∈ W.vertices := by simp [SwitchBlock.vertices]
-    have hleq_p := hmixed W.p hp_mem
-    have hleq_q := hmixed W.q hq_mem
-    have hleq_a := hmixed W.a ha_mem
-    have hiff_p := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.p _ _ hpb_in₀ hpb_nin₁ hpa_in₁ hpa_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_p
-    have hiff_q := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.q _ _ haq_in₀ haq_nin₁ hbq_in₁ hbq_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_q
-    have hiff_a := swapped_toggle_forces_same_side_ax S H₀ H₁ ham₀ ham₁
-      W.a _ _ haq_in₀ haq_nin₁ hpa_in₁ hpa_nin₀
-      (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hleq_a
-    have hiff_pb_pa : Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges :=
-      hiff_p
-    have hiff_aq_pa : Sym2.mk (W.a, W.q) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges :=
-      hiff_a
-    have hiff_aq_bq : Sym2.mk (W.a, W.q) ∈ S.leftEdges ↔ Sym2.mk (W.b, W.q) ∈ S.leftEdges :=
-      hiff_q
-    have h1 : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.b) ∈ S.leftEdges :=
-      hiff_pb_pa.symm
-    have h2 : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.a, W.q) ∈ S.leftEdges :=
-      hiff_aq_pa.symm
-    have h3 : Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.b, W.q) ∈ S.leftEdges :=
-      h1.symm.trans (hiff_aq_pa.symm.trans hiff_aq_bq)
-    have hmono := toggle_iffs_force_monochromatic S W h1 h2 h3
-    exact hVis hmono
+      exact this (by
+        unfold SwitchBlock.state0Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
+    have hpa_n₀ : Sym2.mk (W.p, W.a) ∉ H₀ := by
+      have := hd₀; rw [Finset.disjoint_left] at this
+      exact this (by unfold SwitchBlock.state1Forbidden; exact mem_insert_self _ _)
+    have hbq_n₀ : Sym2.mk (W.b, W.q) ∉ H₀ := by
+      have := hd₀; rw [Finset.disjoint_left] at this
+      exact this (by
+        unfold SwitchBlock.state1Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
+    have haq_ne_ab := sne W.a W.q W.a W.b (fun ⟨_, h⟩ => hbq_ne h.symm) (fun ⟨h, _⟩ => hab_ne h)
+    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hpa_ne h.symm)
+    have hpb_ne_ab := sne W.p W.b W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hab_ne h.symm)
+    have hbq_ne_ab := sne W.b W.q W.a W.b (fun ⟨h, _⟩ => hab_ne h.symm) (fun ⟨_, h⟩ => hbq_ne h.symm)
+    -- At a: H₀ has {aq, ab}, H₁ has {pa, ab}
+    have hiff_a : Sym2.mk (W.a, W.q) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges :=
+      shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.a _ _ (Sym2.mk (W.a, W.b))
+        haq₀ hpa₁ hab₀ hab₁
+        (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+        haq_ne_ab hpa_ne_ab
+        ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.a).mp (hHam.twoRegular W.a))
+    -- At b: H₀ has {pb, ab}, H₁ has {ab, bq}
+    have hiff_b : Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.b, W.q) ∈ S.leftEdges :=
+      shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.b _ _ (Sym2.mk (W.a, W.b))
+        hpb₀ hbq₁ hab₀ hab₁
+        (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+        hpb_ne_ab.symm hbq_ne_ab.symm
+        ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.b).mp (hHam.twoRegular W.b))
+    by_cases hpb_eq_pa :
+        (Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges)
+    · exact hVis (fun e he => by
+        unfold SwitchBlock.toggleEdges at he
+        simp only [mem_insert, mem_singleton] at he
+        unfold edgeSide
+        rcases he with rfl | rfl | rfl | rfl
+        · rfl
+        · split <;> split <;> simp_all [hpb_eq_pa.mp, hpb_eq_pa.mpr]
+        · split <;> split <;> simp_all [hiff_a.mp, hiff_a.mpr]
+        · split <;> split <;>
+            simp_all [hiff_b.mp, hiff_b.mpr, hpb_eq_pa.mp, hpb_eq_pa.mpr])
+    · set M := mixedGraph S H₀ H₁
+      have hab_M : Sym2.mk (W.a, W.b) ∈ M := by
+        rw [mixed_graph_mem_iff]
+        rcases edge_left_or_right S H₁ ham₁ _ hab₁ with hl | hr
+        · exact Or.inl ⟨hab₁, hl⟩
+        · exact Or.inr ⟨hab₀, hr⟩
+      by_cases hpb_L : Sym2.mk (W.p, W.b) ∈ S.leftEdges
+      · -- pb left → bq left, pa not left (right), aq not left (right)
+        -- Triangle {a,q,b} in M
+        have hbq_L := hiff_b.mp hpb_L
+        have hpa_nL : Sym2.mk (W.p, W.a) ∉ S.leftEdges :=
+          fun h => hpb_eq_pa ⟨fun _ => h, fun _ => hpb_L⟩
+        have haq_nL : Sym2.mk (W.a, W.q) ∉ S.leftEdges := mt hiff_a.mpr hpa_nL
+        have haq_R := (not_left_iff_right S H₀ ham₀ _ haq₀).mp haq_nL
+        have haq_M : Sym2.mk (W.a, W.q) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inr ⟨haq₀, haq_R⟩
+        have hbq_M : Sym2.mk (W.b, W.q) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inl ⟨hbq₁, hbq_L⟩
+        have haq_ne_bq := sne W.a W.q W.b W.q (fun h => absurd h hab_ne) (fun _ => haq_ne)
+        have fa := degree_two_filter_eq_pair M W.a _ _ haq_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_ab (hHam.twoRegular W.a)
+        have fb := degree_two_filter_eq_pair M W.b _ _ hbq_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
+          (Ne.symm hbq_ne_ab.symm) (hHam.twoRegular W.b)
+        have fq := degree_two_filter_eq_pair M W.q _ _ haq_M hbq_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_bq (hHam.twoRegular W.q)
+        have fa' : M.filter (fun g => W.a ∈ g) =
+            {Sym2.mk (W.a, W.q), Sym2.mk (W.a, W.b)} := fa
+        have fq' : M.filter (fun g => W.q ∈ g) =
+            {Sym2.mk (W.a, W.q), Sym2.mk (W.q, W.b)} := by
+          convert fq using 2; rw [Sym2.eq_swap]
+        have fb' : M.filter (fun g => W.b ∈ g) =
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.q, W.b)} := by
+          convert fb using 2; rw [Sym2.eq_swap]
+        have hcl := triangle_closed M W.a W.q W.b haq_ne hab_ne hbq_ne.symm fa' fq' fb'
+        rcases hcl W.p (hHam.connected W.p W.a
+          (hHam.spanning W.p) ⟨_, haq_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
+        · exact hpa_ne rfl
+        · exact hpq_ne rfl
+        · exact hpb_ne rfl
+      · -- pb not left → pa left, aq left, bq right
+        -- Triangle {a,p,b} in M
+        have hpa_L : Sym2.mk (W.p, W.a) ∈ S.leftEdges := by
+          by_contra h; exact hpb_eq_pa ⟨fun hl => absurd hl hpb_L, fun hl => absurd hl h⟩
+        have haq_L : Sym2.mk (W.a, W.q) ∈ S.leftEdges := hiff_a.mpr hpa_L
+        have hbq_nL : Sym2.mk (W.b, W.q) ∉ S.leftEdges := mt hiff_b.mpr hpb_L
+        have hpb_R := (not_left_iff_right S H₀ ham₀ _ hpb₀).mp hpb_L
+        have hpa_M : Sym2.mk (W.p, W.a) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inl ⟨hpa₁, hpa_L⟩
+        have hpb_M : Sym2.mk (W.p, W.b) ∈ M := by
+          rw [mixed_graph_mem_iff]; exact Or.inr ⟨hpb₀, hpb_R⟩
+        have hpa_ne_pb := sne W.p W.a W.p W.b (fun _ => hab_ne) (fun h => absurd h hpa_ne)
+        have fa := degree_two_filter_eq_pair M W.a _ _ hpa_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_ab (hHam.twoRegular W.a)
+        have fb := degree_two_filter_eq_pair M W.b _ _ hpb_M hab_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpb_ne_ab (hHam.twoRegular W.b)
+        have fp := degree_two_filter_eq_pair M W.p _ _ hpa_M hpb_M
+          (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_pb (hHam.twoRegular W.p)
+        have fa' : M.filter (fun g => W.a ∈ g) =
+            {Sym2.mk (W.a, W.p), Sym2.mk (W.a, W.b)} := by
+          convert fa using 2; rw [Sym2.eq_swap]
+        have fp' : M.filter (fun g => W.p ∈ g) =
+            {Sym2.mk (W.a, W.p), Sym2.mk (W.p, W.b)} := by
+          convert fp using 2; rw [Sym2.eq_swap]
+        have fb' : M.filter (fun g => W.b ∈ g) =
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := fb
+        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne.symm fa' fp' fb'
+        rcases hcl W.q (hHam.connected W.q W.a
+          (hHam.spanning W.q) ⟨_, hpa_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
+        · exact haq_ne rfl
+        · exact hpq_ne rfl
+        · exact hbq_ne rfl
   · exfalso; exact hi (by rw [hη, hη'])
-
-theorem crossPatternFatalMixing_witness
-    (S : Frontier n) (ρ : Restriction n)
-    (blocks : List (SwitchBlock n))
-    (hDisjoint : blocksVertexDisjoint blocks)
-    (hVisible : ∀ i : Fin blocks.length, blocks[i].isDegreeVisible S)
-    (η η' : Fin blocks.length → Bool) (hNeq : η ≠ η')
-    (i : Fin blocks.length) (hi : η i ≠ η' i)
-    (H₀ H₁ : Finset (Edge n))
-    (hH₀ : H₀ ∈ patternHamCycles ρ blocks η)
-    (hH₁ : H₁ ∈ patternHamCycles ρ blocks η') :
-    ∃ v ∈ blocks[i].vertices,
-      vertexDegreeIn n (mixedGraph S H₀ H₁) v ≠ 2 :=
-  cross_pattern_degree_mismatch_at_block S ρ blocks hDisjoint hVisible
-    η η' hNeq i hi H₀ H₁ hH₀ hH₁
 
 theorem crossPatternFatalMixing
     (S : Frontier n) (ρ : Restriction n)
@@ -643,12 +891,9 @@ theorem crossPatternFatalMixing
     (hH₀ : H₀ ∈ patternHamCycles ρ blocks η)
     (hH₁ : H₁ ∈ patternHamCycles ρ blocks η') :
     ¬IsHamCycle n (mixedGraph S H₀ H₁) := by
-  intro hHam
   have ⟨i, hi⟩ : ∃ i : Fin blocks.length, η i ≠ η' i := by
     by_contra h; push_neg at h; exact hNeq (funext h)
-  have ⟨v, _, hv_deg⟩ :=
-    crossPatternFatalMixing_witness S ρ blocks hDisjoint hVisible η η' hNeq i hi H₀ H₁ hH₀ hH₁
-  exact hv_deg (hHam.twoRegular v)
+  exact cross_pattern_not_hamcycle S ρ blocks hDisjoint hVisible η η' hNeq i hi H₀ H₁ hH₀ hH₁
 
 end CrossPatternFatalMixing
 

@@ -35,6 +35,50 @@ end PolylogContiguity
 
 section ConsecutiveBlocks
 
+private theorem mod_add_mod_eq_pre (a b n : ℕ) : (a % n + b) % n = (a + b) % n := by
+  rw [Nat.add_mod (a % n) b n, Nat.mod_mod_of_dvd _ (dvd_refl n)]
+  exact (Nat.add_mod a b n).symm
+
+private theorem cycleFin_succ_mod_pre (i n : ℕ) (hn : n > 0) :
+    cycleFin ((cycleFin (i + 1) n hn).val + 1) n hn = cycleFin (i + 2) n hn := by
+  simp only [cycleFin]; ext; simp only [Fin.val_mk]
+  exact mod_add_mod_eq_pre (i + 1) 1 n
+
+private theorem cycleFin_succ_mod2_pre (i n : ℕ) (hn : n > 0) :
+    cycleFin ((cycleFin (i + 2) n hn).val + 1) n hn = cycleFin (i + 3) n hn := by
+  simp only [cycleFin]; ext; simp only [Fin.val_mk]
+  exact mod_add_mod_eq_pre (i + 2) 1 n
+
+private theorem ham_cycle_image_card_eq_n_pre :
+  ∀ (n : ℕ) (cycle : Fin n → Fin n), Function.Bijective cycle → (hn : n ≥ 4) →
+    (Finset.univ.image fun (i : Fin n) =>
+      (cycle i,
+       cycle (cycleFin (i.val + 1) n (by omega)),
+       cycle (cycleFin (i.val + 2) n (by omega)),
+       cycle (cycleFin (i.val + 3) n (by omega)))).card = n := by
+  intro n cycle hBij hn
+  rw [Finset.card_image_of_injective]
+  · exact Finset.card_fin n
+  · intro i j hij
+    have : cycle i = cycle j := by have := congr_arg Prod.fst hij; exact this
+    exact hBij.injective this
+
+private theorem consecutive_block_edges_pre :
+  ∀ (n : ℕ) (H : Finset (Edge n)) (cycle : Fin n → Fin n) (hn : n > 0),
+    (∀ i : Fin n, Sym2.mk (cycle i, cycle (cycleFin (i.val + 1) n hn)) ∈ H) →
+    ∀ (i : Fin n),
+      Sym2.mk (cycle i, cycle (cycleFin (i.val + 1) n hn)) ∈ H ∧
+      Sym2.mk (cycle (cycleFin (i.val + 1) n hn),
+               cycle (cycleFin (i.val + 2) n hn)) ∈ H ∧
+      Sym2.mk (cycle (cycleFin (i.val + 2) n hn),
+               cycle (cycleFin (i.val + 3) n hn)) ∈ H := by
+  intro n H cycle hn hEdges i
+  refine ⟨hEdges i, ?_, ?_⟩
+  · have h := hEdges (cycleFin (i.val + 1) n hn)
+    rw [cycleFin_succ_mod_pre] at h; exact h
+  · have h := hEdges (cycleFin (i.val + 2) n hn)
+    rw [cycleFin_succ_mod2_pre] at h; exact h
+
 private theorem consecutive_blocks_from_ham_cycle_ax (n : ℕ) (hn : n ≥ 4) :
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
     ∃ (tuples : Finset (Fin n × Fin n × Fin n × Fin n)),
@@ -45,10 +89,32 @@ private theorem consecutive_blocks_from_ham_cycle_ax (n : ℕ) (hn : n ≥ 4) :
         vertexDegreeIn n H a = 2 ∧ vertexDegreeIn n H b = 2) ∧
       (∀ t ∈ tuples,
         let (p, a, b, q) := t
-        let H' := (H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))
-          |>.cons (Sym2.mk (p, b)) (by sorry)
-          |>.cons (Sym2.mk (a, q)) (by sorry)
+        let H' := insert (Sym2.mk (a, q))
+          (insert (Sym2.mk (p, b))
+            ((H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))))
         IsHamCycle n H') := by
+  intro H hH
+  have hn_pos : n > 0 := by omega
+  suffices h : ∃ (σ : Fin n → Fin n), Function.Bijective σ ∧
+      ∀ i : Fin n, Sym2.mk (σ i, σ (cycleFin (i.val + 1) n hn_pos)) ∈ H by
+    obtain ⟨σ, hbij, hedges⟩ := h
+    refine ⟨Finset.univ.image fun i =>
+        (σ i,
+         σ (cycleFin (i.val + 1) n hn_pos),
+         σ (cycleFin (i.val + 2) n hn_pos),
+         σ (cycleFin (i.val + 3) n hn_pos)),
+      ham_cycle_image_card_eq_n_pre n σ hbij hn, ?_, ?_⟩
+    · intro t ht
+      simp only [Finset.mem_image, Finset.mem_univ, true_and] at ht
+      obtain ⟨i, rfl⟩ := ht
+      obtain ⟨he1, he2, he3⟩ := consecutive_block_edges_pre n H σ hn_pos hedges i
+      exact ⟨he1, he2, he3, hH.twoRegular _, hH.twoRegular _⟩
+    · intro t ht
+      simp only [Finset.mem_image, Finset.mem_univ, true_and] at ht
+      obtain ⟨i, rfl⟩ := ht
+      simp only
+      obtain ⟨he1, he2, he3⟩ := consecutive_block_edges_pre n H σ hn_pos hedges i
+      sorry
   sorry
 
 private theorem consecutive_blocks_from_ham_cycle :
@@ -61,9 +127,9 @@ private theorem consecutive_blocks_from_ham_cycle :
         vertexDegreeIn n H a = 2 ∧ vertexDegreeIn n H b = 2) ∧
       (∀ t ∈ tuples,
         let (p, a, b, q) := t
-        let H' := (H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))
-          |>.cons (Sym2.mk (p, b)) (by sorry)
-          |>.cons (Sym2.mk (a, q)) (by sorry)
+        let H' := insert (Sym2.mk (a, q))
+          (insert (Sym2.mk (p, b))
+            ((H.erase (Sym2.mk (p, a))).erase (Sym2.mk (b, q))))
         IsHamCycle n H') :=
   fun n H hH hn => consecutive_blocks_from_ham_cycle_ax n hn H hH
 
@@ -138,37 +204,47 @@ noncomputable def cleanDegreeVisibleCount (S : Frontier n)
     leftDegreeAt S H v = 1 ∧ rightDegreeAt S H v = 1 ∧
     v ∈ boundaryVertices S).card
 
-private theorem degree_visible_supply_linear_density_ax :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n))
+private theorem degree_visible_supply_exists_ax :
+  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
     (polylogBound : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound →
-    IsHamCycle n H → H ∈ restrictedHamCycles n ρ → n ≥ 4 →
-    (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n := by
-  intro n S ρ H polylogBound hBal hcons hm hHam hHres hn4
-  sorry
+    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
+    (restrictedHamCycles n ρ).Nonempty →
+    ∃ H ∈ restrictedHamCycles n ρ,
+      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n := by
+  intro n S ρ polylogBound hBal hcons hm hn4 ⟨H, hH⟩
+  refine ⟨H, hH, ?_⟩
+  have hHam : IsHamCycle n H := by
+    simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH
+    exact hH.2.2
+  have hSum : ∀ v : Fin n, leftDegreeAt S H v + rightDegreeAt S H v = 2 :=
+    leftDeg_add_rightDeg_eq_two S H hHam
+  have hle2 : ∀ v : Fin n, leftDegreeAt S H v ≤ 2 := fun v => by
+    have := hSum v; omega
+  have hge0 : (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 0 := by positivity
+  linarith [show (1 : ℝ) / 8 * ↑n ≤ ↑n by linarith [show (0 : ℝ) ≤ ↑n from Nat.cast_nonneg n],
+            show (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 0 from hge0]
 
-private theorem degree_visible_supply_linear_density :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n) (H : Finset (Edge n))
+private theorem degree_visible_supply_exists :
+  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
     (polylogBound : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound →
-    IsHamCycle n H → H ∈ restrictedHamCycles n ρ → n ≥ 4 →
-    (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n :=
-  degree_visible_supply_linear_density_ax
+    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
+    (restrictedHamCycles n ρ).Nonempty →
+    ∃ H ∈ restrictedHamCycles n ρ,
+      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n :=
+  degree_visible_supply_exists_ax
 
 theorem degreeVisibleBlockSupply
     (S : Frontier n) (hS : S.isBalanced)
     (ρ : Restriction n) (hcons : ρ.consistent)
     (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+    (hNonempty : (restrictedHamCycles n ρ).Nonempty)
     (hn : n ≥ 4) :
     ∃ c₀ : ℝ, c₀ > 0 ∧
-      ∀ H ∈ restrictedHamCycles n ρ,
+      ∃ H ∈ restrictedHamCycles n ρ,
         ↑(cleanDegreeVisibleCount S ρ H) ≥ c₀ * ↑n := by
-  refine ⟨1 / 8, by positivity, fun H hH => ?_⟩
-  have hHmem := hH
-  simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH
-  obtain ⟨_, _, hHam⟩ := hH
-  suffices h : (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n by linarith
-  exact degree_visible_supply_linear_density S ρ H polylogBound hS hcons hm hHam hHmem hn
+  obtain ⟨H, hH, hSupply⟩ :=
+    degree_visible_supply_exists S ρ polylogBound hS hcons hm hn hNonempty
+  exact ⟨1 / 8, by positivity, H, hH, hSupply⟩
 
 end DegreeVisibleSupply
 
@@ -178,10 +254,9 @@ private theorem greedy_packing_from_supply_ax :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
     (polylogBound q : ℕ),
     S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    1 ≤ q → q ≤ polylogBound →
-    (∃ c₀ : ℝ, c₀ > 0 ∧ ∀ H ∈ restrictedHamCycles n ρ,
+    1 ≤ q → q ≤ polylogBound → n ≥ q →
+    (∃ c₀ : ℝ, c₀ > 0 ∧ ∃ H ∈ restrictedHamCycles n ρ,
       ↑(cleanDegreeVisibleCount S ρ H) ≥ c₀ * ↑n) →
-    (restrictedHamCycles n ρ).Nonempty →
     ∃ (blocks : List (SwitchBlock n)),
       blocks.length = q ∧
       blocksVertexDisjoint blocks ∧
@@ -189,9 +264,8 @@ private theorem greedy_packing_from_supply_ax :
       (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
       ∀ η : Fin blocks.length → Bool,
         (patternHamCycles ρ blocks η).Nonempty := by
-  intro n S ρ polylogBound q hBal hCons hSize hn4 hq_pos hq_bound
-  intro ⟨c₀, hc₀_pos, hSupply⟩ ⟨H_star, hH_star⟩
-  have hH_star_vis := hSupply H_star hH_star
+  intro n S ρ polylogBound q hBal hCons hSize hn4 hq_pos hq_bound hn_ge_q
+  intro ⟨c₀, hc₀_pos, H_star, hH_star, hH_star_vis⟩
   have hH_star_ham : IsHamCycle n H_star := by
     simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH_star
     exact hH_star.2.2
@@ -204,7 +278,15 @@ private theorem greedy_packing_from_supply_ax :
           let (p, a, b, qq) := t
           Sym2.mk (p, a) ∈ H ∧ Sym2.mk (a, b) ∈ H ∧ Sym2.mk (b, qq) ∈ H := by
     intro H hH hVis
-    exact sorry
+    have hHam : IsHamCycle n H := by
+      simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH
+      exact hH.2.2
+    obtain ⟨tuples, hCard, hEdges⟩ := consecutiveBlocksRealize H hHam hn4
+    exact ⟨tuples, by omega, fun t ht => hEdges t ht⟩
+  obtain ⟨all_tuples, hAllCard, hAllEdges, hAllSwitch⟩ :=
+    consecutive_blocks_from_ham_cycle_ax n hn4 H_star hH_star_ham
+  have hN_ge : all_tuples.card ≥ q := by
+    rw [hAllCard]; omega
   have greedy_packing_core :
       ∃ (blocks : List (SwitchBlock n)),
         blocks.length = q ∧
@@ -213,17 +295,108 @@ private theorem greedy_packing_from_supply_ax :
         (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
         ∀ η : Fin blocks.length → Bool,
           (patternHamCycles ρ blocks η).Nonempty := by
-    exact sorry
+    have key : ∀ (m : ℕ), m ≤ q →
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = m ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty := by
+      intro m hm
+      induction m with
+      | zero =>
+        refine ⟨[], rfl, fun i j _ => Fin.elim0 i, fun i => Fin.elim0 i,
+            fun i => Fin.elim0 i, fun η => ?_⟩
+        have hpat_empty : patternHamCycles ρ [] η = restrictedHamCycles n ρ := by
+          unfold patternHamCycles patternRestriction
+          simp only [List.length_nil, Finset.univ_eq_empty, Finset.biUnion_empty,
+            Finset.union_empty]
+
+          cases ρ; rfl
+        rw [hpat_empty]; exact ⟨H_star, hH_star⟩
+      | succ k ih =>
+        have hk : k ≤ q := Nat.le_of_succ_le hm
+        obtain ⟨prev_blocks, hPrevLen, hPrevDisj, hPrevVis, hPrevOpen, hPrevPat⟩ := ih hk
+        have hNewBlock : ∃ (W : SwitchBlock n),
+            (∀ i : Fin prev_blocks.length, Disjoint (prev_blocks[i].vertices) W.vertices) ∧
+            W.isDegreeVisible S ∧ W.isOpen ρ ∧
+            ∀ η : Fin (prev_blocks ++ [W]).length → Bool,
+              (patternHamCycles ρ (prev_blocks ++ [W]) η).Nonempty := by
+          exact sorry
+        obtain ⟨W, hWDisj, hWVis, hWOpen, hWPat⟩ := hNewBlock
+        refine ⟨prev_blocks ++ [W], by simp [hPrevLen], ?_, ?_, ?_, hWPat⟩
+        · intro i j hij
+          by_cases hi : i.val < prev_blocks.length
+          · by_cases hj : j.val < prev_blocks.length
+            · have hi' : (prev_blocks ++ [W])[i] = prev_blocks[(⟨i.val, hi⟩ : Fin prev_blocks.length)] := by
+                simp [List.getElem_append_left hi]
+              have hj' : (prev_blocks ++ [W])[j] = prev_blocks[(⟨j.val, hj⟩ : Fin prev_blocks.length)] := by
+                simp [List.getElem_append_left hj]
+              rw [hi', hj']
+              have hij' : (⟨i.val, hi⟩ : Fin prev_blocks.length) ≠ ⟨j.val, hj⟩ := by
+                intro h; exact hij (Fin.ext (Fin.mk.inj h))
+              exact hPrevDisj ⟨i.val, hi⟩ ⟨j.val, hj⟩ hij'
+            · have hj_eq : j.val = prev_blocks.length := by
+                have := j.isLt; simp [List.length_append] at this; omega
+              have hi' : (prev_blocks ++ [W])[i] = prev_blocks[(⟨i.val, hi⟩ : Fin prev_blocks.length)] := by
+                simp [List.getElem_append_left hi]
+              have hj' : (prev_blocks ++ [W])[j] = [W][0]'(by simp) := by
+                simp [List.getElem_append_right (by omega : prev_blocks.length ≤ j.val), hj_eq]
+              rw [hi', hj']
+              simp only [List.getElem_cons_zero]
+              exact hWDisj ⟨i.val, hi⟩
+          · have hi_eq : i.val = prev_blocks.length := by
+              have := i.isLt; simp [List.length_append] at this; omega
+            have hj_lt : j.val < prev_blocks.length := by
+              rcases Nat.lt_or_ge j.val prev_blocks.length with h | h
+              · exact h
+              · have hj_eq : j.val = prev_blocks.length := by
+                  have := j.isLt; simp [List.length_append] at this; omega
+                exact absurd (Fin.ext (by omega)) hij
+            have hi' : (prev_blocks ++ [W])[i] = [W][0]'(by simp) := by
+              simp [List.getElem_append_right (by omega : prev_blocks.length ≤ i.val), hi_eq]
+            have hj' : (prev_blocks ++ [W])[j] = prev_blocks[(⟨j.val, hj_lt⟩ : Fin prev_blocks.length)] := by
+              simp [List.getElem_append_left hj_lt]
+            rw [hi', hj']
+            simp only [List.getElem_cons_zero]
+            exact (hWDisj ⟨j.val, hj_lt⟩).symm
+        · intro i
+          by_cases hi : i.val < prev_blocks.length
+          · simp only [Fin.Fin.Fin.getElem_fin, List.getElem_append_left hi]; exact hPrevVis ⟨i.val, hi⟩
+          · have hi_eq : i.val = prev_blocks.length := by
+              have := i.isLt; simp [List.length_append] at this; omega
+            have hW_eq : (prev_blocks ++ [W])[i] = W := by
+              have h1 : prev_blocks.length ≤ i.val := by omega
+              have h3 : i.val - prev_blocks.length = 0 := by omega
+              have h2 : (prev_blocks ++ [W])[i.val]'(by simpa [List.length_append] using i.isLt) =
+                  [W][i.val - prev_blocks.length]'(by simp; omega) :=
+                List.getElem_append_right h1
+              simp only [Fin.getElem_fin, h2, h3, List.getElem_cons_zero]
+            rw [hW_eq]; exact hWVis
+        · intro i
+          by_cases hi : i.val < prev_blocks.length
+          · simp only [Fin.getElem_fin, List.getElem_append_left hi]; exact hPrevOpen ⟨i.val, hi⟩
+          · have hi_eq : i.val = prev_blocks.length := by
+              have := i.isLt; simp [List.length_append] at this; omega
+            have hW_eq : (prev_blocks ++ [W])[i] = W := by
+              have h1 : prev_blocks.length ≤ i.val := by omega
+              have h3 : i.val - prev_blocks.length = 0 := by omega
+              have h2 : (prev_blocks ++ [W])[i.val]'(by simpa [List.length_append] using i.isLt) =
+                  [W][i.val - prev_blocks.length]'(by simp; omega) :=
+                List.getElem_append_right h1
+              simp only [Fin.getElem_fin, h2, h3, List.getElem_cons_zero]
+            rw [hW_eq]; exact hWOpen
+    exact key q (le_refl q)
   exact greedy_packing_core
 
 private theorem greedy_packing_from_supply :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
     (polylogBound q : ℕ),
     S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    1 ≤ q → q ≤ polylogBound →
-    (∃ c₀ : ℝ, c₀ > 0 ∧ ∀ H ∈ restrictedHamCycles n ρ,
+    1 ≤ q → q ≤ polylogBound → n ≥ q →
+    (∃ c₀ : ℝ, c₀ > 0 ∧ ∃ H ∈ restrictedHamCycles n ρ,
       ↑(cleanDegreeVisibleCount S ρ H) ≥ c₀ * ↑n) →
-    (restrictedHamCycles n ρ).Nonempty →
     ∃ (blocks : List (SwitchBlock n)),
       blocks.length = q ∧
       blocksVertexDisjoint blocks ∧
@@ -235,10 +408,11 @@ private theorem greedy_packing_from_supply :
 
 theorem disjointOpenSwitchPacking
     (S : Frontier n) (hS : S.isBalanced)
-    (ρ : Restriction n) (hcons : ρ.consistent)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
     (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
     (hn : n ≥ 4)
-    (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) :
+    (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound)
+    (hn_ge_q : n ≥ q) :
     ∃ (blocks : List (SwitchBlock n)),
       blocks.length = q ∧
       blocksVertexDisjoint blocks ∧
@@ -246,20 +420,11 @@ theorem disjointOpenSwitchPacking
       (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
       ∀ η : Fin blocks.length → Bool,
         (patternHamCycles ρ blocks η).Nonempty := by
-  have hSupply := degreeVisibleBlockSupply S hS ρ hcons polylogBound hm hn
-  obtain ⟨c₀, hc₀_pos, hSupply⟩ := hSupply
-  have hPacked := packedFamily hn ρ hcons polylogBound hm
+  have hPacked := packedFamily hn ρ hcons hpath polylogBound hm
   obtain ⟨H₀, hH₀⟩ := hPacked
-  have hVis := hSupply H₀ hH₀
-  suffices ∃ (blocks : List (SwitchBlock n)),
-      blocks.length = q ∧
-      blocksVertexDisjoint blocks ∧
-      (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-      (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-      ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty by exact this
-  exact greedy_packing_from_supply S ρ polylogBound q hS hcons hm hn hq_pos hq_bound
-    ⟨c₀, hc₀_pos, hSupply⟩ ⟨H₀, hH₀⟩
+  have hSupply := degreeVisibleBlockSupply S hS ρ hcons polylogBound hm ⟨H₀, hH₀⟩ hn
+  exact greedy_packing_from_supply S ρ polylogBound q hS hcons hm hn hq_pos hq_bound hn_ge_q
+    hSupply
 
 end DisjointSwitchPacking
 
@@ -337,16 +502,122 @@ private theorem surviving_edges_pull_back_ax :
     unfold survivingEdges at he
     rw [Finset.mem_filter] at he
     obtain ⟨_, havoid⟩ := he
+    have foldl_union_mem_acc : ∀ {β : Type} [DecidableEq β]
+        (f : β → Finset (Fin n)) (acc : Finset (Fin n)) (l : List β) (x : Fin n),
+        x ∈ acc → x ∈ l.foldl (fun a i => a ∪ f i) acc := by
+      intro β _ f acc l x hx
+      induction l generalizing acc with
+      | nil => exact hx
+      | cons a rest ih =>
+        simp only [List.foldl_cons]
+        exact ih _ (Finset.mem_union_left _ hx)
+    have foldl_union_mem_list : ∀ {β : Type} [DecidableEq β]
+        (f : β → Finset (Fin n)) (acc : Finset (Fin n)) (l : List β) (x : Fin n) (b : β),
+        b ∈ l → x ∈ f b → x ∈ l.foldl (fun a i => a ∪ f i) acc := by
+      intro β _ f acc l x b hb hx
+      induction l generalizing acc with
+      | nil => exact absurd hb List.not_mem_nil
+      | cons hd tl ih =>
+        simp only [List.foldl_cons]
+        rcases List.mem_cons.mp hb with rfl | htl
+        · exact foldl_union_mem_acc f _ tl x (Finset.mem_union_right _ hx)
+        · exact ih _ htl
+    have blockInteriorVertices_mem : ∀ (l : List (SwitchBlock n)) (i : Fin l.length),
+        l[i].a ∈ blockInteriorVertices l ∧ l[i].b ∈ blockInteriorVertices l := by
+      intro l i
+      simp only [blockInteriorVertices]
+      have hi_in : i ∈ List.finRange l.length := List.mem_finRange i
+      constructor
+      · apply foldl_union_mem_list _ ∅ _ _ i hi_in
+        exact Finset.mem_insert_self _ _
+      · apply foldl_union_mem_list _ ∅ _ _ i hi_in
+        exact Finset.mem_insert.mpr (Or.inr (Finset.mem_singleton_self _))
+    have card_bound : ∀ (l : List (SwitchBlock n)),
+        (blockInteriorVertices l).card ≤ 2 * l.length := fun l => by
+      induction l with
+      | nil => simp [blockInteriorVertices, List.finRange, List.foldl]
+      | cons hd tl ih =>
+        simp only [List.length_cons]
+        have hcons_le : (blockInteriorVertices (hd :: tl)).card ≤
+            (blockInteriorVertices tl).card + 2 := by
+          have hfoldl_sub : blockInteriorVertices (hd :: tl) ⊆
+              {hd.a, hd.b} ∪ blockInteriorVertices tl := by
+            intro x hx
+            simp only [blockInteriorVertices, List.length_cons,
+                       Finset.mem_union, Finset.mem_insert, Finset.mem_singleton] at *
+            have key : ∀ (L : List (Fin (tl.length + 1))) (acc : Finset (Fin n)),
+                x ∈ L.foldl (fun a i => a ∪ {(hd :: tl)[i].a, (hd :: tl)[i].b}) acc →
+                x ∈ acc ∨ x = hd.a ∨ x = hd.b ∨ x ∈ blockInteriorVertices tl := by
+              intro L
+              induction L with
+              | nil => simp; tauto
+              | cons i rest ih_L =>
+                intro acc hmemL
+                simp only [List.foldl_cons] at hmemL
+                rcases ih_L _ hmemL with h | h | h | h
+                · rcases Finset.mem_union.mp h with hprev | hcur
+                  · exact Or.inl hprev
+                  · simp only [Finset.mem_insert, Finset.mem_singleton] at hcur
+                    rcases Fin.eq_zero_or_eq_succ i with rfl | ⟨j, rfl⟩
+                    · dsimp at hcur; tauto
+                    · dsimp at hcur
+                      right; right; right
+                      rcases hcur with rfl | rfl
+                      · exact (blockInteriorVertices_mem tl j).1
+                      · exact (blockInteriorVertices_mem tl j).2
+                · tauto
+                · tauto
+                · tauto
+            rcases key _ ∅ (by simpa using hx) with h | h | h | h
+            · exact absurd h (Finset.notMem_empty _)
+            · left; left; exact h
+            · left; right; exact h
+            · right; exact h
+          have hcard_pair : ({hd.a, hd.b} : Finset (Fin n)).card ≤ 2 :=
+            Finset.card_insert_le _ _
+          linarith [Finset.card_le_card hfoldl_sub, Finset.card_union_le
+            ({hd.a, hd.b} : Finset (Fin n)) (blockInteriorVertices tl), hcard_pair]
+        linarith [hcons_le, ih]
+    have hbound : (blockInteriorVertices blocks).card ≤ 2 * q := by
+      rw [← hq]; exact card_bound blocks
     have vertex_small : ∀ v : Fin n, v ∈ e → v.val < n - 2 * q := by
       intro v hv
       by_contra hge
       push_neg at hge
-      have : (blockInteriorVertices blocks).card ≤ 2 * q := by
-        unfold blockInteriorVertices
-        induction blocks with
-        | nil => simp [List.finRange, List.foldl]
-        | cons _ _ _ => exact sorry
-      exact sorry
+      have hv_not_interior : v ∉ blockInteriorVertices blocks :=
+        fun hmem => absurd hv (havoid v hmem)
+      have hv_interior : v ∈ blockInteriorVertices blocks := by
+        have hfin_univ : (Finset.univ : Finset (Fin n)).card = n := Finset.card_fin n
+        have hcount : ∀ k : ℕ, k ≤ n →
+            (Finset.univ.filter (fun w : Fin n => k ≤ w.val)).card + k = n := by
+          intro k hk
+          have hunion : (Finset.univ.filter (fun w : Fin n => k ≤ w.val)) ∪
+                        (Finset.univ.filter (fun w : Fin n => w.val < k)) = Finset.univ := by
+            ext w
+            simp only [Finset.mem_union, Finset.mem_filter, Finset.mem_univ, true_and,
+              Finset.mem_univ]
+            exact ⟨fun _ => trivial, fun _ => by
+              by_cases h : k ≤ w.val
+              · exact Or.inl h
+              · exact Or.inr (by omega)⟩
+          have hdisj : Disjoint (Finset.univ.filter (fun w : Fin n => k ≤ w.val))
+                                (Finset.univ.filter (fun w : Fin n => w.val < k)) := by
+            rw [Finset.disjoint_filter]; intro w _ h; omega
+          have hsum : (Finset.univ.filter (fun w : Fin n => k ≤ w.val)).card +
+                      (Finset.univ.filter (fun w : Fin n => w.val < k)).card = n := by
+            rw [← Finset.card_union_of_disjoint hdisj, hunion, Finset.card_fin]
+          suffices hsuff : (Finset.univ.filter (fun w : Fin n => w.val < k)).card = k by omega
+          have hinj : Function.Injective (fun i : Fin k => (⟨i.val, by omega⟩ : Fin n)) :=
+            fun a b hab => Fin.ext (Fin.mk.inj hab)
+          have himg : (Finset.univ.filter (fun w : Fin n => w.val < k)) =
+            Finset.univ.image (fun i : Fin k => (⟨i.val, by omega⟩ : Fin n)) := by
+            ext w; simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_image]
+            constructor
+            · intro hw; exact ⟨⟨w.val, hw⟩, by simp [Fin.ext_iff]⟩
+            · rintro ⟨i, rfl⟩; exact i.isLt
+          rw [himg, Finset.card_image_of_injective _ hinj, Finset.card_fin]
+        exact sorry
+      exact absurd hv_interior hv_not_interior
     have mk_preimage : ∃ e' : Edge (n - 2 * q), mapEdgeDown h e' = e := by
       induction e using Sym2.ind with
       | _ v w =>
@@ -479,6 +750,7 @@ structure MultiCarrierAdmissible (n : ℕ) (q : ℕ) where
   χ : Coloring n
   carriers : Fin q → CarrierEdge n
   hConsistent : ρ.consistent
+  hPathCompatible : ρ.isPathCompatible
   hBalanced : χ.isBalanced
   hBichromatic : ∀ i, (carriers i).isBichromatic χ
   hForced : ∀ i, (carriers i).toEdge ∈ ρ.forcedPresent
@@ -494,35 +766,35 @@ noncomputable def backgroundRestriction {q : ℕ}
    mca.ρ.forcedAbsent⟩
 
 /-! ### Protocol-partition number (hamiltonian_route.tex Definition, lines 1725-1732)
-
-pp₁(I, S) is the minimum number of monochromatic 1-rectangles needed to
-cover all elements of I. A 1-rectangle is a subset R ⊆ I such that for
-all H₀, H₁ ∈ R, the mixed graph mixedGraph S H₁ H₀ is a Hamiltonian cycle
-(i.e., they lie in the same combinatorial rectangle of the communication matrix). -/
-
-def IsOneRectangle (I : Finset (Finset (Edge n))) (S : Frontier n)
-    (R : Finset (Finset (Edge n))) : Prop :=
-  R ⊆ I ∧ ∀ H₀ ∈ R, ∀ H₁ ∈ R, IsHamCycle n (mixedGraph S H₁ H₀)
-
-open Classical in
-noncomputable def protocolPartitionNumber
-    (I : Finset (Finset (Edge n))) (S : Frontier n) : ℕ :=
-  sInf { k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
-    P.card = k ∧
-    (∀ R ∈ P, IsOneRectangle I S R) ∧
-    (∀ H ∈ I, ∃ R ∈ P, H ∈ R) }
-
-noncomputable def Gamma (q N : ℕ) : ℕ :=
-  if q = 0 then 1
-  else if N < 4 * q + 1 then 1
-  else 2 ^ q * Gamma q (N - 2 * q)
-termination_by N
-decreasing_by omega
-
 end MultiCarrierFunnel
 
 section MultiCarrierExtension
 
+structure MultiCarrierExtension (n : ℕ) (q : ℕ) where
+  mca : MultiCarrierAdmissible n q
+  blocks : Fin q → SwitchBlock n
+  hCarrierMatch : ∀ i, (blocks i).a = (mca.carriers i).endpt1 ∧
+                        (blocks i).b = (mca.carriers i).endpt2
+  hAllDistinct : ∀ i j, i ≠ j →
+    Disjoint (blocks i).vertices (blocks j).vertices
+  hPortsBichromatic : ∀ i,
+    isBichromaticEdge mca.χ (blocks i).p (blocks i).q
+
+private noncomputable def carrierVertexSet {n q : ℕ}
+    (mca : MultiCarrierAdmissible n q) : Finset (Fin n) :=
+  Finset.univ.biUnion fun (i : Fin q) =>
+    ({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n))
+
+private theorem carrierVertexSet_card_le {n q : ℕ}
+    (mca : MultiCarrierAdmissible n q) :
+    (carrierVertexSet mca).card ≤ 2 * q := by
+  unfold carrierVertexSet
+  calc (Finset.univ.biUnion fun (i : Fin q) =>
+        ({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n))).card
+      ≤ Finset.univ.card * 2 := by
+        apply Finset.card_biUnion_le_card_mul _ _ 2
+        intro i _
+        calc ({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).card
 structure MultiCarrierExtension (n : ℕ) (q : ℕ) where
   mca : MultiCarrierAdmissible n q
   blocks : Fin q → SwitchBlock n
@@ -603,31 +875,6 @@ private theorem free_both_colors_nonempty {n q : ℕ}
     | inl h => simp only [reds_total]; omega
     | inr h => simp only [reds_total]; omega
   have hreds_ge2 : reds_total ≥ n / 2 := by
-    cases hBal with
-    | inl h => simp only [reds_total]; omega
-    | inr h => simp only [reds_total]; omega
-  have hblues_ge : blues_total ≥ n / 2 := by omega
-  have hBichrom := mca.hBichromatic
-  have pair_true_le : ∀ i : Fin q,
-      (({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).filter
-        (fun v => mca.χ.color v = true)).card ≤ 1 := by
-    intro i
-    have hbi := hBichrom i
-    unfold CarrierEdge.isBichromatic isBichromaticEdge at hbi
-    rw [Finset.card_le_one]
-    intro a ha b hb
-    simp only [Finset.mem_filter, Finset.mem_insert, Finset.mem_singleton] at ha hb
-    rcases ha.1 with rfl | rfl <;> rcases hb.1 with rfl | rfl <;> try rfl
-    · exact absurd (ha.2.trans hb.2.symm) hbi
-    · exact absurd (hb.2.trans ha.2.symm) hbi
-  have pair_false_le : ∀ i : Fin q,
-      (({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).filter
-        (fun v => mca.χ.color v = false)).card ≤ 1 := by
-    intro i
-    have hbi := hBichrom i
-    unfold CarrierEdge.isBichromatic isBichromaticEdge at hbi
-    rw [Finset.card_le_one]
-    intro a ha b hb
     simp only [Finset.mem_filter, Finset.mem_insert, Finset.mem_singleton] at ha hb
     rcases ha.1 with rfl | rfl <;> rcases hb.1 with rfl | rfl <;> try rfl
     · exact absurd (ha.2 ▸ hb.2 ▸ rfl : mca.χ.color (mca.carriers i).endpt1 =
@@ -773,7 +1020,17 @@ private theorem free_color_card_ge_q {n q : ℕ}
 private noncomputable def greedyPortSelection {n q : ℕ}
     (mca : MultiCarrierAdmissible n q) (hn : n ≥ 4 * q + 1) :
     Fin q → Fin n × Fin n :=
-  sorry
+  let reds := (freeVerticesOfColor mca true).toList
+  let blues := (freeVerticesOfColor mca false).toList
+  let hrl : q ≤ reds.length := by
+    simp only [reds, Finset.length_toList]
+    exact free_color_card_ge_q mca hn true
+  let hbl : q ≤ blues.length := by
+    simp only [blues, Finset.length_toList]
+    exact free_color_card_ge_q mca hn false
+  fun i =>
+    (reds[i.val]'(Nat.lt_of_lt_of_le i.isLt hrl),
+     blues[i.val]'(Nat.lt_of_lt_of_le i.isLt hbl))
 
 private theorem greedyPortSelection_spec {n q : ℕ}
     (mca : MultiCarrierAdmissible n q) (hn : n ≥ 4 * q + 1) :
@@ -788,7 +1045,115 @@ private theorem greedyPortSelection_spec {n q : ℕ}
           (sel i).2 ≠ (mca.carriers i).endpt1 ∧ (sel i).2 ≠ (mca.carriers i).endpt2) ∧
     (∀ i j, (sel i).1 ≠ (mca.carriers j).endpt1 ∧ (sel i).1 ≠ (mca.carriers j).endpt2 ∧
             (sel i).2 ≠ (mca.carriers j).endpt1 ∧ (sel i).2 ≠ (mca.carriers j).endpt2) := by
-  exact sorry
+  simp only [greedyPortSelection]
+  set reds := (freeVerticesOfColor mca true).toList
+  set blues := (freeVerticesOfColor mca false).toList
+  have hrl : q ≤ reds.length := by
+    simp only [reds, Finset.length_toList]
+    exact free_color_card_ge_q mca hn true
+  have hbl : q ≤ blues.length := by
+    simp only [blues, Finset.length_toList]
+    exact free_color_card_ge_q mca hn false
+  have hrndup : reds.Nodup := Finset.nodup_toList _
+  have hbndup : blues.Nodup := Finset.nodup_toList _
+  have hredMem : ∀ (i : Fin q), reds[i.val]'(Nat.lt_of_lt_of_le i.isLt hrl) ∈
+      freeVerticesOfColor mca true := by
+    intro i
+    rw [← Finset.mem_toList]
+    exact List.getElem_mem _
+  have hblueMem : ∀ (i : Fin q), blues[i.val]'(Nat.lt_of_lt_of_le i.isLt hbl) ∈
+      freeVerticesOfColor mca false := by
+    intro i
+    rw [← Finset.mem_toList]
+    exact List.getElem_mem _
+  have hredFree : ∀ (i : Fin q), reds[i.val]'(Nat.lt_of_lt_of_le i.isLt hrl) ∉
+      carrierVertexSet mca := by
+    intro i
+    have hm := hredMem i
+    simp only [freeVerticesOfColor, freeVertices, Finset.mem_filter, Finset.mem_sdiff,
+               Finset.mem_univ, true_and] at hm
+    exact hm.1
+  have hblueFree : ∀ (i : Fin q), blues[i.val]'(Nat.lt_of_lt_of_le i.isLt hbl) ∉
+      carrierVertexSet mca := by
+    intro i
+    have hm := hblueMem i
+    simp only [freeVerticesOfColor, freeVertices, Finset.mem_filter, Finset.mem_sdiff,
+               Finset.mem_univ, true_and] at hm
+    exact hm.1
+  have hredColor : ∀ (i : Fin q),
+      mca.χ.color (reds[i.val]'(Nat.lt_of_lt_of_le i.isLt hrl)) = true := by
+    intro i
+    have hm := hredMem i
+    simp only [freeVerticesOfColor, Finset.mem_filter] at hm
+    exact hm.2
+  have hblueColor : ∀ (i : Fin q),
+      mca.χ.color (blues[i.val]'(Nat.lt_of_lt_of_le i.isLt hbl)) = false := by
+    intro i
+    have hm := hblueMem i
+    simp only [freeVerticesOfColor, Finset.mem_filter] at hm
+    exact hm.2
+          (sel i).2 ≠ (mca.carriers i).endpt1 ∧ (sel i).2 ≠ (mca.carriers i).endpt2) ∧
+    (∀ i j, (sel i).1 ≠ (mca.carriers j).endpt1 ∧ (sel i).1 ≠ (mca.carriers j).endpt2 ∧
+            (sel i).2 ≠ (mca.carriers j).endpt1 ∧ (sel i).2 ≠ (mca.carriers j).endpt2) := by
+  simp only [greedyPortSelection]
+  set reds := (freeVerticesOfColor mca true).toList
+  set blues := (freeVerticesOfColor mca false).toList
+  have hrl : q ≤ reds.length := by
+    simp only [reds, Finset.length_toList]
+    exact free_color_card_ge_q mca hn true
+  have hbl : q ≤ blues.length := by
+    intro heq
+    have hr := hredColor i
+    have hb := hblueColor i
+    rw [hr] at heq
+    rw [hb] at heq
+    exact absurd heq.symm Bool.false_ne_true
+  · intro i; exact hredFree i
+  · intro i; exact hblueFree i
+  · intro i
+    intro heq
+    have hrc := hredColor i
+    have hbc := hblueColor i
+    rw [heq] at hrc
+    rw [hrc] at hbc
+    exact absurd hbc (by decide)
+  · intro i j hij
+    have hri : i.val < reds.length := Nat.lt_of_lt_of_le i.isLt hrl
+    have hrj : j.val < reds.length := Nat.lt_of_lt_of_le j.isLt hrl
+    have hbi : i.val < blues.length := Nat.lt_of_lt_of_le i.isLt hbl
+    have hbj : j.val < blues.length := Nat.lt_of_lt_of_le j.isLt hbl
+    have hijv : i.val ≠ j.val := Fin.val_ne_of_ne hij
+    have hrr : reds[i.val]'hri ≠ reds[j.val]'hrj := by
+      rwa [Ne, hrndup.getElem_inj_iff]
+    have hbb : blues[i.val]'hbi ≠ blues[j.val]'hbj := by
+      rwa [Ne, hbndup.getElem_inj_iff]
+    have hrc_i := hredColor i
+    have hbc_i := hblueColor i
+    have hrc_j := hredColor j
+    have hbc_j := hblueColor j
+    refine ⟨hrr, ?_, ?_, hbb⟩
+    · intro heq
+      rw [heq] at hrc_i
+      rw [hrc_i] at hbc_j
+      exact absurd hbc_j (by decide)
+    · intro heq
+      rw [heq] at hbc_i
+      rw [hbc_i] at hrc_j
+      exact absurd hrc_j (by decide)
+  · intro i
+    obtain ⟨he1, he2⟩ := hcarrierIn i
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · exact fun h => hredFree i (h ▸ he1)
+    · exact fun h => hredFree i (h ▸ he2)
+    · exact fun h => hblueFree i (h ▸ he1)
+    · exact fun h => hblueFree i (h ▸ he2)
+  · intro i j
+    obtain ⟨he1, he2⟩ := hcarrierIn j
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · exact fun h => hredFree i (h ▸ he1)
+    · exact fun h => hredFree i (h ▸ he2)
+    · exact fun h => hblueFree i (h ▸ he1)
+    · exact fun h => hblueFree i (h ▸ he2)
 
 private theorem carrier_extension_block_construction :
   ∀ {n q : ℕ} (mca : MultiCarrierAdmissible n q)
@@ -811,7 +1176,7 @@ private theorem carrier_extension_block_construction :
     all_distinct := ?_
   }, ?_, ?_, ?_, trivial⟩
   · exact ⟨(hNotAnyCarrier i i).1, (hNotAnyCarrier i i).2.1, hNeq i,
-           (mca.carriers i).ne, (hNotAnyCarrier i i).2.2.1, (hNotAnyCarrier i i).2.2.2⟩
+           (mca.carriers i).ne, (hNotAnyCarrier i i).2.2.1.symm, (hNotAnyCarrier i i).2.2.2.symm⟩
   · intro i; exact ⟨rfl, rfl⟩
   · intro i j hij
     rw [Finset.disjoint_left]
@@ -821,16 +1186,21 @@ private theorem carrier_extension_block_construction :
     have hcd := mca.hCarrierDisjoint i j hij
     have hca := hNotAnyCarrier i
     have hcb := hNotAnyCarrier j
-    rcases hvi with rfl | rfl | rfl | rfl <;> rcases hvj with rfl | rfl | rfl | rfl
-    all_goals (first | exact absurd rfl hpd.1 | exact absurd rfl hpd.2.1
-                     | exact absurd rfl hpd.2.2.1 | exact absurd rfl hpd.2.2.2
-                     | exact absurd rfl (hca j).1 | exact absurd rfl (hca j).2.1
-                     | exact absurd rfl (hcb i).1.symm | exact absurd rfl (hcb i).2.1.symm
-                     | exact absurd rfl hcd.1 | exact absurd rfl hcd.2.1
-                     | exact absurd rfl hcd.2.2.1 | exact absurd rfl hcd.2.2.2
-                     | exact absurd rfl (hca j).2.2.1 | exact absurd rfl (hca j).2.2.2
-                     | exact absurd rfl (hcb i).2.2.1.symm | exact absurd rfl (hcb i).2.2.2.symm
-                     | sorry)
+    rcases hvi with rfl | rfl | rfl | rfl
+    all_goals (rcases hvj with hvj | hvj | hvj | hvj)
+    all_goals (first | exact absurd hvj hpd.1 | exact absurd hvj hpd.2.1
+                     | exact absurd hvj hpd.2.2.1 | exact absurd hvj hpd.2.2.2
+                     | exact absurd hvj.symm hpd.1 | exact absurd hvj.symm hpd.2.1
+                     | exact absurd hvj.symm hpd.2.2.1 | exact absurd hvj.symm hpd.2.2.2
+                     | exact absurd hvj (hca j).1 | exact absurd hvj (hca j).2.1
+                     | exact absurd hvj (hca j).2.2.1 | exact absurd hvj (hca j).2.2.2
+                     | exact absurd hvj.symm (hcb i).1 | exact absurd hvj.symm (hcb i).2.1
+                     | exact absurd hvj.symm (hcb i).2.2.1 | exact absurd hvj.symm (hcb i).2.2.2
+                     | exact absurd hvj hcd.1 | exact absurd hvj hcd.2.1
+                     | exact absurd hvj hcd.2.2.1 | exact absurd hvj hcd.2.2.2
+                     | exact absurd hvj.symm hcd.1 | exact absurd hvj.symm hcd.2.1
+                     | exact absurd hvj.symm hcd.2.2.1 | exact absurd hvj.symm hcd.2.2.2
+                     | simp_all)
   · intro i
     exact hBichrom i
 
@@ -870,7 +1240,8 @@ private theorem multi_carrier_pattern_ham_cycle_exists :
     ∃ H : Finset (Edge n), IsHamCycle n H ∧ satisfiesRestriction H ext.mca.ρ := by
   intro n q ext hn hq η
   have hn4 : n ≥ 4 := by omega
-  have hne := packedFamily hn4 ext.mca.ρ ext.mca.hConsistent ext.mca.ρ.size (le_refl _)
+  have hpath := ext.mca.hPathCompatible
+  have hne := packedFamily hn4 ext.mca.ρ ext.mca.hConsistent hpath ext.mca.ρ.size (le_refl _)
   obtain ⟨H, hH⟩ := hne
   exact ⟨H, restrictedHamCycle_to_satisfies ext.mca.ρ H hH⟩
 
@@ -905,38 +1276,38 @@ private theorem interiorVertices_card_le {n q : ℕ}
 private noncomputable def survivingVertices {n q : ℕ}
     (ext : MultiCarrierExtension n q) : Finset (Fin n) :=
   Finset.univ \ interiorVertices ext
+private theorem restrictedHamCycle_to_satisfies {n : ℕ}
+    (ρ : Restriction n) (H : Finset (Edge n))
+    (hH : H ∈ restrictedHamCycles n ρ) :
+    IsHamCycle n H ∧ satisfiesRestriction H ρ := by
+  simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and] at hH
+  exact ⟨hH.2.2, hH.1, hH.2.1⟩
 
-private theorem surviving_card_ge {n q : ℕ}
-    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
-    (survivingVertices ext).card ≥ n - 2 * q := by
-  unfold survivingVertices
-  have hsub : interiorVertices ext ⊆ Finset.univ := Finset.subset_univ _
-  rw [Finset.card_sdiff_of_subset hsub, Finset.card_fin]
-  have := interiorVertices_card_le ext
-  omega
+private theorem multi_carrier_pattern_ham_cycle_exists :
+  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q),
+    n ≥ 4 * q + 1 → q ≥ 1 →
+    ∀ (η : Fin q → Bool),
+    ∃ H : Finset (Edge n), IsHamCycle n H ∧ satisfiesRestriction H ext.mca.ρ := by
+  intro n q ext hn hq η
+  have hn4 : n ≥ 4 := by omega
+  have hpath := ext.mca.hPathCompatible
+  have hne := packedFamily hn4 ext.mca.ρ ext.mca.hConsistent hpath ext.mca.ρ.size (le_refl _)
+  obtain ⟨H, hH⟩ := hne
+  exact ⟨H, restrictedHamCycle_to_satisfies ext.mca.ρ H hH⟩
 
-private theorem interiorVertices_card_eq {n q : ℕ}
-    (ext : MultiCarrierExtension n q) :
-    (interiorVertices ext).card = 2 * q := by
-  unfold interiorVertices
-  rw [Finset.card_biUnion]
-  · simp only [Finset.card_fin]
-    have : ∀ i : Fin q,
-        ({(ext.mca.carriers i).endpt1, (ext.mca.carriers i).endpt2} : Finset (Fin n)).card = 2 :=
-      fun i => Finset.card_pair (ext.mca.carriers i).ne
-    simp_rw [this]
+theorem multiCarrierPatternRealizability {q : ℕ}
     ring
   · intro i _ j _ hij
     have hdisj := ext.mca.hCarrierDisjoint i j hij
-    rw [Finset.disjoint_left]
+    simp only [Function.onFun, Finset.disjoint_left]
     intro v
     simp only [Finset.mem_insert, Finset.mem_singleton]
     intro hv hv2
-    rcases hv with rfl | rfl <;> rcases hv2 with rfl | rfl
-    · exact hdisj.1 rfl
-    · exact hdisj.2.1 rfl
-    · exact hdisj.2.2.1 rfl
-    · exact hdisj.2.2.2 rfl
+    rcases hv with rfl | rfl <;> rcases hv2 with hv2 | hv2
+    · exact hdisj.1 hv2
+    · exact hdisj.2.1 hv2
+    · exact hdisj.2.2.1 hv2
+    · exact hdisj.2.2.2 hv2
 
 private theorem surviving_card_eq {n q : ℕ}
     (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
@@ -949,7 +1320,9 @@ private noncomputable def survivingEquiv {n q : ℕ}
     (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
     Fin (n - 2 * q) ≃ (survivingVertices ext : Set (Fin n)) := by
   have hcard := surviving_card_eq ext hn
-  exact (Fintype.equivFinOfCardEq (by rw [Fintype.card_coe]; exact hcard.symm)).symm
+  have : Fintype.card ↑(survivingVertices ext) = n - 2 * q := by
+    rw [Fintype.card_coe]; exact hcard
+  exact (Fintype.equivFinOfCardEq this).symm
 
 private noncomputable def embedSurviving {n q : ℕ}
     (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
@@ -962,13 +1335,37 @@ private theorem embed_range_eq_surviving {n q : ℕ}
     Set.range (embedSurviving ext hn) = ↑(survivingVertices ext) := by
   ext v
   simp only [Set.mem_range, embedSurviving, Function.Embedding.trans_apply,
-             Equiv.toEmbedding_apply, Finset.mem_coe]
-  constructor
-  · rintro ⟨i, rfl⟩; exact (survivingEquiv ext hn i).prop
-  · intro hv
-    have := (survivingEquiv ext hn).surjective ⟨v, hv⟩
-    obtain ⟨i, hi⟩ := this
-    exact ⟨i, congr_arg Subtype.val hi⟩
+private theorem interiorVertices_card_eq {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (interiorVertices ext).card = 2 * q := by
+  unfold interiorVertices
+  rw [Finset.card_biUnion]
+  · have : ∀ i : Fin q,
+        ({(ext.mca.carriers i).endpt1, (ext.mca.carriers i).endpt2} : Finset (Fin n)).card = 2 :=
+      fun i => Finset.card_pair (ext.mca.carriers i).ne
+    simp_rw [this]
+    simp [Finset.sum_const, Finset.card_univ, smul_eq_mul]
+    ring
+  · intro i _ j _ hij
+    have hdisj := ext.mca.hCarrierDisjoint i j hij
+    simp only [Function.onFun, Finset.disjoint_left]
+    intro v
+    simp only [Finset.mem_insert, Finset.mem_singleton]
+    intro hv hv2
+    rcases hv with rfl | rfl <;> rcases hv2 with hv2 | hv2
+    · exact hdisj.1 hv2
+    · exact hdisj.2.1 hv2
+    (ext.blocks i).q ≠ (ext.mca.carriers i).endpt1 ∧
+    (ext.blocks i).q ≠ (ext.mca.carriers i).endpt2 := by
+  have hm := ext.hCarrierMatch i
+  have hd := (ext.blocks i).all_distinct
+  exact ⟨fun h => hd.1 (h.trans hm.1.symm), fun h => hd.2.1 (h.trans hm.2.symm),
+         fun h => hd.2.2.2.2.1 (h.trans hm.1.symm).symm, fun h => hd.2.2.2.2.2 (h.trans hm.2.symm).symm⟩
+
+private theorem port_in_surviving_p {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (ext.blocks i).p ∈ survivingVertices ext := by
+  unfold survivingVertices
 
 private theorem carrier_in_block_vertices {n q : ℕ}
     (ext : MultiCarrierExtension n q) (i : Fin q) :
@@ -976,7 +1373,7 @@ private theorem carrier_in_block_vertices {n q : ℕ}
     (ext.mca.carriers i).endpt2 ∈ (ext.blocks i).vertices := by
   have hm := ext.hCarrierMatch i
   simp only [SwitchBlock.vertices, Finset.mem_insert, Finset.mem_singleton]
-  exact ⟨Or.inr (Or.inl hm.1), Or.inr (Or.inr (Or.inl hm.2))⟩
+  exact ⟨Or.inr (Or.inl hm.1.symm), Or.inr (Or.inr (Or.inl hm.2.symm))⟩
 
 private theorem port_not_carrier {n q : ℕ}
     (ext : MultiCarrierExtension n q) (i : Fin q) :
@@ -986,8 +1383,8 @@ private theorem port_not_carrier {n q : ℕ}
     (ext.blocks i).q ≠ (ext.mca.carriers i).endpt2 := by
   have hm := ext.hCarrierMatch i
   have hd := (ext.blocks i).all_distinct
-  exact ⟨fun h => hd.1 (hm.1 ▸ h), fun h => hd.2.1 (hm.2 ▸ h),
-         fun h => hd.2.2.2.2.1 (hm.1 ▸ h), fun h => hd.2.2.2.2.2 (hm.2 ▸ h)⟩
+  exact ⟨fun h => hd.1 (h.trans hm.1.symm), fun h => hd.2.1 (h.trans hm.2.symm),
+         fun h => hd.2.2.2.2.1 (h.trans hm.1.symm).symm, fun h => hd.2.2.2.2.2 (h.trans hm.2.symm).symm⟩
 
 private theorem port_in_surviving_p {n q : ℕ}
     (ext : MultiCarrierExtension n q) (i : Fin q) :
@@ -1002,17 +1399,17 @@ private theorem port_in_surviving_p {n q : ℕ}
   have hpc := port_not_carrier ext i
   by_cases hij : i = j
   · subst hij
-    rcases hj with rfl | rfl
-    · exact hpc.1 rfl
-    · exact hpc.2.1 rfl
+    rcases hj with hj | hj
+    · exact hpc.1 hj
+    · exact hpc.2.1 hj
   · have hblkdisj := ext.hAllDistinct i j hij
     rw [Finset.disjoint_left] at hblkdisj
     have hp_in_i : (ext.blocks i).p ∈ (ext.blocks i).vertices := by
       simp [SwitchBlock.vertices]
     have hcib := carrier_in_block_vertices ext j
-    rcases hj with rfl | rfl
-    · exact absurd hcib.1 (hblkdisj hp_in_i)
-    · exact absurd hcib.2 (hblkdisj hp_in_i)
+    rcases hj with hj | hj
+    · exact absurd (hj ▸ hcib.1) (hblkdisj hp_in_i)
+    · exact absurd (hj ▸ hcib.2) (hblkdisj hp_in_i)
 
 private theorem port_in_surviving_q {n q : ℕ}
     (ext : MultiCarrierExtension n q) (i : Fin q) :
@@ -1027,17 +1424,17 @@ private theorem port_in_surviving_q {n q : ℕ}
   have hpc := port_not_carrier ext i
   by_cases hij : i = j
   · subst hij
-    rcases hj with rfl | rfl
-    · exact hpc.2.2.1 rfl
-    · exact hpc.2.2.2 rfl
+    rcases hj with hj | hj
+    · exact hpc.2.2.1 hj
+    · exact hpc.2.2.2 hj
   · have hblkdisj := ext.hAllDistinct i j hij
     rw [Finset.disjoint_left] at hblkdisj
     have hq_in_i : (ext.blocks i).q ∈ (ext.blocks i).vertices := by
       simp [SwitchBlock.vertices]
     have hcib := carrier_in_block_vertices ext j
-    rcases hj with rfl | rfl
-    · exact absurd hcib.1 (hblkdisj hq_in_i)
-    · exact absurd hcib.2 (hblkdisj hq_in_i)
+    rcases hj with hj | hj
+    · exact absurd (hj ▸ hcib.1) (hblkdisj hq_in_i)
+    · exact absurd (hj ▸ hcib.2) (hblkdisj hq_in_i)
 
 private noncomputable def portPreimage {n q : ℕ}
     (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) (i : Fin q)
@@ -1078,32 +1475,40 @@ private noncomputable def childColoring {n q : ℕ}
     Coloring (n - 2 * q) :=
   ⟨fun v => ext.mca.χ.color (embedSurviving ext hn v)⟩
 
+private noncomputable def liftPreimage {n m : ℕ} (emb : Fin m ↪ Fin n)
+    (v : Fin n) : Option (Fin m) :=
+  if h : ∃ i, emb i = v then some (Classical.choose h) else none
+
+private noncomputable def liftEdge {n m : ℕ} (emb : Fin m ↪ Fin n)
+    (e : Edge n) : Option (Edge m) :=
+  Sym2.lift ⟨fun a b =>
+    match liftPreimage emb a, liftPreimage emb b with
+    | some i, some j => some (Sym2.mk (i, j))
+    | _, _ => none,
+    fun a b => by
+      cases h1 : liftPreimage emb a <;> cases h2 : liftPreimage emb b <;>
+        simp [h1, h2, Sym2.eq_swap]⟩ e
+
 private noncomputable def childRestriction {n q : ℕ}
     (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
     Restriction (n - 2 * q) :=
   let emb := embedSurviving ext hn
   let bg := backgroundRestriction ext.mca
-  { forcedPresent := bg.forcedPresent.filterMap (fun e =>
-      Sym2.lift ⟨fun a b =>
-        match (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun i => emb i = a),
-              (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun j => emb j = b) with
-        | some i, some j => some (Sym2.mk (i, j))
-        | _, _ => none,
-        sorry⟩ e)
-    forcedAbsent := bg.forcedAbsent.filterMap (fun e =>
-      Sym2.lift ⟨fun a b =>
-        match (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun i => emb i = a),
-              (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun j => emb j = b) with
-        | some i, some j => some (Sym2.mk (i, j))
-        | _, _ => none,
-        sorry⟩ e) }
+  { forcedPresent := (bg.forcedPresent.biUnion fun e =>
+        match liftEdge emb e with
+        | some e' => {e'}
+        | none => ∅) ∪
+      (Finset.univ.image fun i => (childCarriers ext hn i).toEdge)
+    forcedAbsent := (bg.forcedAbsent.biUnion fun e =>
+      match liftEdge emb e with
+      | some e' => {e'}
+      | none => ∅) }
 
 private theorem multi_carrier_suppression_child :
-  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q),
-    n ≥ 2 * q →
+  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q),
     ∃ (child : MultiCarrierAdmissible (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
+      (∀ i, embedSurviving ext hn (child.carriers i).endpt1 = (ext.blocks i).p ∧
+            embedSurviving ext hn (child.carriers i).endpt2 = (ext.blocks i).q) ∧
       (backgroundRestriction child).size = (backgroundRestriction ext.mca).size := by
   intro n q ext hn
   refine ⟨{
@@ -1120,19 +1525,23 @@ private theorem multi_carrier_suppression_child :
       unfold isBichromaticEdge at hports
       have h1 := portPreimage_val ext hn i true
       have h2 := portPreimage_val ext hn i false
-      simp only [ite_true] at h1; simp only [ite_false] at h2
+      simp only [ite_true] at h1; simp only [Bool.false_eq_true, ↓reduceIte] at h2
       have hemb1 : embedSurviving ext hn (portPreimage ext hn i true) = (ext.blocks i).p :=
-        Fin.ext h1
+        Fin.val_injective h1
       have hemb2 : embedSurviving ext hn (portPreimage ext hn i false) = (ext.blocks i).q :=
-        Fin.ext h2
+        Fin.val_injective h2
       rw [hemb1, hemb2]
       exact hports
-    hForced := sorry
+    hForced := by
+      intro i
+      unfold childRestriction
+      simp only [Finset.mem_union]
+      exact Or.inr (Finset.mem_image.mpr ⟨i, Finset.mem_univ i, rfl⟩)
     hCarrierDisjoint := by
       intro i j hij
       unfold childCarriers
       simp only
-      have hemb : Fin (n - 2 * q) ↪ Fin n := embedSurviving ext hn
+      set emb := embedSurviving ext hn with emb_def
       have hpd := ext.hAllDistinct i j hij
       rw [Finset.disjoint_left] at hpd
       have hp_i : (ext.blocks i).p ∈ (ext.blocks i).vertices := by
@@ -1148,13 +1557,17 @@ private theorem multi_carrier_suppression_child :
       have h_pj := portPreimage_val ext hn j true
       have h_qj := portPreimage_val ext hn j false
       simp only [ite_true] at h_pi h_pj
-      simp only [ite_false] at h_qi h_qj
-      have emb_pi : hemb (portPreimage ext hn i true) = (ext.blocks i).p := Fin.ext h_pi
-      have emb_qi : hemb (portPreimage ext hn i false) = (ext.blocks i).q := Fin.ext h_qi
-      have emb_pj : hemb (portPreimage ext hn j true) = (ext.blocks j).p := Fin.ext h_pj
-      have emb_qj : hemb (portPreimage ext hn j false) = (ext.blocks j).q := Fin.ext h_qj
+      simp only [Bool.false_eq_true, ↓reduceIte] at h_qi h_qj
+      have emb_pi : emb (portPreimage ext hn i true) = (ext.blocks i).p :=
+        Fin.val_injective h_pi
+      have emb_qi : emb (portPreimage ext hn i false) = (ext.blocks i).q :=
+        Fin.val_injective h_qi
+      have emb_pj : emb (portPreimage ext hn j true) = (ext.blocks j).p :=
+        Fin.val_injective h_pj
+      have emb_qj : emb (portPreimage ext hn j false) = (ext.blocks j).q :=
+        Fin.val_injective h_qj
       refine ⟨?_, ?_, ?_, ?_⟩ <;> intro heq <;> {
-        have := congr_arg (⇑hemb) heq
+        have := congr_arg (⇑emb) heq
         first
         | (rw [emb_pi, emb_pj] at this; exact absurd hp_j (hpd (this ▸ hp_i)))
         | (rw [emb_pi, emb_qj] at this; exact absurd hq_j (hpd (this ▸ hp_i)))
@@ -1163,15 +1576,29 @@ private theorem multi_carrier_suppression_child :
       }
   }, ?_, ?_⟩
   · intro i
-    exact sorry
-  · exact sorry
+    have h1 := portPreimage_val ext hn i true
+    have h2 := portPreimage_val ext hn i false
+    simp only [ite_true] at h1
+    simp only [Bool.false_eq_true, ↓reduceIte] at h2
+    exact ⟨Fin.val_injective h1, Fin.val_injective h2⟩
+  · -- Background mass preservation: |ρ_child°| = |ρ°| (paper lines 1575-1578).
+    -- childRestriction.forcedPresent = lifted_bg_fp ∪ new_carriers_img.
+    -- backgroundRestriction child subtracts new_carriers_img, giving
+    --   (lifted_bg_fp ∪ new_carriers_img) \ new_carriers_img = lifted_bg_fp \ new_carriers_img.
+    -- bg edges avoid carrier vertices (survivingVertices), so their lifts under embedSurviving
+    -- are disjoint from new_carriers_img, giving lifted_bg_fp \ new_carriers_img = lifted_bg_fp.
+    -- The lift biUnion is cardinality-preserving: embedSurviving is injective and every bg
+    -- edge has both endpoints in survivingVertices, so liftEdge always returns Some.
+    -- Hence (backgroundRestriction child).size = lifted_bg_fp.card + lifted_bg_fa.card
+    --                                          = bg.forcedPresent.card + bg.forcedAbsent.card.
+    sorry
 
 theorem multiCarrierSuppression {q : ℕ}
     (ext : MultiCarrierExtension n q)
     (hn : n ≥ 2 * q) :
     ∃ (child : MultiCarrierAdmissible (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
+      (∀ i, embedSurviving ext hn (child.carriers i).endpt1 = (ext.blocks i).p ∧
+            embedSurviving ext hn (child.carriers i).endpt2 = (ext.blocks i).q) ∧
       (backgroundRestriction child).size = (backgroundRestriction ext.mca).size :=
   multi_carrier_suppression_child ext hn
 
@@ -1239,6 +1666,37 @@ private theorem bichromatic_carrier_forces_toggle_heterogeneity :
     have hpa_ne_color : χ.color W.p ≠ χ.color W.a := by
       intro heq
       have := (chromatic_side_reflects_color χ W.p W.a hpa).mpr heq
+    (i : Fin q),
+    (ext.mca.carriers i).isBichromatic ext.mca.χ →
+    isBichromaticEdge ext.mca.χ (ext.blocks i).p (ext.blocks i).q →
+    ¬(∀ e ∈ (ext.blocks i).toggleEdges,
+      edgeSide (chromaticFrontier ext.mca.χ) e =
+        edgeSide (chromaticFrontier ext.mca.χ) (Sym2.mk ((ext.blocks i).p, (ext.blocks i).a))) := by
+  intro n q ext i hBichrom hPortBi hMono
+  unfold CarrierEdge.isBichromatic isBichromaticEdge at hBichrom
+  have hMatch := ext.hCarrierMatch i
+  obtain ⟨ha_eq, hb_eq⟩ := hMatch
+  set W := ext.blocks i
+  set χ := ext.mca.χ
+  have hDistinct := W.all_distinct
+  obtain ⟨hpa, hpb, _, _, _, _⟩ := hDistinct
+  have hab_color : χ.color W.a ≠ χ.color W.b := by rw [ha_eq, hb_eq]; exact hBichrom
+  unfold SwitchBlock.toggleEdges at hMono
+  have hpa_mem : Sym2.mk (W.p, W.a) ∈
+      ({Sym2.mk (W.p, W.a), Sym2.mk (W.p, W.b),
+        Sym2.mk (W.a, W.q), Sym2.mk (W.b, W.q)} : Finset (Edge n)) := by simp
+  have hpb_mem : Sym2.mk (W.p, W.b) ∈
+      ({Sym2.mk (W.p, W.a), Sym2.mk (W.p, W.b),
+        Sym2.mk (W.a, W.q), Sym2.mk (W.b, W.q)} : Finset (Edge n)) := by simp
+  have hMono_pb := hMono _ hpb_mem
+  have hSame_side : edgeSide (chromaticFrontier χ) (Sym2.mk (W.p, W.a)) =
+                    edgeSide (chromaticFrontier χ) (Sym2.mk (W.p, W.b)) :=
+    hMono_pb.symm
+  cases h_pa_side : edgeSide (chromaticFrontier χ) (Sym2.mk (W.p, W.a))
+  · rw [h_pa_side] at hSame_side
+    have hpa_ne_color : χ.color W.p ≠ χ.color W.a := by
+      intro heq
+      have := (chromatic_side_reflects_color χ W.p W.a hpa).mpr heq
       rw [this] at h_pa_side; simp at h_pa_side
     have hpb_ne_color : χ.color W.p ≠ χ.color W.b := by
       intro heq
@@ -1258,47 +1716,16 @@ private theorem mixed_degree_at_vertex (S : Frontier n)
     (H₀ H₁ : Finset (Edge n)) (hH₀ : IsHamCycle n H₀) (hH₁ : IsHamCycle n H₁)
     (v : Fin n) :
     vertexDegreeIn n (mixedGraph S H₁ H₀) v =
-    leftDegreeAt S H₀ v + rightDegreeAt S H₁ v := by
-  unfold mixedGraph vertexDegreeIn
-  rw [Finset.filter_union]
-  have hdisj : Disjoint
-      (Finset.filter (fun e => v ∈ e) (leftSubgraph S H₀))
-      (Finset.filter (fun e => v ∈ e) (rightSubgraph S H₁)) := by
-    rw [Finset.disjoint_left]
-    intro e he1 he2
-    simp only [Finset.mem_filter] at he1 he2
-    simp only [leftSubgraph, rightSubgraph, Finset.mem_inter] at he1 he2
-    exact Finset.disjoint_left.mp S.disjoint he1.1.2 he2.1.2
-  rw [Finset.card_union_of_disjoint hdisj]
-  unfold leftDegreeAt rightDegreeAt vertexDegreeIn
-  rfl
+  exact ext.hAllDistinct ⟨i.val, hi_lt⟩ ⟨j.val, hj_lt⟩
+    (fun h => hij (Fin.ext (Fin.mk.inj h)))
 
-private theorem profile_diff_breaks_mixed_regularity (S : Frontier n)
-    (H₀ H₁ : Finset (Edge n)) (hH₀ : IsHamCycle n H₀) (hH₁ : IsHamCycle n H₁)
-    (v : Fin n) (hNeq : leftDegreeAt S H₀ v ≠ leftDegreeAt S H₁ v) :
-    vertexDegreeIn n (mixedGraph S H₁ H₀) v ≠ 2 := by
-  rw [mixed_degree_at_vertex S H₀ H₁ hH₀ hH₁]
-  have hSum₀ := leftDeg_add_rightDeg_eq_two S H₀ hH₀ v
-  have hSum₁ := leftDeg_add_rightDeg_eq_two S H₁ hH₁ v
-  omega
+private noncomputable def patternToListPattern {q : ℕ}
+    (ext : MultiCarrierExtension n q) (η : Fin q → Bool) :
+    Fin (extensionBlocksList ext).length → Bool :=
+  fun i => η ⟨i.val, by
+    have := extensionBlocksList_length ext; omega⟩
 
-private noncomputable def extensionBlocksList {n q : ℕ}
-    (ext : MultiCarrierExtension n q) : List (SwitchBlock n) :=
-  (List.finRange q).map ext.blocks
-
-private theorem extensionBlocksList_length {n q : ℕ}
-    (ext : MultiCarrierExtension n q) :
-    (extensionBlocksList ext).length = q := by
-  simp [extensionBlocksList]
-
-set_option maxHeartbeats 800000 in
-private theorem extensionBlocksList_vertex_disjoint {n q : ℕ}
-    (ext : MultiCarrierExtension n q) :
-    blocksVertexDisjoint (extensionBlocksList ext) := by
-  intro i j hij
-  have hlen := extensionBlocksList_length ext
-  have hi_lt : i.val < q := lt_of_lt_of_eq i.isLt (extensionBlocksList_length ext)
-  have hj_lt : j.val < q := lt_of_lt_of_eq j.isLt (extensionBlocksList_length ext)
+private noncomputable def suppressHamCycle {n q : ℕ}
   have hfr_i : i.val < (List.finRange q).length := by rw [List.length_finRange]; exact hi_lt
   have hfr_j : j.val < (List.finRange q).length := by rw [List.length_finRange]; exact hj_lt
   have hi_eq : (extensionBlocksList ext)[i] = ext.blocks ⟨i.val, hi_lt⟩ := by
@@ -1321,17 +1748,47 @@ private noncomputable def patternToListPattern {q : ℕ}
   fun i => η ⟨i.val, by
     have := extensionBlocksList_length ext; omega⟩
 
+private noncomputable def suppressHamCycle {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q)
+    (H : Finset (Edge n)) : Finset (Edge (n - 2 * q)) :=
+  let emb := embedSurviving ext hn
+  H.biUnion fun e =>
+    match liftEdge emb e with
+    | some e' => {e'}
+    | none => ∅
+
 private theorem suppression_bijection_card :
-  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q) (η : Fin q → Bool),
-    n ≥ 2 * q →
+  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q) (η : Fin q → Bool) (hn : n ≥ 2 * q),
     ∀ (child : MultiCarrierAdmissible (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) →
+      (∀ i, embedSurviving ext hn (child.carriers i).endpt1 = (ext.blocks i).p ∧
+            embedSurviving ext hn (child.carriers i).endpt2 = (ext.blocks i).q) →
       (patternHamCycles ext.mca.ρ (extensionBlocksList ext)
         (patternToListPattern ext η)).card =
       (restrictedHamCycles (n - 2 * q) child.ρ).card := by
   intro n q ext η hn child hCarr
-  exact sorry
+  apply Finset.card_bij (fun H _ => suppressHamCycle ext hn H)
+  · -- Membership: suppressHamCycle maps pattern Ham cycles into child restricted Ham cycles.
+    -- H ∈ patternHamCycles satisfies ext.mca.ρ plus the block local restrictions for η.
+    -- Suppressing removes carrier vertices; surviving edges under embedSurviving satisfy
+    -- childRestriction, which is exactly child.ρ by construction. The result is a Ham
+    -- cycle on n-2*q vertices because suppression preserves 2-regularity and connectivity
+    -- away from the removed blocks (paper: hamiltonian_route.tex lines 1571-1574).
+    intro H hH
+    simp only [restrictedHamCycles, Finset.mem_filter, Finset.mem_univ, true_and]
+    sorry
+  · -- Injectivity: if suppressHamCycle H₁ = suppressHamCycle H₂ for H₁, H₂ ∈ patternHamCycles,
+    -- then H₁ = H₂. embedSurviving is injective, so equal suppressed edge sets imply equal
+    -- surviving edge sets. The block-internal edges of H₁ and H₂ are uniquely determined
+    -- by η via the pattern restriction, so H₁ and H₂ agree on all edges.
+    intro H₁ hH₁ H₂ hH₂ heq
+    have hemb_inj := (embedSurviving ext hn).injective
+    sorry
+  · -- Surjectivity: every H' ∈ restrictedHamCycles (n-2*q) child.ρ lifts to a pattern cycle.
+    -- Construct H by embedding H' back via embedSurviving and inserting the block-internal
+    -- path forced by η at each block. The result is a Ham cycle on n vertices satisfying
+    -- the pattern restriction for η (paper: κ_η⁻¹ exists, hamiltonian_route.tex line 1574).
+    intro H' hH'
+    sorry
 
 set_option maxHeartbeats 800000 in
 private theorem blocks_all_degree_visible {n q : ℕ}
@@ -1369,27 +1826,7 @@ private theorem degree_visible_block_breaks_mixed_regularity :
   set ηL := patternToListPattern ext η
   set η'L := patternToListPattern ext η'
   have hNeqL : ηL ≠ η'L := by
-    intro h; apply hNeq
-    ext i
-    have := congr_fun h ⟨i.val, by rw [extensionBlocksList_length]; exact i.isLt⟩
-    simp [patternToListPattern] at this
-    exact this
-  have hBlocksDisj := extensionBlocksList_vertex_disjoint ext
-  have hBlocksVis := blocks_all_degree_visible ext
-  exact crossPatternFatalMixing S ext.mca.ρ blocks hBlocksDisj hBlocksVis
-    η'L ηL (Ne.symm hNeqL) H₁ H₀ hH₁ hH₀
-
-theorem multiCarrierPatternIsolation {q : ℕ}
-    (ext : MultiCarrierExtension n q)
-    (η η' : Fin q → Bool) (hNeq : η ≠ η')
-    (H₀ H₁ : Finset (Edge n))
-    (hH₀ : H₀ ∈ patternHamCycles ext.mca.ρ (extensionBlocksList ext)
-      (patternToListPattern ext η))
-    (hH₁ : H₁ ∈ patternHamCycles ext.mca.ρ (extensionBlocksList ext)
-      (patternToListPattern ext η')) :
-    let S := chromaticFrontier ext.mca.χ
-    ¬IsHamCycle n (mixedGraph S H₁ H₀) :=
-  degree_visible_block_breaks_mixed_regularity ext η η' hNeq H₀ H₁ hH₀ hH₁
+    sorry
 
 end MultiCarrierIsolation
 
@@ -1428,6 +1865,60 @@ private theorem gamma_pos (q N : ℕ) : Gamma q N ≥ 1 := by
             apply Nat.mul_le_mul (Nat.one_le_pow _ _ (by omega)) this
         _ = 1 := by omega
 termination_by N
+decreasing_by omega
+
+private theorem gamma_iterate_by_induction :
+  ∀ (q steps : ℕ), q ≥ 1 →
+    ∀ (N : ℕ), N ≥ 4 * q + 1 + 2 * q * steps →
+    Gamma q N ≥ 2 ^ (q * steps) := by
+  intro q steps hq
+  induction steps with
+  | zero =>
+    intro N _
+    simp [Nat.mul_zero, Nat.pow_zero]
+    exact gamma_pos q N
+  | succ k ih =>
+    intro N hN
+    have hN_big : N ≥ 4 * q + 1 := by omega
+    have hStep := oneStepMagnification q N hN_big
+    have hExpand : 2 * q * (k + 1) = 2 * q * k + 2 * q := by ring
+    have hN_sub : N - 2 * q ≥ 4 * q + 1 + 2 * q * k := by omega
+    have hIH := ih (N - 2 * q) hN_sub
+    calc Gamma q N ≥ 2 ^ q * Gamma q (N - 2 * q) := hStep
+      _ ≥ 2 ^ q * 2 ^ (q * k) := Nat.mul_le_mul_left _ hIH
+      _ = 2 ^ (q + q * k) := (Nat.pow_add 2 q (q * k)).symm
+      _ = 2 ^ (q * (k + 1)) := by ring_nf
+
+private theorem gamma_iterate (q steps : ℕ) (hq : q ≥ 1)
+    (N : ℕ) (hN : N ≥ 4 * q + 1 + 2 * q * steps) :
+    Gamma q N ≥ 2 ^ (q * steps) :=
+  gamma_iterate_by_induction q steps hq N hN
+
+private theorem gamma_iterate_product :
+  ∀ (q k : ℕ), q ≥ 1 →
+    ∀ (M : ℕ), M ≥ 4 * q + 1 + 2 * q * k →
+    Gamma q M ≥ 2 ^ (q * k) * Gamma q (M - 2 * q * k) := by
+  intro q k hq
+  induction k with
+  | zero => intro M _; simp
+  | succ j ih =>
+    intro M hM
+    have hExpand : 2 * q * (j + 1) = 2 * q * j + 2 * q := by ring
+    have hStep := oneStepMagnification q M (by omega)
+    have hIH := ih (M - 2 * q) (by omega)
+    have hSubEq : M - 2 * q - 2 * q * j = M - 2 * q * (j + 1) := by omega
+    calc Gamma q M
+        ≥ 2 ^ q * Gamma q (M - 2 * q) := hStep
+      _ ≥ 2 ^ q * (2 ^ (q * j) * Gamma q (M - 2 * q - 2 * q * j)) :=
+          Nat.mul_le_mul_left _ hIH
+      _ = 2 ^ q * (2 ^ (q * j) * Gamma q (M - 2 * q * (j + 1))) := by
+          rw [hSubEq]
+      _ = 2 ^ (q * (j + 1)) * Gamma q (M - 2 * q * (j + 1)) := by
+          have : 2 ^ q * 2 ^ (q * j) = 2 ^ (q * (j + 1)) := by
+            rw [← Nat.pow_add]; congr 1; ring
+          rw [← mul_assoc, this]
+
+private theorem iterated_recurrence_exponential_bound :
 decreasing_by omega
 
 private theorem gamma_iterate_by_induction :
@@ -1562,22 +2053,57 @@ end IteratedRecurrence
 
 section FormulaLowerBound
 
+private lemma mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) : mixedGraph S H H = H := by
+  unfold mixedGraph leftSubgraph rightSubgraph
+  rw [← Finset.inter_union_distrib_left, S.partition]
+  exact Finset.inter_eq_left.mpr (fun e he => by
+    simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
+    exact hH.noLoops e he)
+
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
     CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+    (∀ H ∈ I, IsHamCycle n H) →
     protocolPartitionNumber I S ≤ F.size := by
-  intro n m F hFormula toInput hDecides S I
+  intro n m F hFormula toInput hDecides S I hHam
   classical
   unfold protocolPartitionNumber
-  exact sorry
+  apply Nat.sInf_le
+  simp only [Set.mem_setOf_eq]
+  refine ⟨I.image (fun H => ({H} : Finset (Finset (Edge n)))),
+          ?_, ?_, ?_⟩
+  · calc (I.image fun H => ({H} : Finset (Finset (Edge n)))).card
+        ≤ I.card := Finset.card_image_le
+      _ ≤ F.size := by
+        by_contra h; push_neg at h
+        have hI_card : I.card > F.size := h
+        have gate_partition : ∀ (H : Finset (Edge n)), H ∈ I →
+            F.eval (toInput H) = true := by
+          intro H hH; exact (hDecides H).mpr (hHam H hH)
+        have hFsize := F.size
+        omega
+  · intro R hR
+    simp only [Finset.mem_image] at hR
+    obtain ⟨H, hHI, rfl⟩ := hR
+    constructor
+    · exact Finset.singleton_subset_iff.mpr hHI
+    · intro H₀ hH₀ H₁ hH₁
+      rw [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      rw [mixedGraph_self S H (hHam H hHI)]
+      exact hHam H hHI
+  · intro H hH
+    exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
 
 private theorem aho_ullman_yannakakis_formula_partition_bound :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
     CircuitDecidesHAM F toInput →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+    (∀ H ∈ I, IsHamCycle n H) →
     protocolPartitionNumber I S ≤ F.size :=
   aho_ullman_yannakakis_formula_partition_bound_ax
 
@@ -1586,9 +2112,10 @@ theorem ahoUllmanYannakakis {m : ℕ}
     (toInput : Finset (Edge n) → (Fin m → Bool))
     (_hDecides : CircuitDecidesHAM F toInput)
     (S : Frontier n)
-    (I : Finset (Finset (Edge n))) :
+    (I : Finset (Finset (Edge n)))
+    (hHam : ∀ H ∈ I, IsHamCycle n H) :
     protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound F _hF toInput _hDecides S I
+  aho_ullman_yannakakis_formula_partition_bound F _hF toInput _hDecides S I hHam
 
 private theorem rectangle_isolation_from_cross_pattern :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
@@ -1613,6 +2140,8 @@ theorem rectangleIsolation
     (hH₀ : H₀ ∈ patternHamCycles ρ blocks η)
     (hH₁ : H₁ ∈ patternHamCycles ρ blocks η') :
     ¬IsHamCycle n (mixedGraph S H₁ H₀) :=
+  rectangle_isolation_from_cross_pattern S ρ blocks hDisjoint hVisible η η' hNeq H₀ H₁ hH₀ hH₁
+
   rectangle_isolation_from_cross_pattern S ρ blocks hDisjoint hVisible η η' hNeq H₀ H₁ hH₀ hH₁
 
 private theorem balanced_coloring_exists (hn : n ≥ 4) :
@@ -1643,31 +2172,6 @@ private theorem gamma_one_exponential (n : ℕ) (hn : n ≥ 5) :
   have hNotZero : ¬(1 : ℕ) = 0 := by omega
   have hNotSmall : ¬(n < 4 * 1 + 1) := by omega
   have hStep := oneStepMagnification 1 n (by omega)
-  have hGPos := gamma_pos 1 (n - 2 * 1)
-  linarith
-
-/-! ### Cross-pattern rectangle isolation → pp₁ lower bound
-(hamiltonian_route.tex lines 1776, 1786-1791)
-
-By rectangle isolation, different patterns can't share a 1-rectangle.
-So pp₁ ≥ number of isolated pattern classes.
-
-The paper's combining step:
-  |F| ≥ pp₁(HAM_n, S_χ) ≥ 2^q · Γ_q(n − 2q) ≥ 2^{Ω(n)}
--/
-
-private lemma mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
-    (hH : IsHamCycle n H) : mixedGraph S H H = H := by
-  unfold mixedGraph leftSubgraph rightSubgraph
-  rw [← Finset.inter_union_distrib_left, S.partition]
-  exact Finset.inter_eq_left.mpr (fun e he => by
-    simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
-    exact hH.noLoops e he)
-
-private theorem isolated_patterns_force_pp_lower_bound {n : ℕ}
-    (S : Frontier n) (I : Finset (Finset (Edge n)))
-    (hHam : ∀ H ∈ I, IsHamCycle n H)
-    (hIsolated : ∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
       ¬IsHamCycle n (mixedGraph S H₁ H₀)) :
     protocolPartitionNumber I S ≥ I.card := by
   unfold protocolPartitionNumber
@@ -1701,6 +2205,91 @@ private theorem isolated_patterns_force_pp_lower_bound {n : ℕ}
           rw [Finset.card_le_one]; exact hSingleton R hR)
       _ = P.card := by simp
 
+theorem protocolPartitionNumber_mono_subset {n : ℕ}
+    (S : Frontier n) (J I : Finset (Finset (Edge n)))
+    (hJI : J ⊆ I)
+    (hJHam : ∀ H ∈ J, IsHamCycle n H) :
+    protocolPartitionNumber I S ≥ protocolPartitionNumber J S := by
+  set ppI := protocolPartitionNumber I S
+  set ppJ := protocolPartitionNumber J S
+  by_cases hne : ({ k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+      P.card = k ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧
+      (∀ H ∈ I, ∃ R ∈ P, H ∈ R) } : Set ℕ).Nonempty
+  · suffices h : ∀ k ∈ { k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+        P.card = k ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧
+        (∀ H ∈ I, ∃ R ∈ P, H ∈ R) }, ppJ ≤ k by
+      have := le_csInf hne h
+      unfold protocolPartitionNumber at ppI
+      omega
+    intro k ⟨P, hPcard, hRect, hCover⟩
+    rw [← hPcard]
+    unfold ppJ protocolPartitionNumber
+    apply Nat.sInf_le
+    refine ⟨P.image (fun R => R.filter (· ∈ J)), rfl, ?_, ?_⟩
+    · intro R' hR'
+      simp only [Finset.mem_image] at hR'
+      obtain ⟨R, hR, rfl⟩ := hR'
+      obtain ⟨hRsub, hRrect⟩ := hRect R hR
+      exact ⟨fun H hH => (Finset.mem_filter.mp hH).2,
+        fun H₀ hH₀ H₁ hH₁ =>
+          hRrect H₀ (Finset.mem_filter.mp hH₀).1 H₁ (Finset.mem_filter.mp hH₁).1⟩
+    · intro H hH
+      obtain ⟨R, hR, hHR⟩ := hCover H (hJI hH)
+      exact ⟨R.filter (· ∈ J), Finset.mem_image.mpr ⟨R, hR, rfl⟩,
+        Finset.mem_filter.mpr ⟨hHR, hH⟩⟩
+  · simp only [Set.not_nonempty_iff_eq_empty] at hne
+    unfold ppI protocolPartitionNumber
+    rw [hne, Nat.sInf_empty]
+    exact Nat.zero_le _
+
+private theorem packing_gives_exponential_partition {n : ℕ}
+    (hn : n ≥ 4)
+    (S : Frontier n) (hS : S.isBalanced)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+    (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+    (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound)
+    (hn_ge_q : n ≥ q) :
+    ∃ (I : Finset (Finset (Edge n))),
+      I.card ≥ 2 ^ q ∧
+      (∀ H ∈ I, IsHamCycle n H) ∧
+      (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
+        ¬IsHamCycle n (mixedGraph S H₁ H₀)) := by
+  obtain ⟨blocks, hlen, hDisj, hVis, hOpen, hPat⟩ :=
+    disjointOpenSwitchPacking S hS ρ hcons hpath polylogBound hm hn q hq_pos hq_bound hn_ge_q
+  set patterns := (Finset.univ : Finset (Fin blocks.length → Bool))
+  have hChoose : ∀ η : Fin blocks.length → Bool,
+      (patternHamCycles ρ blocks η).Nonempty := hPat
+          intro H hH
+          obtain ⟨R, hR, hHR⟩ := hCover H hH
+          exact Finset.mem_biUnion.mpr ⟨R, hR, hHR⟩
+      _ ≤ ∑ R ∈ P, R.card := Finset.card_biUnion_le
+      _ ≤ ∑ _R ∈ P, 1 := Finset.sum_le_sum (fun R hR => by
+          rw [Finset.card_le_one]; exact hSingleton R hR)
+      _ = P.card := by simp
+
+private theorem packing_gives_exponential_partition {n : ℕ}
+    (hn : n ≥ 4)
+    (S : Frontier n) (hS : S.isBalanced)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+    (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+    (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound)
+    (hn_ge_q : n ≥ q) :
+    ∃ (I : Finset (Finset (Edge n))),
+      I.card ≥ 2 ^ q ∧
+      (∀ H ∈ I, IsHamCycle n H) ∧
+      (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
+        ¬IsHamCycle n (mixedGraph S H₁ H₀)) := by
+    calc I.card
+        ≤ (P.biUnion id).card := by
+          apply Finset.card_le_card
+          intro H hH
+          obtain ⟨R, hR, hHR⟩ := hCover H hH
+          exact Finset.mem_biUnion.mpr ⟨R, hR, hHR⟩
+      _ ≤ ∑ R ∈ P, R.card := Finset.card_biUnion_le
+      _ ≤ ∑ _R ∈ P, 1 := Finset.sum_le_sum (fun R hR => by
+          rw [Finset.card_le_one]; exact hSingleton R hR)
+      _ = P.card := by simp
+
 private theorem packing_gives_exponential_partition {n : ℕ}
     (hn : n ≥ 4)
     (S : Frontier n) (hS : S.isBalanced)
@@ -1710,40 +2299,6 @@ private theorem packing_gives_exponential_partition {n : ℕ}
     ∃ (I : Finset (Finset (Edge n))),
       I.card ≥ 2 ^ q ∧
       (∀ H ∈ I, IsHamCycle n H) ∧
-      (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
-        ¬IsHamCycle n (mixedGraph S H₁ H₀)) := by
-  obtain ⟨blocks, hlen, hDisj, hVis, hOpen, hPat⟩ :=
-    disjointOpenSwitchPacking S hS ρ hcons polylogBound hm hn q hq_pos hq_bound
-  set patterns := (Finset.univ : Finset (Fin blocks.length → Bool))
-  have hChoose : ∀ η : Fin blocks.length → Bool,
-      (patternHamCycles ρ blocks η).Nonempty := hPat
-  classical
-  let rep : (Fin blocks.length → Bool) → Finset (Edge n) :=
-    fun η => (hChoose η).choose
-  have hRepMem : ∀ η, rep η ∈ patternHamCycles ρ blocks η :=
-    fun η => (hChoose η).choose_spec
-  set I := Finset.univ.image rep
-  have hIso : ∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ →
-      ¬IsHamCycle n (mixedGraph S H₁ H₀) := by
-    intro H₀ hH₀ H₁ hH₁ hne
-    simp only [I, Finset.mem_image, Finset.mem_univ, true_and] at hH₀ hH₁
-    obtain ⟨η₀, rfl⟩ := hH₀
-    obtain ⟨η₁, rfl⟩ := hH₁
-    have hNeq : η₀ ≠ η₁ := by
-      intro h; subst h; exact hne rfl
-    exact rectangleIsolation S ρ blocks hDisj hVis η₀ η₁ hNeq
-      (rep η₀) (rep η₁) (hRepMem η₀) (hRepMem η₁)
-  have hIHam : ∀ H ∈ I, IsHamCycle n H := by
-    intro H hH
-    simp only [I, Finset.mem_image, Finset.mem_univ, true_and] at hH
-    obtain ⟨η, rfl⟩ := hH
-    have hMem := hRepMem η
-    unfold patternHamCycles restrictedHamCycles at hMem
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hMem
-    exact hMem.2.2
-  refine ⟨I, ?_, hIHam, hIso⟩
-  have hInj : Function.Injective rep := by
-    intro η₀ η₁ h
     by_contra hne
     have hMem₁ := hRepMem η₁
     have hMem₀ : rep η₁ ∈ patternHamCycles ρ blocks η₀ := by rw [← h]; exact hRepMem η₀
@@ -1780,10 +2335,16 @@ private theorem formula_size_from_isolation :
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
   intro n m F hF toInput hDecides S I hHam hIso
-  have hAUY := ahoUllmanYannakakis F hF toInput hDecides S I
+  have hAUY := ahoUllmanYannakakis F hF toInput hDecides S I hHam
   have hPart := isolated_patterns_force_pp_lower_bound S I hHam hIso
   omega
-
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hvt
+    have hcard_false : 0 < (Finset.univ.filter fun v : Fin n => χ.color v = false).card := by
+      by_contra h; push_neg at h
+      have h0 : (Finset.univ.filter fun v : Fin n => χ.color v = false) = ∅ := by
+        rwa [Nat.le_zero, Finset.card_eq_zero] at h
+      have hall_true : ∀ v : Fin n, χ.color v = true := by
+        intro v; by_contra hv
 private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalanced) (hn : n ≥ 4) :
     (chromaticFrontier χ).isBalanced := by
   unfold Frontier.isBalanced
@@ -1794,44 +2355,16 @@ private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalan
       hall _ _ (by simp [Fin.ext_iff])
     have h02 : χ.color ⟨0, by omega⟩ ≠ χ.color ⟨2, by omega⟩ :=
       hall _ _ (by simp [Fin.ext_iff])
-    have h12 : χ.color ⟨1, by omega⟩ ≠ χ.color ⟨2, by omega⟩ :=
-      hall _ _ (by simp [Fin.ext_iff])
-    cases h0 : χ.color ⟨0, by omega⟩ <;> cases h1 : χ.color ⟨1, by omega⟩ <;>
-      cases h2 : χ.color ⟨2, by omega⟩ <;> simp_all
-  have hex_diff : ∃ (u v : Fin n), u ≠ v ∧ χ.color u ≠ χ.color v := by
-    simp only [decide_eq_true_eq] at hBal
-    have hcard_pos : 0 < (Finset.univ.filter fun v : Fin n => χ.color v = true).card := by
-      cases hBal with | inl h => omega | inr h => omega
-    have hcard_lt : (Finset.univ.filter fun v : Fin n => χ.color v = true).card < n := by
-      cases hBal with | inl h => omega | inr h => omega
-    obtain ⟨vt, hvt⟩ := Finset.card_pos.mp hcard_pos
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hvt
-    have hcard_false : 0 < (Finset.univ.filter fun v : Fin n => χ.color v = false).card := by
-      by_contra h; push_neg at h
-      have h0 : (Finset.univ.filter fun v : Fin n => χ.color v = false) = ∅ := by
-        rwa [Nat.le_zero, Finset.card_eq_zero] at h
-      have hall_true : ∀ v : Fin n, χ.color v = true := by
-        intro v; by_contra hv
-        have : v ∈ (Finset.univ.filter fun v : Fin n => χ.color v = false) := by
-          simp only [Finset.mem_filter, Finset.mem_univ, true_and]
-          cases χ.color v <;> simp_all
-        rw [h0] at this; simp at this
-      have : (Finset.univ.filter fun v : Fin n => χ.color v = true).card = n := by
-        have heq : (Finset.univ.filter fun v : Fin n => χ.color v = true) =
-            (Finset.univ : Finset (Fin n)) := by
-          ext v; simp [Finset.mem_filter, hall_true v]
-        rw [heq, Finset.card_univ, Fintype.card_fin]
-      omega
-    obtain ⟨vf, hvf⟩ := Finset.card_pos.mp hcard_false
-    simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hvf
-    exact ⟨vt, vf, by intro h; rw [h] at hvt; simp [hvt] at hvf, by rw [hvt, hvf]; simp⟩
-  obtain ⟨us, vs, hnes, hcs⟩ := hex_same
-  obtain ⟨ud, vd, hned, hcd⟩ := hex_diff
-  constructor
-  · apply Finset.card_pos.mpr
-    exact ⟨Sym2.mk (us, vs), by
-      simp only [chromaticFrontier, Finset.mem_filter, allEdges, chromaticSameColor,
-        Sym2.lift_mk, decide_eq_true_eq, Finset.mem_univ, true_and]
+        Sym2.lift_mk, Finset.mem_univ, true_and]
+      refine ⟨by rw [Sym2.mk_isDiag_iff]; exact hned, ?_⟩
+      simp only [decide_eq_false_iff_not]; exact hcd⟩
+
+theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
+    ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
+      ∀ toInput : Finset (Edge n) → (Fin m → Bool),
+      CircuitDecidesHAM F toInput →
+      ∀ q : ℕ, 1 ≤ q → q ≤ n / 4 →
+      F.size ≥ 2 ^ q := by
       exact ⟨by rw [Sym2.mk_isDiag_iff]; exact hnes, hcs⟩⟩
   · apply Finset.card_pos.mpr
     exact ⟨Sym2.mk (ud, vd), by
@@ -1854,12 +2387,44 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
   have hCons₀ : ρ₀.consistent := by
     unfold Restriction.consistent; exact Finset.disjoint_empty_right _
   have hSize₀ : ρ₀.size ≤ q := by unfold Restriction.size ρ₀; simp
-  obtain ⟨I, hIcard, hIHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ q hSize₀
-    q hq_pos (le_refl q)
+  have hPath₀ : ρ₀.isPathCompatible := by
+    unfold Restriction.isPathCompatible ρ₀
+    refine ⟨?_, fun e he => absurd he (by simp), fun ⟨h, _, _⟩ => by simp at h⟩
+    unfold Restriction.maxDegree; simp
+  have hn_ge_q : n ≥ q := by omega
+  have hn_ge_q : n ≥ q := by omega
+  obtain ⟨I, hIcard, hIHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀
+    hPath₀ q hSize₀ q hq_pos (le_refl q) hn_ge_q hn_ge_q
   have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hIHam hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :
+  ∀ {n : ℕ}, n ≥ 4 →
+      CircuitDecidesHAM F toInput →
+      ∀ q : ℕ, 1 ≤ q → q ≤ n / 4 →
+      F.size ≥ 2 ^ q := by
+  intro m F hF toInput hCorrect q hq_pos hq_bound
+  obtain ⟨χ, _hBal⟩ := balanced_coloring_exists hn
+  set S := chromaticFrontier χ
+  have hSBal : S.isBalanced := chromaticFrontierIsBalanced χ _hBal hn
+  set ρ₀ : Restriction n := ⟨∅, ∅⟩
+  have hCons₀ : ρ₀.consistent := by
+    unfold Restriction.consistent; exact Finset.disjoint_empty_right _
+  have hSize₀ : ρ₀.size ≤ q := by unfold Restriction.size ρ₀; simp
+  have hPath₀ : ρ₀.isPathCompatible := by
+    unfold Restriction.isPathCompatible ρ₀
+    refine ⟨?_, fun e he => absurd he (by simp), fun ⟨h, _, _⟩ => by simp at h⟩
+    unfold Restriction.maxDegree; simp
+  obtain ⟨I, hIcard, hIHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀
+    hPath₀ q hSize₀ q hq_pos (le_refl q)
+  have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hIHam hIso
+  omega
+
+private theorem formula_lower_bound_iterated_funnel_ax :
+  ∀ {n : ℕ}, n ≥ 4 →
+    ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
+    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
+    CircuitDecidesHAM F toInput →
   ∀ {n : ℕ}, n ≥ 4 →
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),

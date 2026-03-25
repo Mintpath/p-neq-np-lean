@@ -58,18 +58,81 @@ private theorem cross_pattern_rect_isolation_pp_bound_ax :
     (∀ η : Fin blocks.length → Bool,
       (patternHamCycles ρ blocks η).Nonempty) →
     ∀ (I : Finset (Finset (Edge n))),
+    (∀ H ∈ I, IsHamCycle n H) →
     (∀ η : Fin blocks.length → Bool,
       ∀ H ∈ patternHamCycles ρ blocks η, H ∈ I) →
     protocolPartitionNumber I S ≥
       (Finset.univ : Finset (Fin blocks.length → Bool)).card := by
-  intro n S ρ blocks hDisjoint hVisible hOpen I hI
+  intro n S ρ blocks hDisjoint hVisible hOpen I hIHam hI
   have hIso : ∀ (η η' : Fin blocks.length → Bool), η ≠ η' →
       ∀ (H₀ : Finset (Edge n)), H₀ ∈ patternHamCycles ρ blocks η →
       ∀ (H₁ : Finset (Edge n)), H₁ ∈ patternHamCycles ρ blocks η' →
       ¬IsHamCycle n (mixedGraph S H₁ H₀) := by
     intro η η' hNeq H₀ hH₀ H₁ hH₁
     exact rectangleIsolation S ρ blocks hDisjoint hVisible η η' hNeq H₀ H₁ hH₀ hH₁
-  sorry
+  classical
+  let rep : (Fin blocks.length → Bool) → Finset (Edge n) :=
+    fun η => (hOpen η).choose
+  have hRepMem : ∀ η, rep η ∈ patternHamCycles ρ blocks η :=
+    fun η => (hOpen η).choose_spec
+  have hRepInI : ∀ η, rep η ∈ I := fun η => hI η _ (hRepMem η)
+  have hRepHam : ∀ η, IsHamCycle n (rep η) :=
+    fun η => patternHamCycles_isHamCycle ρ blocks η _ (hRepMem η)
+  have hRepInj : Function.Injective rep := by
+    intro η₀ η₁ h
+    by_contra hne
+    have : ¬IsHamCycle n (mixedGraph S (rep η₁) (rep η₁)) :=
+      hIso η₀ η₁ hne (rep η₁) (h ▸ hRepMem η₀) (rep η₁) (hRepMem η₁)
+    rw [mixedGraph_self S _ (hRepHam η₁)] at this
+    exact this (hRepHam η₁)
+  have hRepNoShare : ∀ η₀ η₁ : Fin blocks.length → Bool, η₀ ≠ η₁ →
+      ∀ (R : Finset (Finset (Edge n))), IsOneRectangle I S R →
+      ¬(rep η₀ ∈ R ∧ rep η₁ ∈ R) := by
+    intro η₀ η₁ hne R ⟨_, hRrect⟩ ⟨h₀, h₁⟩
+    exact hIso η₀ η₁ hne _ (hRepMem η₀) _ (hRepMem η₁) (hRrect _ h₀ _ h₁)
+  by_contra hlt
+  push_neg at hlt
+  unfold protocolPartitionNumber at hlt
+  set coverSet := { k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+      P.card = k ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧
+      (∀ H ∈ I, ∃ R ∈ P, H ∈ R) } with hCoverSet_def
+  have hne : coverSet.Nonempty := by
+    refine ⟨I.card, I.image (fun H => {H}), ?_, ?_, ?_⟩
+    · exact Finset.card_image_of_injective _ Finset.singleton_injective
+    · intro R hR
+      simp only [Finset.mem_image] at hR
+      obtain ⟨H, hH, rfl⟩ := hR
+      refine ⟨Finset.singleton_subset_iff.mpr hH, fun H₀ hH₀ H₁ hH₁ => ?_⟩
+      rw [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁, mixedGraph_self S _ (hIHam H hH)]
+      exact hIHam H hH
+    · intro H hH
+      exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
+  obtain ⟨k, ⟨P, hPcard, hRect, hCover⟩, hk_lt⟩ :=
+    (csInf_lt_iff (OrderBot.bddBelow _) hne).mp hlt
+  rw [← hPcard] at hk_lt
+  have hAssign : ∀ η : Fin blocks.length → Bool, ∃ R ∈ P, rep η ∈ R := by
+    intro η; exact hCover (rep η) (hRepInI η)
+  have hAtMostOne : ∀ R ∈ P, ∀ η₀ η₁ : Fin blocks.length → Bool,
+      rep η₀ ∈ R → rep η₁ ∈ R → η₀ = η₁ := by
+    intro R hR η₀ η₁ h₀ h₁
+    by_contra hne
+    exact hRepNoShare η₀ η₁ hne R (hRect R hR) ⟨h₀, h₁⟩
+  let assign : (Fin blocks.length → Bool) → Finset (Finset (Edge n)) :=
+    fun η => (hAssign η).choose
+  have hAssignMem : ∀ η, assign η ∈ P := fun η => (hAssign η).choose_spec.1
+  have hAssignIn : ∀ η, rep η ∈ assign η := fun η => (hAssign η).choose_spec.2
+  have hAssignInj : Function.Injective assign := by
+    intro η₀ η₁ h
+    exact hAtMostOne (assign η₀) (hAssignMem η₀) η₀ η₁ (hAssignIn η₀) (h ▸ hAssignIn η₁)
+  have : (Finset.univ : Finset (Fin blocks.length → Bool)).card ≤ P.card := by
+    calc (Finset.univ : Finset (Fin blocks.length → Bool)).card
+        = (Finset.univ.image assign).card :=
+          (Finset.card_image_of_injective _ hAssignInj).symm
+      _ ≤ P.card := Finset.card_le_card (fun R hR => by
+          simp only [Finset.mem_image, Finset.mem_univ, true_and] at hR
+          obtain ⟨η, rfl⟩ := hR; exact hAssignMem η)
+  omega
 
 private theorem cross_pattern_rect_isolation_pp_bound_proof
     (S : Frontier n) (ρ : Restriction n)
@@ -79,11 +142,12 @@ private theorem cross_pattern_rect_isolation_pp_bound_proof
     (hOpen : ∀ η : Fin blocks.length → Bool,
       (patternHamCycles ρ blocks η).Nonempty)
     (I : Finset (Finset (Edge n)))
+    (hIHam : ∀ H ∈ I, IsHamCycle n H)
     (hI : ∀ η : Fin blocks.length → Bool,
       ∀ H ∈ patternHamCycles ρ blocks η, H ∈ I) :
     protocolPartitionNumber I S ≥
       (Finset.univ : Finset (Fin blocks.length → Bool)).card :=
-  cross_pattern_rect_isolation_pp_bound_ax S ρ blocks hDisjoint hVisible hOpen I hI
+  cross_pattern_rect_isolation_pp_bound_ax S ρ blocks hDisjoint hVisible hOpen I hIHam hI
 
 theorem crossPatternRectIsolation_pp
     (S : Frontier n) (ρ : Restriction n)
@@ -93,11 +157,12 @@ theorem crossPatternRectIsolation_pp
     (hOpen : ∀ η : Fin blocks.length → Bool,
       (patternHamCycles ρ blocks η).Nonempty)
     (I : Finset (Finset (Edge n)))
+    (hIHam : ∀ H ∈ I, IsHamCycle n H)
     (hI : ∀ η : Fin blocks.length → Bool,
       ∀ H ∈ patternHamCycles ρ blocks η, H ∈ I) :
     protocolPartitionNumber I S ≥
       (Finset.univ : Finset (Fin blocks.length → Bool)).card :=
-  cross_pattern_rect_isolation_pp_bound_proof S ρ blocks hDisjoint hVisible hOpen I hI
+  cross_pattern_rect_isolation_pp_bound_proof S ρ blocks hDisjoint hVisible hOpen I hIHam hI
 
 end CrossPatternRectangleIsolation
 

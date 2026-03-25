@@ -231,6 +231,223 @@ theorem pairingMismatchCollisionForcesError {m : ℕ}
 Uses `numComponentsBMG` from Stitch.lean for the boundary multigraph
 component count rather than a separate axiom. -/
 
+private theorem bmg_vertices_eq_dangling
+    {n : ℕ} (S : Frontier n)
+    (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (hU : danglingEndpoints S H = danglingEndpoints S H') :
+    (boundaryMultigraphOf S (leftSubgraph S H') (rightSubgraph S H)).vertices =
+    danglingEndpoints S H := by
+  unfold boundaryMultigraphOf danglingEndpoints
+  ext v; simp only [Finset.mem_filter]
+  constructor
+  · rintro ⟨hbv, hdeg⟩
+    constructor
+    · exact hbv
+    · rcases hdeg with h | h
+      · have hv_dang' : v ∈ danglingEndpoints S H' := by
+          unfold danglingEndpoints; simp only [Finset.mem_filter]
+          exact ⟨hbv, by unfold degreeProfile leftDegreeAt; exact h⟩
+        rw [← hU] at hv_dang'
+        exact (Finset.mem_filter.mp hv_dang').2
+      · unfold degreeProfile leftDegreeAt
+        have h2 := leftDeg_add_rightDeg_eq_two S H hH v
+        unfold leftDegreeAt rightDegreeAt at h2
+        omega
+  · rintro ⟨hbv, hdeg⟩
+    constructor
+    · exact hbv
+    · left
+      have hv_dang : v ∈ danglingEndpoints S H := by
+        unfold danglingEndpoints; simp only [Finset.mem_filter]; exact ⟨hbv, hdeg⟩
+      rw [hU] at hv_dang
+      unfold danglingEndpoints at hv_dang
+      have hfilt := (Finset.mem_filter.mp hv_dang).2
+      unfold degreeProfile leftDegreeAt at hfilt
+      exact hfilt
+
+private theorem cast_pairs_eq
+    {n : ℕ} {U V : Finset (Fin n)} (h : U = V) (M : PerfectMatching V) :
+    (h ▸ M).pairs = M.pairs := by
+  subst h; rfl
+
+private theorem bmg_ledge_of_pair
+    {n : ℕ} (S : Frontier n)
+    (H' : Finset (Edge n)) (hH' : IsHamCycle n H')
+    (R : Finset (Edge n))
+    (p : Fin n × Fin n) (hp : p ∈ (pathPairing S H' hH').pairs) :
+    (p.1, p.2) ∈ (boundaryMultigraphOf S (leftSubgraph S H') R).lEdges := by
+  unfold boundaryMultigraphOf
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+  have hp1 := (pathPairing S H' hH').fst_mem p hp
+  have hp2 := (pathPairing S H' hH').snd_mem p hp
+  exact ⟨dangling_mem_boundary S H' p.1 hp1,
+         dangling_mem_boundary S H' p.2 hp2,
+         (pathPairing S H' hH').ne_pair p hp,
+         dangling_left_deg_one S H' p.1 hp1,
+         dangling_left_deg_one S H' p.2 hp2,
+         pathPairing_reflects_components S H' hH' p hp⟩
+
+private theorem bmg_redge_of_pair
+    {n : ℕ} (S : Frontier n)
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (L : Finset (Edge n))
+    (p : Fin n × Fin n) (hp : p ∈ (rightPairing S H hH).pairs) :
+    (p.1, p.2) ∈ (boundaryMultigraphOf S L (rightSubgraph S H)).rEdges := by
+  unfold boundaryMultigraphOf
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+  have hp1 := (rightPairing S H hH).fst_mem p hp
+  have hp2 := (rightPairing S H hH).snd_mem p hp
+  have hp1_bdy : p.1 ∈ boundaryVertices S := by
+    unfold rightDanglingEndpoints at hp1; exact (Finset.mem_filter.mp hp1).1
+  have hp2_bdy : p.2 ∈ boundaryVertices S := by
+    unfold rightDanglingEndpoints at hp2; exact (Finset.mem_filter.mp hp2).1
+  have hp1_deg : vertexDegreeIn n (rightSubgraph S H) p.1 = 1 := by
+    unfold rightDanglingEndpoints rightDegreeAt at hp1
+    exact (Finset.mem_filter.mp hp1).2
+  have hp2_deg : vertexDegreeIn n (rightSubgraph S H) p.2 = 1 := by
+    unfold rightDanglingEndpoints rightDegreeAt at hp2
+    exact (Finset.mem_filter.mp hp2).2
+  exact ⟨hp1_bdy, hp2_bdy,
+         (rightPairing S H hH).ne_pair p hp,
+         hp1_deg, hp2_deg,
+         rightPairing_reflects_components S H hH p hp⟩
+
+private theorem pair_of_bmg_ledge
+    {n : ℕ} (S : Frontier n)
+    (H' : Finset (Edge n)) (hH' : IsHamCycle n H')
+    (R : Finset (Edge n))
+    (u v : Fin n) (hne : u ≠ v)
+    (hle : (u, v) ∈ (boundaryMultigraphOf S (leftSubgraph S H') R).lEdges) :
+    (u, v) ∈ (pathPairing S H' hH').pairs ∨ (v, u) ∈ (pathPairing S H' hH').pairs := by
+  unfold boundaryMultigraphOf at hle
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hle
+  obtain ⟨hu_bdy, hv_bdy, _, hu_deg, hv_deg, hreach⟩ := hle
+  have hu_dang : u ∈ danglingEndpoints S H' := by
+    unfold danglingEndpoints; simp only [Finset.mem_filter]
+    exact ⟨hu_bdy, by unfold degreeProfile leftDegreeAt; exact hu_deg⟩
+  have hv_dang : v ∈ danglingEndpoints S H' := by
+    unfold danglingEndpoints; simp only [Finset.mem_filter]
+    exact ⟨hv_bdy, by unfold degreeProfile leftDegreeAt; exact hv_deg⟩
+  exact (pathPairing_iff_reachable S H' hH' u v hu_dang hv_dang hne).mpr hreach
+
+private theorem pair_of_bmg_redge
+    {n : ℕ} (S : Frontier n)
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (L : Finset (Edge n))
+    (u v : Fin n) (hne : u ≠ v)
+    (hre : (u, v) ∈ (boundaryMultigraphOf S L (rightSubgraph S H)).rEdges) :
+    (u, v) ∈ (rightPairing S H hH).pairs ∨ (v, u) ∈ (rightPairing S H hH).pairs := by
+  unfold boundaryMultigraphOf at hre
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hre
+  obtain ⟨hu_bdy, hv_bdy, _, hu_deg, hv_deg, hreach⟩ := hre
+  have hu_rdang : u ∈ rightDanglingEndpoints S H := by
+    unfold rightDanglingEndpoints; simp only [Finset.mem_filter]
+    exact ⟨hu_bdy, by unfold rightDegreeAt; exact hu_deg⟩
+  have hv_rdang : v ∈ rightDanglingEndpoints S H := by
+    unfold rightDanglingEndpoints; simp only [Finset.mem_filter]
+    exact ⟨hv_bdy, by unfold rightDegreeAt; exact hv_deg⟩
+  exact (rightPairing_iff_reachable S H hH u v hu_rdang hv_rdang hne).mpr hreach
+
+private theorem bmg_adj_iff_overlay_adj
+    {n : ℕ} (S : Frontier n) (_hS : S.isBalanced)
+    (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (_hd : degreeProfile S H = degreeProfile S H')
+    (_hc : ¬ hasPrematureCycle S H)
+    (_hc' : ¬ hasPrematureCycle S H')
+    (hU : danglingEndpoints S H = danglingEndpoints S H')
+    (u v : Fin n) :
+    let π' := hU ▸ pathPairing S H' hH'
+    let ρ := danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH
+    (bmgToGraph (boundaryMultigraphOf S (leftSubgraph S H') (rightSubgraph S H))).Adj u v ↔
+    (overlayGraph π' ρ).Adj u v := by
+  set L := leftSubgraph S H'
+  set R := rightSubgraph S H
+  set BMG := boundaryMultigraphOf S L R
+  set π' := hU ▸ pathPairing S H' hH'
+  set ρ := danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH
+  have hπ'_pairs : π'.pairs = (pathPairing S H' hH').pairs :=
+    cast_pairs_eq hU (pathPairing S H' hH')
+  have hρ_pairs : ρ.pairs = (rightPairing S H hH).pairs :=
+    cast_pairs_eq (danglingEndpoints_eq_rightDanglingEndpoints S H hH) (rightPairing S H hH)
+  have hverts := bmg_vertices_eq_dangling S H H' hH hH' hU
+  constructor
+  · intro hadj
+    have hne := hadj.1
+    have hedges := hadj.2.2.2
+    show (overlayGraph π' ρ).Adj u v
+    unfold overlayGraph
+    rcases hedges with hle | hle | hre | hre
+    · have := pair_of_bmg_ledge S H' hH' R u v hne hle
+      left; rw [hπ'_pairs]
+      rcases this with hp | hp
+      · exact ⟨(u, v), hp, Or.inl ⟨rfl, rfl⟩⟩
+      · exact ⟨(v, u), hp, Or.inr ⟨rfl, rfl⟩⟩
+    · have := pair_of_bmg_ledge S H' hH' R v u (Ne.symm hne) hle
+      left; rw [hπ'_pairs]
+      rcases this with hp | hp
+      · exact ⟨(v, u), hp, Or.inr ⟨rfl, rfl⟩⟩
+      · exact ⟨(u, v), hp, Or.inl ⟨rfl, rfl⟩⟩
+    · have := pair_of_bmg_redge S H hH L u v hne hre
+      right; rw [hρ_pairs]
+      rcases this with hp | hp
+      · exact ⟨(u, v), hp, Or.inl ⟨rfl, rfl⟩⟩
+      · exact ⟨(v, u), hp, Or.inr ⟨rfl, rfl⟩⟩
+    · have := pair_of_bmg_redge S H hH L v u (Ne.symm hne) hre
+      right; rw [hρ_pairs]
+      rcases this with hp | hp
+      · exact ⟨(v, u), hp, Or.inr ⟨rfl, rfl⟩⟩
+      · exact ⟨(u, v), hp, Or.inl ⟨rfl, rfl⟩⟩
+  · intro hovl
+    show (bmgToGraph BMG).Adj u v
+    unfold overlayGraph at hovl
+    rcases hovl with ⟨p, hp, hpuv⟩ | ⟨p, hp, hpuv⟩
+    · rw [hπ'_pairs] at hp
+      have hne : u ≠ v := by
+        rcases hpuv with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+        · exact (pathPairing S H' hH').ne_pair p hp
+        · exact ((pathPairing S H' hH').ne_pair p hp).symm
+      have hp1_dang' := (pathPairing S H' hH').fst_mem p hp
+      have hp2_dang' := (pathPairing S H' hH').snd_mem p hp
+      have hle := bmg_ledge_of_pair S H' hH' R p hp
+      rcases hpuv with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact ⟨hne,
+          hverts ▸ (hU ▸ hp1_dang' : p.1 ∈ danglingEndpoints S H),
+          hverts ▸ (hU ▸ hp2_dang' : p.2 ∈ danglingEndpoints S H),
+          Or.inl hle⟩
+      · exact ⟨hne,
+          hverts ▸ (hU ▸ hp2_dang' : p.2 ∈ danglingEndpoints S H),
+          hverts ▸ (hU ▸ hp1_dang' : p.1 ∈ danglingEndpoints S H),
+          Or.inr (Or.inl hle)⟩
+    · rw [hρ_pairs] at hp
+      have hne : u ≠ v := by
+        rcases hpuv with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+        · exact (rightPairing S H hH).ne_pair p hp
+        · exact ((rightPairing S H hH).ne_pair p hp).symm
+      have hp1_rdang := (rightPairing S H hH).fst_mem p hp
+      have hp2_rdang := (rightPairing S H hH).snd_mem p hp
+      have hDE := danglingEndpoints_eq_rightDanglingEndpoints S H hH
+      have hre := bmg_redge_of_pair S H hH L p hp
+      rcases hpuv with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact ⟨hne,
+          hverts ▸ (hDE ▸ hp1_rdang : p.1 ∈ danglingEndpoints S H),
+          hverts ▸ (hDE ▸ hp2_rdang : p.2 ∈ danglingEndpoints S H),
+          Or.inr (Or.inr (Or.inl hre))⟩
+      · exact ⟨hne,
+          hverts ▸ (hDE ▸ hp2_rdang : p.2 ∈ danglingEndpoints S H),
+          hverts ▸ (hDE ▸ hp1_rdang : p.1 ∈ danglingEndpoints S H),
+          Or.inr (Or.inr (Or.inr hre))⟩
+
+private theorem same_adj_same_components
+    {n : ℕ} (G₁ G₂ : SimpleGraph (Fin n)) (U : Finset (Fin n))
+    (hadj : ∀ u v : Fin n, G₁.Adj u v ↔ G₂.Adj u v) :
+    Set.ncard {c : G₁.ConnectedComponent | ∃ v ∈ U, G₁.connectedComponentMk v = c} =
+    Set.ncard {c : G₂.ConnectedComponent | ∃ v ∈ U, G₂.connectedComponentMk v = c} := by
+  have hG : G₁ = G₂ := by
+    ext u v; exact hadj u v
+  subst hG; rfl
+
 private theorem boundary_multigraph_equals_overlay_components :
   ∀ {n : ℕ} (S : Frontier n) (hS : S.isBalanced)
     (H H' : Finset (Edge n))
@@ -244,7 +461,15 @@ private theorem boundary_multigraph_equals_overlay_components :
     numComponentsBMG (boundaryMultigraphOf S (leftSubgraph S H') (rightSubgraph S H)) =
     overlayComponentCount π' ρ := by
   intro n S hS H H' hH hH' hd hc hc' hU
-  sorry
+  set BMG := boundaryMultigraphOf S (leftSubgraph S H') (rightSubgraph S H)
+  set π' := hU ▸ pathPairing S H' hH'
+  set ρ := danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH
+  unfold numComponentsBMG overlayComponentCount
+  have hverts := bmg_vertices_eq_dangling S H H' hH hH' hU
+  rw [hverts]
+  exact same_adj_same_components (bmgToGraph BMG) (overlayGraph π' ρ)
+    (danglingEndpoints S H)
+    (bmg_adj_iff_overlay_adj S hS H H' hH hH' hd hc hc' hU)
 
 theorem pairingMismatch_boundaryIsOverlay
     (S : Frontier n) (hS : S.isBalanced)

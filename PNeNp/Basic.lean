@@ -81,6 +81,11 @@ open Classical in
 def IsConnectedEdgeSet (n : ℕ) (edges : Finset (Edge n)) : Prop :=
   (edgeSetToGraph n edges).Connected
 
+def IsIncidentConnected (n : ℕ) (edges : Finset (Edge n)) : Prop :=
+  ∀ v w : Fin n,
+    (∃ e ∈ edges, v ∈ e) → (∃ e ∈ edges, w ∈ e) →
+    (edgeSetToGraph n edges).Reachable v w
+
 structure IsHamCycle (n : ℕ) (edges : Finset (Edge n)) : Prop where
   twoRegular : ∀ v : Fin n, vertexDegreeIn n edges v = 2
   connected : IsConnectedEdgeSet n edges
@@ -120,6 +125,18 @@ def Frontier.isBalanced {n : ℕ} (S : Frontier n) : Prop :=
 def Frontier.isInterior {n : ℕ} (S : Frontier n) : Prop :=
   S.isBalanced
 
+def Frontier.swap {n : ℕ} (S : Frontier n) : Frontier n where
+  leftEdges := S.rightEdges
+  rightEdges := S.leftEdges
+  partition := by rw [Finset.union_comm]; exact S.partition
+  disjoint := S.disjoint.symm
+
+@[simp] lemma Frontier.swap_leftEdges {n : ℕ} (S : Frontier n) :
+    S.swap.leftEdges = S.rightEdges := rfl
+
+@[simp] lemma Frontier.swap_rightEdges {n : ℕ} (S : Frontier n) :
+    S.swap.rightEdges = S.leftEdges := rfl
+
 end Frontier
 
 section Boundary
@@ -147,6 +164,20 @@ noncomputable def leftDegreeAt (S : Frontier n) (H : Finset (Edge n)) (v : Fin n
 
 noncomputable def rightDegreeAt (S : Frontier n) (H : Finset (Edge n)) (v : Fin n) : ℕ :=
   vertexDegreeIn n (rightSubgraph S H) v
+
+@[simp] lemma leftSubgraph_swap (S : Frontier n) (H : Finset (Edge n)) :
+    leftSubgraph S.swap H = rightSubgraph S H := by
+  unfold leftSubgraph rightSubgraph; simp
+
+@[simp] lemma rightSubgraph_swap (S : Frontier n) (H : Finset (Edge n)) :
+    rightSubgraph S.swap H = leftSubgraph S H := by
+  unfold leftSubgraph rightSubgraph; simp
+
+theorem boundaryVertices_swap (S : Frontier n) :
+    boundaryVertices S.swap = boundaryVertices S := by
+  unfold boundaryVertices Frontier.swap
+  ext v; simp only [Finset.mem_filter, Finset.mem_univ, true_and]
+  exact ⟨fun ⟨h1, h2⟩ => ⟨h2, h1⟩, fun ⟨h1, h2⟩ => ⟨h2, h1⟩⟩
 
 end LeftRight
 

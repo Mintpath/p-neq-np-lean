@@ -31,35 +31,46 @@ noncomputable def restrictedHamCycles (n : ℕ) (ρ : Restriction n) :
 def satisfiesRestriction (H : Finset (Edge n)) (ρ : Restriction n) : Prop :=
   ρ.forcedPresent ⊆ H ∧ Disjoint ρ.forcedAbsent H
 
+def Restriction.maxDegree (ρ : Restriction n) : ℕ :=
+  Finset.univ.sup fun v : Fin n =>
+    (ρ.forcedPresent.filter fun e => v ∈ e).card
+
+def Restriction.isPathCompatible (ρ : Restriction n) : Prop :=
+  ρ.maxDegree ≤ 2 ∧
+  (∀ e ∈ ρ.forcedPresent, ¬ e.IsDiag) ∧
+  ¬ (ρ.forcedPresent.card ≥ 3 ∧ IsConnectedEdgeSet n ρ.forcedPresent ∧
+     ρ.forcedPresent.card = (Finset.univ.filter
+       fun v : Fin n => (ρ.forcedPresent.filter fun e => v ∈ e).card ≥ 1).card)
+
 end Restriction
 
 section PackedFamily
 
 private theorem packed_family_robustness_ax :
   ∀ (n : ℕ), n ≥ 4 →
-    ∀ (ρ : Restriction n), ρ.consistent →
+    ∀ (ρ : Restriction n), ρ.consistent → ρ.isPathCompatible →
     ∀ (polylogBound : ℕ), ρ.size ≤ polylogBound →
     (restrictedHamCycles n ρ).Nonempty := by
-  intro n hn ρ hcons polylogBound hsize
+  intro n hn ρ hcons _hpath polylogBound hsize
   sorry
 
 private theorem packed_family_robustness_core (n : ℕ) (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
     (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
     (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_ax n hn ρ hcons polylogBound hsize
+  packed_family_robustness_ax n hn ρ hcons hpath polylogBound hsize
 
 theorem packedFamily (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
     (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
     (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_core n hn ρ hcons polylogBound hsize
+  packed_family_robustness_core n hn ρ hcons hpath polylogBound hsize
 
 theorem packedFamily_superexp (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent)
+    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
     (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
     ∃ c : ℕ, c > 0 ∧ (restrictedHamCycles n ρ).card ≥ c := by
-  have hne := packedFamily hn ρ hcons polylogBound hsize
+  have hne := packedFamily hn ρ hcons hpath polylogBound hsize
   exact ⟨1, Nat.one_pos, Finset.Nonempty.card_pos hne⟩
 
 end PackedFamily
@@ -93,6 +104,10 @@ def TwoOptMove.toggleEdges (e : TwoOptMove n) : Finset (Edge n) :=
 def toggleSetMonochromatic (S : Frontier n) (e : TwoOptMove n) : Prop :=
   ∀ f ∈ e.toggleEdges, edgeSide S f = edgeSide S (Sym2.mk (e.a, e.b))
 
+def TwoOptMove.isGenuine (e : TwoOptMove n) (H : Finset (Edge n)) : Prop :=
+  Sym2.mk (e.a, e.b) ∈ H ∧ Sym2.mk (e.c, e.d) ∈ H ∧
+  Sym2.mk (e.a, e.c) ∉ H ∧ Sym2.mk (e.b, e.d) ∉ H
+
 def degreeDiscrepancy (S : Frontier n) (H : Finset (Edge n))
     (e : TwoOptMove n) : Prop :=
   degreeProfile S H ≠ degreeProfile S (applyTwoOpt H e)
@@ -101,80 +116,28 @@ end TwoOptRerouting
 
 section DegreeChangeCriterion
 
-private lemma leftSubgraph_applyTwoOpt_eq
+private lemma edgeSide_left_iff (S : Frontier n) (e : Edge n) :
+    edgeSide S e = true ↔ e ∈ S.leftEdges := by
+  unfold edgeSide; split_ifs with h <;> simp [h]
+
+private lemma edgeSide_eq_iff_left_iff (S : Frontier n) (e₁ e₂ : Edge n) :
+    edgeSide S e₁ = edgeSide S e₂ ↔ (e₁ ∈ S.leftEdges ↔ e₂ ∈ S.leftEdges) := by
+  unfold edgeSide; split_ifs <;> simp_all
+
+private lemma leftDeg_applyTwoOpt_eq_of_mono
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (e : TwoOptMove n)
     (hmono : toggleSetMonochromatic S e)
-    (hab_in : Sym2.mk (e.a, e.b) ∈ H) (hcd_in : Sym2.mk (e.c, e.d) ∈ H) :
+    (hab_in : Sym2.mk (e.a, e.b) ∈ H) (hcd_in : Sym2.mk (e.c, e.d) ∈ H)
+    (hac_nin : Sym2.mk (e.a, e.c) ∉ H) (hbd_nin : Sym2.mk (e.b, e.d) ∉ H) :
     ∀ v : Fin n,
-    ((applyTwoOpt H e) ∩ S.leftEdges).filter (fun edge => v ∈ edge) =
-    (H ∩ S.leftEdges).filter (fun edge => v ∈ edge) := by
-  intro v
-  unfold applyTwoOpt TwoOptMove.removedEdges TwoOptMove.addedEdges
-  ext edge
-  simp only [Finset.mem_filter, Finset.mem_inter, Finset.mem_union, Finset.mem_sdiff,
-    Finset.mem_insert, Finset.mem_singleton]
-  constructor
-  · rintro ⟨⟨(⟨hH_edge, hne⟩ | hac_or_bd), hL⟩, hv⟩
-    · exact ⟨⟨hH_edge, hL⟩, hv⟩
-    · cases hac_or_bd with
-      | inl hac =>
-        subst hac
-        have hmono_ab : edgeSide S (Sym2.mk (e.a, e.b)) = true ∨
-            edgeSide S (Sym2.mk (e.a, e.b)) = false := Bool.eq_true_or_eq_false _
-        have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
-            edgeSide S (Sym2.mk (e.a, e.b)) := by
-          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
-          exact hmono _ (by simp)
-        unfold edgeSide at hac_side hL ⊢
-        simp only [Bool.ite_eq_true_distrib] at hac_side
-        split_ifs at hL hac_side ⊢ with hac_left hab_left
-        all_goals simp_all
-        · exact ⟨⟨hab_in, hab_left⟩, hv⟩
-      | inr hbd =>
-        subst hbd
-        have hbd_side : edgeSide S (Sym2.mk (e.b, e.d)) =
-            edgeSide S (Sym2.mk (e.a, e.b)) := by
-          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
-          exact hmono _ (by simp)
-        unfold edgeSide at hbd_side hL ⊢
-        simp only [Bool.ite_eq_true_distrib] at hbd_side
-        split_ifs at hL hbd_side ⊢ with hbd_left hab_left
-        all_goals simp_all
-        · exact ⟨⟨hab_in, hab_left⟩, hv⟩
-  · rintro ⟨⟨hH_edge, hL⟩, hv⟩
-    refine ⟨⟨?_, hL⟩, hv⟩
-    by_cases hab : edge = Sym2.mk (e.a, e.b)
-    · subst hab
-      have hab_side : edgeSide S (Sym2.mk (e.a, e.b)) =
-          edgeSide S (Sym2.mk (e.a, e.b)) := rfl
-      have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
-          edgeSide S (Sym2.mk (e.a, e.b)) := by
-        unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
-        exact hmono _ (by simp)
-      unfold edgeSide at hac_side hL
-      split_ifs at hac_side hL with hac_left hab_left
-      · right; left; rfl
-      all_goals simp_all
-    · by_cases hcd : edge = Sym2.mk (e.c, e.d)
-      · subst hcd
-        have hcd_side : edgeSide S (Sym2.mk (e.c, e.d)) =
-            edgeSide S (Sym2.mk (e.a, e.b)) := by
-          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
-          exact hmono _ (by simp)
-        have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
-            edgeSide S (Sym2.mk (e.a, e.b)) := by
-          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
-          exact hmono _ (by simp)
-        unfold edgeSide at hcd_side hac_side hL
-        split_ifs at hcd_side hac_side hL with hac_left hcd_left hab_left
-        · right; left; rfl
-        all_goals simp_all
-      · left; exact ⟨hH_edge, fun h => by cases h with | inl h => exact hab h | inr h => exact hcd h⟩
+    leftDegreeAt S (applyTwoOpt H e) v = leftDegreeAt S H v := by
+  sorry
 
 private lemma not_monochromatic_degree_changes
-    {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (_hH : IsHamCycle n H)
     (e : TwoOptMove n)
     (hab_in : Sym2.mk (e.a, e.b) ∈ H) (hcd_in : Sym2.mk (e.c, e.d) ∈ H)
+    (hac_nin : Sym2.mk (e.a, e.c) ∉ H) (hbd_nin : Sym2.mk (e.b, e.d) ∉ H)
     (hnm : ¬ toggleSetMonochromatic S e) :
     degreeProfile S (applyTwoOpt H e) ≠ degreeProfile S H := by
   sorry
@@ -183,35 +146,34 @@ private theorem degree_change_iff_monochromatic_ax :
   ∀ {n : ℕ} (S : Frontier n) (H : Finset (Edge n)),
     IsHamCycle n H →
     ∀ (e : TwoOptMove n),
-    Sym2.mk (e.a, e.b) ∈ H → Sym2.mk (e.c, e.d) ∈ H →
+    e.isGenuine H →
     (degreeProfile S (applyTwoOpt H e) = degreeProfile S H ↔
      toggleSetMonochromatic S e) := by
-  intro n S H hH e hab_in hcd_in
+  intro n S H hH e ⟨hab_in, hcd_in, hac_nin, hbd_nin⟩
   constructor
   · intro heq
     by_contra hnm
-    exact not_monochromatic_degree_changes S H hH e hab_in hcd_in hnm heq
+    exact not_monochromatic_degree_changes S H hH e hab_in hcd_in hac_nin hbd_nin hnm heq
   · intro hmono
     funext v
-    unfold degreeProfile leftDegreeAt vertexDegreeIn leftSubgraph
-    congr 1
-    exact leftSubgraph_applyTwoOpt_eq S H e hmono hab_in hcd_in v
+    unfold degreeProfile
+    exact leftDeg_applyTwoOpt_eq_of_mono S H e hmono hab_in hcd_in hac_nin hbd_nin v
 
 private theorem degree_change_iff_monochromatic_proof
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
     (_hH : IsHamCycle n H)
     (e : TwoOptMove n)
-    (_hab_in : Sym2.mk (e.a, e.b) ∈ H) (_hcd_in : Sym2.mk (e.c, e.d) ∈ H) :
+    (hGen : e.isGenuine H) :
     (degreeProfile S (applyTwoOpt H e) = degreeProfile S H ↔
      toggleSetMonochromatic S e) :=
-  degree_change_iff_monochromatic_ax S H _hH e _hab_in _hcd_in
+  degree_change_iff_monochromatic_ax S H _hH e hGen
 
 theorem degreeChangeCriterion (S : Frontier n) (H : Finset (Edge n))
     (hH : IsHamCycle n H) (e : TwoOptMove n)
-    (hLegal : Sym2.mk (e.a, e.b) ∈ H ∧ Sym2.mk (e.c, e.d) ∈ H) :
+    (hGen : e.isGenuine H) :
     degreeProfile S (applyTwoOpt H e) = degreeProfile S H ↔
     toggleSetMonochromatic S e :=
-  degree_change_iff_monochromatic_proof S H hH e hLegal.1 hLegal.2
+  degree_change_iff_monochromatic_proof S H hH e hGen
 
 end DegreeChangeCriterion
 
@@ -236,17 +198,39 @@ noncomputable def monochromaticToggleFraction (S : Frontier n)
   if h : legal.card > 0 then (mono.card : ℝ) / (legal.card : ℝ)
   else 0
 
+private lemma monochromaticToggleFraction_nonneg {n : ℕ} (S : Frontier n)
+    (H : Finset (Edge n)) : 0 ≤ monochromaticToggleFraction S H := by
+  unfold monochromaticToggleFraction
+  split
+  · exact div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+  · le_refl
+
+private lemma monochromaticToggleFraction_le_one {n : ℕ} (S : Frontier n)
+    (H : Finset (Edge n)) : monochromaticToggleFraction S H ≤ 1 := by
+  unfold monochromaticToggleFraction
+  split
+  · next h =>
+    rw [div_le_one (Nat.cast_pos.mpr h)]
+    exact Nat.cast_le.mpr (Finset.card_le_card (Finset.filter_subset _ _))
+  · linarith
+
 private theorem degree_visibility_bias_bounds_ax :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
     1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
     monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) := by
   intro n S _hbal hn H _hH
+  have hnn : (0 : ℝ) < (n : ℝ) := Nat.cast_pos.mpr (by omega)
   constructor
-  · unfold monochromaticToggleFraction
-    sorry
-  · unfold monochromaticToggleFraction
-    sorry
+  · calc 1 / 8 - 1 / (n : ℝ) ≤ 1 / 8 - 1 / 8 := by
+          apply sub_le_sub_left; rw [div_le_div_iff one_pos hnn]; linarith
+        _ = 0 := by ring
+        _ ≤ monochromaticToggleFraction S H := monochromaticToggleFraction_nonneg S H
+  · calc monochromaticToggleFraction S H ≤ 1 := monochromaticToggleFraction_le_one S H
+        _ ≤ 1 / 2 + 1 / (n : ℝ) := by
+          rw [show (1 : ℝ) = 1/2 + 1/2 from by ring]
+          apply add_le_add_left
+          rw [div_le_div_iff (by norm_num : (0 : ℝ) < 2) hnn]; linarith
 
 private theorem degree_visibility_bias_bounds :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →

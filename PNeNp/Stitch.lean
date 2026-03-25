@@ -149,6 +149,81 @@ open Classical in
 def IsConnectedBoundaryMultigraph {n : ℕ} (G : BoundaryMultigraph n) : Prop :=
   numComponentsBMG G = 1
 
+private theorem every_component_has_boundary_vertex
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S)
+    (c : (edgeSetToGraph n (L ∪ R)).ConnectedComponent)
+    (hc : c ∈ Set.range (edgeSetToGraph n (L ∪ R)).connectedComponentMk) :
+    ∃ v : Fin n, v ∈ boundaryVertices S ∧
+      (edgeSetToGraph n (L ∪ R)).connectedComponentMk v = c := by
+  obtain ⟨v₀, rfl⟩ := hc
+  by_cases h1 : vertexDegreeIn n L v₀ = 1
+  · exact ⟨v₀, hLEndpoints v₀ h1, rfl⟩
+  · by_cases h2 : vertexDegreeIn n R v₀ = 1
+    · exact ⟨v₀, hREndpoints v₀ h2, rfl⟩
+    · sorry
+
+private theorem reachable_in_union_gives_reachable_in_bmg
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S)
+    (u v : Fin n) (hu : u ∈ boundaryVertices S) (hv : v ∈ boundaryVertices S)
+    (hreach : (edgeSetToGraph n (L ∪ R)).Reachable u v) :
+    (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u v := by
+  sorry
+
+private theorem reachable_in_bmg_gives_reachable_in_union
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (u v : Fin n) (hu : u ∈ boundaryVertices S) (hv : v ∈ boundaryVertices S)
+    (hreach : (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u v) :
+    (edgeSetToGraph n (L ∪ R)).Reachable u v := by
+  sorry
+
+open Classical in
+private theorem component_map_well_defined
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S)
+    (u v : Fin n) (hu : u ∈ boundaryVertices S) (hv : v ∈ boundaryVertices S)
+    (hsame : (edgeSetToGraph n (L ∪ R)).connectedComponentMk u =
+             (edgeSetToGraph n (L ∪ R)).connectedComponentMk v) :
+    (bmgToGraph (boundaryMultigraphOf S L R)).connectedComponentMk u =
+    (bmgToGraph (boundaryMultigraphOf S L R)).connectedComponentMk v := by
+  have hreach : (edgeSetToGraph n (L ∪ R)).Reachable u v :=
+    SimpleGraph.ConnectedComponent.exact hsame
+  have hbmg := reachable_in_union_gives_reachable_in_bmg S L R
+    hSpanning hLNoCycles hRNoCycles hLEndpoints hREndpoints u v hu hv hreach
+  exact SimpleGraph.ConnectedComponent.sound hbmg
+
+open Classical in
+private theorem component_map_injective
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (u v : Fin n) (hu : u ∈ boundaryVertices S) (hv : v ∈ boundaryVertices S)
+    (hsame : (bmgToGraph (boundaryMultigraphOf S L R)).connectedComponentMk u =
+             (bmgToGraph (boundaryMultigraphOf S L R)).connectedComponentMk v) :
+    (edgeSetToGraph n (L ∪ R)).connectedComponentMk u =
+    (edgeSetToGraph n (L ∪ R)).connectedComponentMk v := by
+  have hreach : (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u v :=
+    SimpleGraph.ConnectedComponent.exact hsame
+  have hunion := reachable_in_bmg_gives_reachable_in_union S L R u v hu hv hreach
+  exact SimpleGraph.ConnectedComponent.sound hunion
+
 private theorem contraction_preserves_components :
   ∀ {n : ℕ} (S : Frontier n) (L R : Finset (Edge n)),
     (∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2) →
@@ -160,6 +235,10 @@ private theorem contraction_preserves_components :
     (∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S) →
     numComponents (L ∪ R) = numComponentsBMG (boundaryMultigraphOf S L R) := by
   intro n S L R hSpanning hLNoCycles hRNoCycles hLEndpoints hREndpoints
+  unfold numComponents numComponentsBMG
+  set G := edgeSetToGraph n (L ∪ R)
+  set B := boundaryMultigraphOf S L R
+  set Gb := bmgToGraph B
   sorry
 
 private theorem connected_iff_one_component :
@@ -246,6 +325,35 @@ theorem sameStateStitch_degreeCondition
     vertexDegreeIn n (mixedGraph S H H') v = 2 :=
   mixed_degree_eq S H H' hH hH' hd v
 
+private lemma danglingEndpoints_eq_degree_iff
+    {n : ℕ} (S : Frontier n) (H H' : Finset (Edge n))
+    (hU : danglingEndpoints S H = danglingEndpoints S H')
+    (v : Fin n) (hv : v ∈ boundaryVertices S) :
+    vertexDegreeIn n (leftSubgraph S H) v = 1 ↔
+    vertexDegreeIn n (leftSubgraph S H') v = 1 := by
+  have fwd : v ∈ danglingEndpoints S H ↔ v ∈ danglingEndpoints S H' := by
+    rw [hU]
+  unfold danglingEndpoints at fwd
+  simp only [Finset.mem_filter] at fwd
+  unfold degreeProfile leftDegreeAt at fwd
+  constructor
+  · intro h; exact (fwd.mp ⟨hv, h⟩).2
+  · intro h; exact (fwd.mpr ⟨hv, h⟩).2
+
+private lemma same_pairing_implies_left_reachability_iff
+    {n : ℕ} (S : Frontier n) (hS : S.isBalanced)
+    (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (hU : danglingEndpoints S H = danglingEndpoints S H')
+    (hπ : HEq (σ_S S H hH).π (σ_S S H' hH').π)
+    (u v : Fin n)
+    (hu_bdy : u ∈ boundaryVertices S) (hv_bdy : v ∈ boundaryVertices S)
+    (hu_deg : vertexDegreeIn n (leftSubgraph S H) u = 1)
+    (hv_deg : vertexDegreeIn n (leftSubgraph S H) v = 1) :
+    (edgeSetToGraph n (leftSubgraph S H')).Reachable u v ↔
+    (edgeSetToGraph n (leftSubgraph S H)).Reachable u v := by
+  sorry
+
 private theorem matching_pairings_give_same_boundary_left_edges :
   ∀ {n : ℕ} (S : Frontier n) (hS : S.isBalanced)
     (H H' : Finset (Edge n))
@@ -261,9 +369,17 @@ private theorem matching_pairings_give_same_boundary_left_edges :
   simp only [Finset.mem_filter, Finset.mem_univ, true_and]
   constructor
   · rintro ⟨hp1, hp2, hne, hdeg1, hdeg2, hreach⟩
-    exact ⟨hp1, hp2, hne, sorry, sorry, sorry⟩
+    have hdeg1' := (danglingEndpoints_eq_degree_iff S H H' hU p.1 hp1).mpr hdeg1
+    have hdeg2' := (danglingEndpoints_eq_degree_iff S H H' hU p.2 hp2).mpr hdeg2
+    exact ⟨hp1, hp2, hne, hdeg1', hdeg2',
+      (same_pairing_implies_left_reachability_iff S hS H H' hH hH' hU hπ
+        p.1 p.2 hp1 hp2 hdeg1' hdeg2').mp hreach⟩
   · rintro ⟨hp1, hp2, hne, hdeg1, hdeg2, hreach⟩
-    exact ⟨hp1, hp2, hne, sorry, sorry, sorry⟩
+    have hdeg1' := (danglingEndpoints_eq_degree_iff S H H' hU p.1 hp1).mp hdeg1
+    have hdeg2' := (danglingEndpoints_eq_degree_iff S H H' hU p.2 hp2).mp hdeg2
+    exact ⟨hp1, hp2, hne, hdeg1', hdeg2',
+      (same_pairing_implies_left_reachability_iff S hS H H' hH hH' hU hπ
+        p.1 p.2 hp1 hp2 hdeg1 hdeg2).mpr hreach⟩
 
 theorem sameStateStitch_boundaryGraphEq
     (S : Frontier n) (hS : S.isBalanced)

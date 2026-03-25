@@ -714,6 +714,82 @@ private theorem free_both_colors_nonempty {n q : ℕ}
       have : n - (n + 1) / 2 ≤ q := by omega
       omega
 
+private theorem free_color_card_ge_q {n q : ℕ}
+    (mca : MultiCarrierAdmissible n q) (hn : n ≥ 4 * q + 1) (c : Bool) :
+    (freeVerticesOfColor mca c).card ≥ q := by
+  unfold freeVerticesOfColor freeVertices
+  have hBal := mca.hBalanced
+  unfold Coloring.isBalanced at hBal
+  have hcarrier := carrierVertexSet_card_le mca
+  have hBichrom := mca.hBichromatic
+  have pair_color_le : ∀ i : Fin q,
+      (({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).filter
+        (fun v => mca.χ.color v = c)).card ≤ 1 := by
+    intro i
+    have hbi := hBichrom i
+    unfold CarrierEdge.isBichromatic isBichromaticEdge at hbi
+    rw [Finset.card_le_one]
+    intro a ha b hb
+    simp only [Finset.mem_filter, Finset.mem_insert, Finset.mem_singleton] at ha hb
+    rcases ha.1 with rfl | rfl <;> rcases hb.1 with rfl | rfl <;> try rfl
+    all_goals (cases c <;> simp_all)
+  have carrier_color_le : ((carrierVertexSet mca).filter (fun v => mca.χ.color v = c)).card ≤ q := by
+    unfold carrierVertexSet
+    rw [Finset.filter_biUnion]
+    calc (Finset.univ.biUnion fun i : Fin q =>
+          (({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).filter
+            fun v => mca.χ.color v = c)).card
+        ≤ ∑ i : Fin q, (({(mca.carriers i).endpt1, (mca.carriers i).endpt2} : Finset (Fin n)).filter
+            fun v => mca.χ.color v = c).card := Finset.card_biUnion_le
+      _ ≤ ∑ _i : Fin q, 1 := Finset.sum_le_sum (fun i _ => pair_color_le i)
+      _ = q := by simp
+  set reds := (Finset.univ.filter fun v : Fin n => mca.χ.color v = true).card
+  set blues := (Finset.univ.filter fun v : Fin n => mca.χ.color v = false).card
+  have hpart : reds + blues = n := by
+    have : (Finset.univ : Finset (Fin n)) =
+      (Finset.univ.filter fun v => mca.χ.color v = true) ∪
+      (Finset.univ.filter fun v => mca.χ.color v = false) := by
+      ext v; simp only [Finset.mem_union, Finset.mem_filter, Finset.mem_univ, true_and]
+      cases mca.χ.color v <;> simp
+    have hdisj : Disjoint (Finset.univ.filter fun v : Fin n => mca.χ.color v = true)
+                          (Finset.univ.filter fun v : Fin n => mca.χ.color v = false) := by
+      rw [Finset.disjoint_filter]; intro v _ h; simp [h]
+    rw [← Finset.card_union_of_disjoint hdisj, ← this, Finset.card_fin]
+  set total_c := (Finset.univ.filter fun v : Fin n => mca.χ.color v = c).card
+  have htotal_ge : total_c ≥ n / 2 := by
+    cases c <;> simp only [total_c, reds, blues] at * <;> omega
+  have hfree_filter_eq : ((Finset.univ \ carrierVertexSet mca).filter fun v => mca.χ.color v = c) =
+      (Finset.univ.filter fun v => mca.χ.color v = c) \
+      ((carrierVertexSet mca).filter fun v => mca.χ.color v = c) := by
+    ext v; simp [Finset.mem_sdiff, Finset.mem_filter]
+    tauto
+  rw [hfree_filter_eq]
+  have hsub : (carrierVertexSet mca).filter (fun v => mca.χ.color v = c) ⊆
+      Finset.univ.filter (fun v : Fin n => mca.χ.color v = c) := by
+    intro v hv; simp [Finset.mem_filter] at hv ⊢; exact hv.2
+  rw [Finset.card_sdiff_of_subset hsub]
+  omega
+
+private noncomputable def greedyPortSelection {n q : ℕ}
+    (mca : MultiCarrierAdmissible n q) (hn : n ≥ 4 * q + 1) :
+    Fin q → Fin n × Fin n :=
+  sorry
+
+private theorem greedyPortSelection_spec {n q : ℕ}
+    (mca : MultiCarrierAdmissible n q) (hn : n ≥ 4 * q + 1) :
+    let sel := greedyPortSelection mca hn
+    (∀ i, mca.χ.color (sel i).1 ≠ mca.χ.color (sel i).2) ∧
+    (∀ i, (sel i).1 ∉ carrierVertexSet mca) ∧
+    (∀ i, (sel i).2 ∉ carrierVertexSet mca) ∧
+    (∀ i, (sel i).1 ≠ (sel i).2) ∧
+    (∀ i j, i ≠ j → (sel i).1 ≠ (sel j).1 ∧ (sel i).1 ≠ (sel j).2 ∧
+                      (sel i).2 ≠ (sel j).1 ∧ (sel i).2 ≠ (sel j).2) ∧
+    (∀ i, (sel i).1 ≠ (mca.carriers i).endpt1 ∧ (sel i).1 ≠ (mca.carriers i).endpt2 ∧
+          (sel i).2 ≠ (mca.carriers i).endpt1 ∧ (sel i).2 ≠ (mca.carriers i).endpt2) ∧
+    (∀ i j, (sel i).1 ≠ (mca.carriers j).endpt1 ∧ (sel i).1 ≠ (mca.carriers j).endpt2 ∧
+            (sel i).2 ≠ (mca.carriers j).endpt1 ∧ (sel i).2 ≠ (mca.carriers j).endpt2) := by
+  exact sorry
+
 private theorem carrier_extension_block_construction :
   ∀ {n q : ℕ} (mca : MultiCarrierAdmissible n q)
     (polylogBound : ℕ), q ≤ polylogBound → n ≥ 4 * q + 1 →
@@ -724,7 +800,39 @@ private theorem carrier_extension_block_construction :
       (hPorts : ∀ i, isBichromaticEdge mca.χ (blocks i).p (blocks i).q),
       True := by
   intro n q mca polylogBound _hqBound hn
-  exact sorry
+  have hspec := greedyPortSelection_spec mca hn
+  set sel := greedyPortSelection mca hn with hsel_def
+  obtain ⟨hBichrom, hNotCarrier1, hNotCarrier2, hNeq, hPairDisj, hNotSameCarrier, hNotAnyCarrier⟩ := hspec
+  refine ⟨fun i => {
+    p := (sel i).1
+    a := (mca.carriers i).endpt1
+    b := (mca.carriers i).endpt2
+    q := (sel i).2
+    all_distinct := ?_
+  }, ?_, ?_, ?_, trivial⟩
+  · exact ⟨(hNotAnyCarrier i i).1, (hNotAnyCarrier i i).2.1, hNeq i,
+           (mca.carriers i).ne, (hNotAnyCarrier i i).2.2.1, (hNotAnyCarrier i i).2.2.2⟩
+  · intro i; exact ⟨rfl, rfl⟩
+  · intro i j hij
+    rw [Finset.disjoint_left]
+    intro v hvi hvj
+    simp only [SwitchBlock.vertices, Finset.mem_insert, Finset.mem_singleton] at hvi hvj
+    have hpd := hPairDisj i j hij
+    have hcd := mca.hCarrierDisjoint i j hij
+    have hca := hNotAnyCarrier i
+    have hcb := hNotAnyCarrier j
+    rcases hvi with rfl | rfl | rfl | rfl <;> rcases hvj with rfl | rfl | rfl | rfl
+    all_goals (first | exact absurd rfl hpd.1 | exact absurd rfl hpd.2.1
+                     | exact absurd rfl hpd.2.2.1 | exact absurd rfl hpd.2.2.2
+                     | exact absurd rfl (hca j).1 | exact absurd rfl (hca j).2.1
+                     | exact absurd rfl (hcb i).1.symm | exact absurd rfl (hcb i).2.1.symm
+                     | exact absurd rfl hcd.1 | exact absurd rfl hcd.2.1
+                     | exact absurd rfl hcd.2.2.1 | exact absurd rfl hcd.2.2.2
+                     | exact absurd rfl (hca j).2.2.1 | exact absurd rfl (hca j).2.2.2
+                     | exact absurd rfl (hcb i).2.2.1.symm | exact absurd rfl (hcb i).2.2.2.symm
+                     | sorry)
+  · intro i
+    exact hBichrom i
 
 theorem multiCarrierExtensionExistence {q : ℕ}
     (mca : MultiCarrierAdmissible n q)
@@ -807,6 +915,189 @@ private theorem surviving_card_ge {n q : ℕ}
   have := interiorVertices_card_le ext
   omega
 
+private theorem interiorVertices_card_eq {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (interiorVertices ext).card = 2 * q := by
+  unfold interiorVertices
+  rw [Finset.card_biUnion]
+  · simp only [Finset.card_fin]
+    have : ∀ i : Fin q,
+        ({(ext.mca.carriers i).endpt1, (ext.mca.carriers i).endpt2} : Finset (Fin n)).card = 2 :=
+      fun i => Finset.card_pair (ext.mca.carriers i).ne
+    simp_rw [this]
+    ring
+  · intro i _ j _ hij
+    have hdisj := ext.mca.hCarrierDisjoint i j hij
+    rw [Finset.disjoint_left]
+    intro v
+    simp only [Finset.mem_insert, Finset.mem_singleton]
+    intro hv hv2
+    rcases hv with rfl | rfl <;> rcases hv2 with rfl | rfl
+    · exact hdisj.1 rfl
+    · exact hdisj.2.1 rfl
+    · exact hdisj.2.2.1 rfl
+    · exact hdisj.2.2.2 rfl
+
+private theorem surviving_card_eq {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    (survivingVertices ext).card = n - 2 * q := by
+  unfold survivingVertices
+  rw [Finset.card_sdiff_of_subset (Finset.subset_univ _), Finset.card_fin,
+      interiorVertices_card_eq ext]
+
+private noncomputable def survivingEquiv {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Fin (n - 2 * q) ≃ (survivingVertices ext : Set (Fin n)) := by
+  have hcard := surviving_card_eq ext hn
+  exact (Fintype.equivFinOfCardEq (by rw [Fintype.card_coe]; exact hcard.symm)).symm
+
+private noncomputable def embedSurviving {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Fin (n - 2 * q) ↪ Fin n :=
+  (survivingEquiv ext hn).toEmbedding.trans
+    ⟨fun x => x.val, fun a b h => Subtype.ext h⟩
+
+private theorem embed_range_eq_surviving {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Set.range (embedSurviving ext hn) = ↑(survivingVertices ext) := by
+  ext v
+  simp only [Set.mem_range, embedSurviving, Function.Embedding.trans_apply,
+             Equiv.toEmbedding_apply, Finset.mem_coe]
+  constructor
+  · rintro ⟨i, rfl⟩; exact (survivingEquiv ext hn i).prop
+  · intro hv
+    have := (survivingEquiv ext hn).surjective ⟨v, hv⟩
+    obtain ⟨i, hi⟩ := this
+    exact ⟨i, congr_arg Subtype.val hi⟩
+
+private theorem carrier_in_block_vertices {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (ext.mca.carriers i).endpt1 ∈ (ext.blocks i).vertices ∧
+    (ext.mca.carriers i).endpt2 ∈ (ext.blocks i).vertices := by
+  have hm := ext.hCarrierMatch i
+  simp only [SwitchBlock.vertices, Finset.mem_insert, Finset.mem_singleton]
+  exact ⟨Or.inr (Or.inl hm.1), Or.inr (Or.inr (Or.inl hm.2))⟩
+
+private theorem port_not_carrier {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (ext.blocks i).p ≠ (ext.mca.carriers i).endpt1 ∧
+    (ext.blocks i).p ≠ (ext.mca.carriers i).endpt2 ∧
+    (ext.blocks i).q ≠ (ext.mca.carriers i).endpt1 ∧
+    (ext.blocks i).q ≠ (ext.mca.carriers i).endpt2 := by
+  have hm := ext.hCarrierMatch i
+  have hd := (ext.blocks i).all_distinct
+  exact ⟨fun h => hd.1 (hm.1 ▸ h), fun h => hd.2.1 (hm.2 ▸ h),
+         fun h => hd.2.2.2.2.1 (hm.1 ▸ h), fun h => hd.2.2.2.2.2 (hm.2 ▸ h)⟩
+
+private theorem port_in_surviving_p {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (ext.blocks i).p ∈ survivingVertices ext := by
+  unfold survivingVertices
+  simp only [Finset.mem_sdiff, Finset.mem_univ, true_and]
+  intro hmem
+  unfold interiorVertices at hmem
+  simp only [Finset.mem_biUnion, Finset.mem_univ, true_and,
+             Finset.mem_insert, Finset.mem_singleton] at hmem
+  obtain ⟨j, hj⟩ := hmem
+  have hpc := port_not_carrier ext i
+  by_cases hij : i = j
+  · subst hij
+    rcases hj with rfl | rfl
+    · exact hpc.1 rfl
+    · exact hpc.2.1 rfl
+  · have hblkdisj := ext.hAllDistinct i j hij
+    rw [Finset.disjoint_left] at hblkdisj
+    have hp_in_i : (ext.blocks i).p ∈ (ext.blocks i).vertices := by
+      simp [SwitchBlock.vertices]
+    have hcib := carrier_in_block_vertices ext j
+    rcases hj with rfl | rfl
+    · exact absurd hcib.1 (hblkdisj hp_in_i)
+    · exact absurd hcib.2 (hblkdisj hp_in_i)
+
+private theorem port_in_surviving_q {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (ext.blocks i).q ∈ survivingVertices ext := by
+  unfold survivingVertices
+  simp only [Finset.mem_sdiff, Finset.mem_univ, true_and]
+  intro hmem
+  unfold interiorVertices at hmem
+  simp only [Finset.mem_biUnion, Finset.mem_univ, true_and,
+             Finset.mem_insert, Finset.mem_singleton] at hmem
+  obtain ⟨j, hj⟩ := hmem
+  have hpc := port_not_carrier ext i
+  by_cases hij : i = j
+  · subst hij
+    rcases hj with rfl | rfl
+    · exact hpc.2.2.1 rfl
+    · exact hpc.2.2.2 rfl
+  · have hblkdisj := ext.hAllDistinct i j hij
+    rw [Finset.disjoint_left] at hblkdisj
+    have hq_in_i : (ext.blocks i).q ∈ (ext.blocks i).vertices := by
+      simp [SwitchBlock.vertices]
+    have hcib := carrier_in_block_vertices ext j
+    rcases hj with rfl | rfl
+    · exact absurd hcib.1 (hblkdisj hq_in_i)
+    · exact absurd hcib.2 (hblkdisj hq_in_i)
+
+private noncomputable def portPreimage {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) (i : Fin q)
+    (isP : Bool) : Fin (n - 2 * q) :=
+  let v : (survivingVertices ext : Set (Fin n)) :=
+    if isP then ⟨(ext.blocks i).p, port_in_surviving_p ext i⟩
+    else ⟨(ext.blocks i).q, port_in_surviving_q ext i⟩
+  (survivingEquiv ext hn).symm v
+
+private theorem portPreimage_val {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) (i : Fin q)
+    (isP : Bool) :
+    (embedSurviving ext hn (portPreimage ext hn i isP)).val =
+    if isP then (ext.blocks i).p.val else (ext.blocks i).q.val := by
+  unfold portPreimage embedSurviving
+  simp only [Function.Embedding.trans_apply, Equiv.toEmbedding_apply, Equiv.apply_symm_apply]
+  split <;> rfl
+
+private noncomputable def childCarriers {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Fin q → CarrierEdge (n - 2 * q) := fun i =>
+  { endpt1 := portPreimage ext hn i true
+    endpt2 := portPreimage ext hn i false
+    ne := by
+      intro heq
+      have h1 := portPreimage_val ext hn i true
+      have h2 := portPreimage_val ext hn i false
+      simp only [ite_true] at h1; simp only [ite_false] at h2
+      have : (embedSurviving ext hn (portPreimage ext hn i true)) =
+             (embedSurviving ext hn (portPreimage ext hn i false)) :=
+        congr_arg (embedSurviving ext hn) heq
+      rw [Fin.ext_iff] at this
+      rw [h1, h2] at this
+      exact (ext.blocks i).all_distinct.2.2.1 (Fin.ext this) }
+
+private noncomputable def childColoring {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Coloring (n - 2 * q) :=
+  ⟨fun v => ext.mca.χ.color (embedSurviving ext hn v)⟩
+
+private noncomputable def childRestriction {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (hn : n ≥ 2 * q) :
+    Restriction (n - 2 * q) :=
+  let emb := embedSurviving ext hn
+  let bg := backgroundRestriction ext.mca
+  { forcedPresent := bg.forcedPresent.filterMap (fun e =>
+      Sym2.lift ⟨fun a b =>
+        match (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun i => emb i = a),
+              (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun j => emb j = b) with
+        | some i, some j => some (Sym2.mk (i, j))
+        | _, _ => none,
+        sorry⟩ e)
+    forcedAbsent := bg.forcedAbsent.filterMap (fun e =>
+      Sym2.lift ⟨fun a b =>
+        match (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun i => emb i = a),
+              (Finset.univ : Finset (Fin (n - 2 * q))).find? (fun j => emb j = b) with
+        | some i, some j => some (Sym2.mk (i, j))
+        | _, _ => none,
+        sorry⟩ e) }
+
 private theorem multi_carrier_suppression_child :
   ∀ {n q : ℕ} (ext : MultiCarrierExtension n q),
     n ≥ 2 * q →
@@ -815,7 +1106,65 @@ private theorem multi_carrier_suppression_child :
             (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
       (backgroundRestriction child).size = (backgroundRestriction ext.mca).size := by
   intro n q ext hn
-  exact sorry
+  refine ⟨{
+    ρ := childRestriction ext hn
+    χ := childColoring ext hn
+    carriers := childCarriers ext hn
+    hConsistent := sorry
+    hBalanced := sorry
+    hBichromatic := by
+      intro i
+      unfold CarrierEdge.isBichromatic isBichromaticEdge childCarriers childColoring
+      simp only
+      have hports := ext.hPortsBichromatic i
+      unfold isBichromaticEdge at hports
+      have h1 := portPreimage_val ext hn i true
+      have h2 := portPreimage_val ext hn i false
+      simp only [ite_true] at h1; simp only [ite_false] at h2
+      have hemb1 : embedSurviving ext hn (portPreimage ext hn i true) = (ext.blocks i).p :=
+        Fin.ext h1
+      have hemb2 : embedSurviving ext hn (portPreimage ext hn i false) = (ext.blocks i).q :=
+        Fin.ext h2
+      rw [hemb1, hemb2]
+      exact hports
+    hForced := sorry
+    hCarrierDisjoint := by
+      intro i j hij
+      unfold childCarriers
+      simp only
+      have hemb : Fin (n - 2 * q) ↪ Fin n := embedSurviving ext hn
+      have hpd := ext.hAllDistinct i j hij
+      rw [Finset.disjoint_left] at hpd
+      have hp_i : (ext.blocks i).p ∈ (ext.blocks i).vertices := by
+        simp [SwitchBlock.vertices]
+      have hq_i : (ext.blocks i).q ∈ (ext.blocks i).vertices := by
+        simp [SwitchBlock.vertices]
+      have hp_j : (ext.blocks j).p ∈ (ext.blocks j).vertices := by
+        simp [SwitchBlock.vertices]
+      have hq_j : (ext.blocks j).q ∈ (ext.blocks j).vertices := by
+        simp [SwitchBlock.vertices]
+      have h_pi := portPreimage_val ext hn i true
+      have h_qi := portPreimage_val ext hn i false
+      have h_pj := portPreimage_val ext hn j true
+      have h_qj := portPreimage_val ext hn j false
+      simp only [ite_true] at h_pi h_pj
+      simp only [ite_false] at h_qi h_qj
+      have emb_pi : hemb (portPreimage ext hn i true) = (ext.blocks i).p := Fin.ext h_pi
+      have emb_qi : hemb (portPreimage ext hn i false) = (ext.blocks i).q := Fin.ext h_qi
+      have emb_pj : hemb (portPreimage ext hn j true) = (ext.blocks j).p := Fin.ext h_pj
+      have emb_qj : hemb (portPreimage ext hn j false) = (ext.blocks j).q := Fin.ext h_qj
+      refine ⟨?_, ?_, ?_, ?_⟩ <;> intro heq <;> {
+        have := congr_arg (⇑hemb) heq
+        first
+        | (rw [emb_pi, emb_pj] at this; exact absurd hp_j (hpd (this ▸ hp_i)))
+        | (rw [emb_pi, emb_qj] at this; exact absurd hq_j (hpd (this ▸ hp_i)))
+        | (rw [emb_qi, emb_pj] at this; exact absurd hp_j (hpd (this ▸ hq_i)))
+        | (rw [emb_qi, emb_qj] at this; exact absurd hq_j (hpd (this ▸ hq_i)))
+      }
+  }, ?_, ?_⟩
+  · intro i
+    exact sorry
+  · exact sorry
 
 theorem multiCarrierSuppression {q : ℕ}
     (ext : MultiCarrierExtension n q)

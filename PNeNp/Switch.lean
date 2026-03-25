@@ -108,7 +108,68 @@ private lemma leftSubgraph_applyTwoOpt_eq
     ∀ v : Fin n,
     ((applyTwoOpt H e) ∩ S.leftEdges).filter (fun edge => v ∈ edge) =
     (H ∩ S.leftEdges).filter (fun edge => v ∈ edge) := by
-  sorry
+  intro v
+  unfold applyTwoOpt TwoOptMove.removedEdges TwoOptMove.addedEdges
+  ext edge
+  simp only [Finset.mem_filter, Finset.mem_inter, Finset.mem_union, Finset.mem_sdiff,
+    Finset.mem_insert, Finset.mem_singleton]
+  constructor
+  · rintro ⟨⟨(⟨hH_edge, hne⟩ | hac_or_bd), hL⟩, hv⟩
+    · exact ⟨⟨hH_edge, hL⟩, hv⟩
+    · cases hac_or_bd with
+      | inl hac =>
+        subst hac
+        have hmono_ab : edgeSide S (Sym2.mk (e.a, e.b)) = true ∨
+            edgeSide S (Sym2.mk (e.a, e.b)) = false := Bool.eq_true_or_eq_false _
+        have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
+            edgeSide S (Sym2.mk (e.a, e.b)) := by
+          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+          exact hmono _ (by simp)
+        unfold edgeSide at hac_side hL ⊢
+        simp only [Bool.ite_eq_true_distrib] at hac_side
+        split_ifs at hL hac_side ⊢ with hac_left hab_left
+        all_goals simp_all
+        · exact ⟨⟨hab_in, hab_left⟩, hv⟩
+      | inr hbd =>
+        subst hbd
+        have hbd_side : edgeSide S (Sym2.mk (e.b, e.d)) =
+            edgeSide S (Sym2.mk (e.a, e.b)) := by
+          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+          exact hmono _ (by simp)
+        unfold edgeSide at hbd_side hL ⊢
+        simp only [Bool.ite_eq_true_distrib] at hbd_side
+        split_ifs at hL hbd_side ⊢ with hbd_left hab_left
+        all_goals simp_all
+        · exact ⟨⟨hab_in, hab_left⟩, hv⟩
+  · rintro ⟨⟨hH_edge, hL⟩, hv⟩
+    refine ⟨⟨?_, hL⟩, hv⟩
+    by_cases hab : edge = Sym2.mk (e.a, e.b)
+    · subst hab
+      have hab_side : edgeSide S (Sym2.mk (e.a, e.b)) =
+          edgeSide S (Sym2.mk (e.a, e.b)) := rfl
+      have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
+          edgeSide S (Sym2.mk (e.a, e.b)) := by
+        unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+        exact hmono _ (by simp)
+      unfold edgeSide at hac_side hL
+      split_ifs at hac_side hL with hac_left hab_left
+      · right; left; rfl
+      all_goals simp_all
+    · by_cases hcd : edge = Sym2.mk (e.c, e.d)
+      · subst hcd
+        have hcd_side : edgeSide S (Sym2.mk (e.c, e.d)) =
+            edgeSide S (Sym2.mk (e.a, e.b)) := by
+          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+          exact hmono _ (by simp)
+        have hac_side : edgeSide S (Sym2.mk (e.a, e.c)) =
+            edgeSide S (Sym2.mk (e.a, e.b)) := by
+          unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+          exact hmono _ (by simp)
+        unfold edgeSide at hcd_side hac_side hL
+        split_ifs at hcd_side hac_side hL with hac_left hcd_left hab_left
+        · right; left; rfl
+        all_goals simp_all
+      · left; exact ⟨hH_edge, fun h => by cases h with | inl h => exact hab h | inr h => exact hcd h⟩
 
 private lemma not_monochromatic_degree_changes
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)

@@ -496,6 +496,57 @@ private lemma leftSubgraph_component_is_path
     (hne : comp.Nonempty)
     (h2reg : ∀ v : Fin n, vertexDegreeIn n comp v ≤ 2) :
     ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+  intro hall
+  have comp_sub_H : comp ⊆ H :=
+    Finset.Subset.trans hcomp Finset.inter_subset_left
+  have comp_eq_H : comp = H :=
+    cycle_component_equals_H H hH comp comp_sub_H hne hall
+  have H_sub_left : H ⊆ S.leftEdges := by
+    intro e he
+    have : e ∈ comp := comp_eq_H ▸ he
+    have : e ∈ H ∩ S.leftEdges := hcomp this
+    exact Finset.mem_inter.mp this |>.2
+  obtain ⟨e, he⟩ := hRight
+  have he_H : e ∈ H := Finset.mem_inter.mp he |>.1
+  have he_right : e ∈ S.rightEdges := Finset.mem_inter.mp he |>.2
+  have he_left : e ∈ S.leftEdges := H_sub_left he_H
+  exact Finset.disjoint_left.mp S.disjoint he_left he_right
+
+private lemma vertexDegreeIn_mono (n : ℕ) (A B : Finset (Edge n)) (hAB : A ⊆ B) (v : Fin n) :
+    vertexDegreeIn n A v ≤ vertexDegreeIn n B v := by
+  unfold vertexDegreeIn
+  exact Finset.card_le_card (Finset.filter_subset_filter _ hAB)
+
+private lemma vertexDegreeIn_comp_eq_of_maximal (n : ℕ)
+    (comp parent : Finset (Edge n)) (hcomp : comp ⊆ parent)
+    (hmax : ∀ e ∈ parent \ comp, ∀ v : Fin n, v ∈ e → vertexDegreeIn n comp v = 0)
+    (v : Fin n) (hv : vertexDegreeIn n comp v > 0) :
+    vertexDegreeIn n comp v = vertexDegreeIn n parent v := by
+  unfold vertexDegreeIn at *
+  apply le_antisymm
+  · exact Finset.card_le_card (Finset.filter_subset_filter _ hcomp)
+  · apply Finset.card_le_card
+    intro e he
+    simp only [Finset.mem_filter] at he ⊢
+    by_contra h
+    push_neg at h
+    have hnotcomp : e ∉ comp := fun hc => absurd he.2 (h hc)
+    have hdiff : e ∈ parent \ comp := Finset.mem_sdiff.mpr ⟨he.1, hnotcomp⟩
+    have := hmax e hdiff v he.2
+    omega
+
+private lemma connected_maxdeg2_not_cycle_exactly2_deg1
+    (n : ℕ) (comp : Finset (Edge n))
+    (hne : comp.Nonempty)
+    (hconn : IsConnectedEdgeSet n comp)
+    (hdeg_le2 : ∀ v : Fin n, vertexDegreeIn n comp v ≤ 2)
+    (hpath : ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2)) :
+    (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v = 1).card = 2 := by
+  sorry
+
+private lemma finset_card_eq_two {α : Type*} [DecidableEq α]
+    (S : Finset α) (hcard : S.card = 2) :
+    ∃ a b : α, a ≠ b ∧ a ∈ S ∧ b ∈ S ∧ S = {a, b} := by
   sorry
 
 private lemma path_component_has_two_deg1_vertices
@@ -503,20 +554,206 @@ private lemma path_component_has_two_deg1_vertices
     (comp : Finset (Edge n)) (hcomp : comp ⊆ leftSubgraph S H)
     (hne : comp.Nonempty)
     (hpath : ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
-    (hconn : IsConnectedEdgeSet n comp) :
+    (hconn : IsConnectedEdgeSet n comp)
+    (hmax : ∀ e ∈ leftSubgraph S H \ comp,
+      ∀ v : Fin n, v ∈ e → vertexDegreeIn n comp v = 0) :
     ∃ u v : Fin n, u ≠ v ∧
       vertexDegreeIn n comp u = 1 ∧ vertexDegreeIn n comp v = 1 ∧
       u ∈ danglingEndpoints S H ∧ v ∈ danglingEndpoints S H ∧
       (edgeSetToGraph n comp).Reachable u v ∧
       (∀ w : Fin n, vertexDegreeIn n comp w = 1 → w = u ∨ w = v) := by
+  have hdeg_le2 : ∀ v : Fin n, vertexDegreeIn n comp v ≤ 2 := by
+    intro v
+    calc vertexDegreeIn n comp v
+        ≤ vertexDegreeIn n (leftSubgraph S H) v :=
+          vertexDegreeIn_mono n comp (leftSubgraph S H) hcomp v
+      _ ≤ 2 := leftSubgraph_max_degree_two S H hH v
+  set D1 := Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v = 1
+  have hD1_eq2 : D1.card = 2 :=
+    connected_maxdeg2_not_cycle_exactly2_deg1 n comp hne hconn hdeg_le2 hpath
+  obtain ⟨u, v, huv_ne, hu_mem, hv_mem, hD1_eq⟩ := finset_card_eq_two D1 hD1_eq2
+  simp only [D1, Finset.mem_filter] at hu_mem hv_mem
+  have deg1_implies_dangling : ∀ w : Fin n, vertexDegreeIn n comp w = 1 →
+      w ∈ danglingEndpoints S H := by
+    intro w hw
+    have hpos : vertexDegreeIn n comp w > 0 := by omega
+    have hcomp_eq := vertexDegreeIn_comp_eq_of_maximal n comp
+      (leftSubgraph S H) hcomp hmax w hpos
+    simp only [danglingEndpoints, Finset.mem_filter, degreeProfile]
+    constructor
+    · simp only [boundaryVertices, Finset.mem_filter, Finset.mem_univ, true_and]
+      constructor
+      · have hleft : leftDegreeAt S H w ≥ 1 := by
+          show vertexDegreeIn n (leftSubgraph S H) w ≥ 1; omega
+        unfold leftDegreeAt leftSubgraph vertexDegreeIn at hleft
+        have hne' : (Finset.filter (fun e => w ∈ e) (H ∩ S.leftEdges)).Nonempty := by
+          by_contra h'; rw [Finset.not_nonempty_iff_eq_empty] at h'
+          rw [h', Finset.card_empty] at hleft; omega
+        obtain ⟨e, he⟩ := hne'
+        simp only [Finset.mem_filter, Finset.mem_inter] at he
+        exact ⟨e, he.1.2, he.2⟩
+      · have hsum := leftDeg_add_rightDeg_eq_two S H hH w
+        have hleft : leftDegreeAt S H w = 1 := by
+          show vertexDegreeIn n (leftSubgraph S H) w = 1; omega
+        have hright : rightDegreeAt S H w ≥ 1 := by omega
+        unfold rightDegreeAt rightSubgraph vertexDegreeIn at hright
+        have hne' : (Finset.filter (fun e => w ∈ e) (H ∩ S.rightEdges)).Nonempty := by
+          by_contra h'; rw [Finset.not_nonempty_iff_eq_empty] at h'
+          rw [h', Finset.card_empty] at hright; omega
+        obtain ⟨e, he⟩ := hne'
+        simp only [Finset.mem_filter, Finset.mem_inter] at he
+        exact ⟨e, he.1.2, he.2⟩
+    · show leftDegreeAt S H w = 1
+      show vertexDegreeIn n (leftSubgraph S H) w = 1; omega
+  refine ⟨u, v, huv_ne, hu_mem.2, hv_mem.2,
+    deg1_implies_dangling u hu_mem.2, deg1_implies_dangling v hv_mem.2,
+    hconn.preconnected u v, ?_⟩
+  intro w hw
+  have : w ∈ D1 := Finset.mem_filter.mpr ⟨Finset.mem_univ w, hw⟩
+  rw [hD1_eq] at this
+  simp only [Finset.mem_insert, Finset.mem_singleton] at this
+  exact this
+
+open Classical in
+private noncomputable def edgeComponentOf (n : ℕ) (edges : Finset (Edge n))
+    (u : Fin n) : Finset (Edge n) :=
+  edges.filter fun e =>
+    ∃ v : Fin n, v ∈ e ∧ (edgeSetToGraph n edges).Reachable u v
+
+private lemma edgeComponentOf_sub (n : ℕ) (edges : Finset (Edge n)) (u : Fin n) :
+    edgeComponentOf n edges u ⊆ edges := by
+  intro e he
+  unfold edgeComponentOf at he
+  simp only [Finset.mem_filter] at he
+  exact he.1
+
+private lemma edgeComponentOf_connected (n : ℕ) (edges : Finset (Edge n))
+    (u : Fin n) (hu : ∃ e ∈ edges, u ∈ e) :
+    IsConnectedEdgeSet n (edgeComponentOf n edges u) := by
   sorry
+
+private lemma edgeComponentOf_nonempty (n : ℕ) (edges : Finset (Edge n))
+    (u : Fin n) (hu : ∃ e ∈ edges, u ∈ e) :
+    (edgeComponentOf n edges u).Nonempty := by
+  sorry
+
+private lemma edgeComponentOf_degree_le (n : ℕ) (edges : Finset (Edge n))
+    (u v : Fin n) :
+    vertexDegreeIn n (edgeComponentOf n edges u) v ≤ vertexDegreeIn n edges v := by
+  unfold vertexDegreeIn
+  apply Finset.card_le_card
+  exact Finset.filter_subset_filter _ (edgeComponentOf_sub n edges u)
+
+private lemma edgeComponentOf_degree_eq (n : ℕ) (edges : Finset (Edge n))
+    (u v : Fin n) (hreach : (edgeSetToGraph n edges).Reachable u v) :
+    vertexDegreeIn n (edgeComponentOf n edges u) v = vertexDegreeIn n edges v := by
+  sorry
+
+private lemma edgeComponentOf_reachable_iff (n : ℕ) (edges : Finset (Edge n))
+    (u v : Fin n) (hv : ∃ e ∈ edgeComponentOf n edges u, v ∈ e) :
+    (edgeSetToGraph n edges).Reachable u v := by
+  sorry
+
+private lemma edgeComponentOf_not_cycle (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (u : Fin n) (hu : u ∈ danglingEndpoints S H) :
+    ¬(∀ v : Fin n, vertexDegreeIn n (edgeComponentOf n (leftSubgraph S H) u) v = 0 ∨
+      vertexDegreeIn n (edgeComponentOf n (leftSubgraph S H) u) v = 2) := by
+  sorry
+
+private lemma reachable_in_component_lifts (n : ℕ) (edges : Finset (Edge n))
+    (u v : Fin n)
+    (hreach : (edgeSetToGraph n (edgeComponentOf n edges u)).Reachable u v) :
+    (edgeSetToGraph n edges).Reachable u v := by
+  have hsub := edgeComponentOf_sub n edges u
+  apply SimpleGraph.Reachable.mono _ hreach
+  intro x y hadj
+  exact ⟨hadj.1, hsub hadj.2⟩
 
 private lemma deg1_unique_partner
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
     (u : Fin n) (hu : u ∈ danglingEndpoints S H) :
     ∃! v, v ∈ danglingEndpoints S H ∧ v ≠ u ∧
       (edgeSetToGraph n (leftSubgraph S H)).Reachable u v := by
-  sorry
+  set L := leftSubgraph S H with hL_def
+  set comp := edgeComponentOf n L u
+  have hu_dangling : degreeProfile S H u = 1 := by
+    simp only [danglingEndpoints, Finset.mem_filter] at hu
+    exact hu.2
+  have hu_deg : vertexDegreeIn n L u = 1 := by
+    unfold degreeProfile leftDegreeAt at hu_dangling
+    exact hu_dangling
+  have hu_edge : ∃ e ∈ L, u ∈ e := by
+    unfold vertexDegreeIn at hu_deg
+    by_contra h
+    push_neg at h
+    have : (L.filter fun e => u ∈ e).card = 0 := by
+      rw [Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+      intro e he
+      exact h e he
+    omega
+  have hcomp_sub : comp ⊆ L := edgeComponentOf_sub n L u
+  have hcomp_ne : comp.Nonempty := edgeComponentOf_nonempty n L u hu_edge
+  have hcomp_conn : IsConnectedEdgeSet n comp := edgeComponentOf_connected n L u hu_edge
+  have hcomp_not_cycle := edgeComponentOf_not_cycle S H hH u hu
+  have hcomp_max : ∀ e ∈ L \ comp, ∀ v : Fin n, v ∈ e → vertexDegreeIn n comp v = 0 := by
+    intro e he_diff v hv_in_e
+    simp only [Finset.mem_sdiff] at he_diff
+    obtain ⟨he_L, he_not_comp⟩ := he_diff
+    by_contra h_nonzero
+    have hv_reach : (edgeSetToGraph n L).Reachable u v := by
+      have h_pos : 0 < vertexDegreeIn n comp v := by omega
+      unfold vertexDegreeIn at h_pos
+      rw [Finset.card_pos] at h_pos
+      obtain ⟨f, hf⟩ := h_pos
+      simp only [Finset.mem_filter] at hf
+      obtain ⟨hf_comp, hv_in_f⟩ := hf
+      have hf_comp' : f ∈ edgeComponentOf n L u := hf_comp
+      simp only [edgeComponentOf, Finset.mem_filter] at hf_comp'
+      obtain ⟨_, w, hw_in_f, hw_reach⟩ := hf_comp'
+      sorry
+    have he_should_be_comp : e ∈ comp := by
+      show e ∈ edgeComponentOf n L u
+      simp only [edgeComponentOf, Finset.mem_filter]
+      exact ⟨he_L, v, hv_in_e, hv_reach⟩
+    exact he_not_comp he_should_be_comp
+  obtain ⟨a, b, hab_ne, ha_deg1, hb_deg1, ha_dang, hb_dang, hab_reach, hab_only⟩ :=
+    path_component_has_two_deg1_vertices S H hH comp hcomp_sub hcomp_ne hcomp_not_cycle hcomp_conn hcomp_max
+  have hu_deg_comp : vertexDegreeIn n comp u = 1 := by
+    have hself : (edgeSetToGraph n L).Reachable u u := SimpleGraph.Reachable.refl u
+    rw [edgeComponentOf_degree_eq n L u u hself]
+    exact hu_deg
+  have hu_is_ab : u = a ∨ u = b := hab_only u hu_deg_comp
+  rcases hu_is_ab with rfl | rfl
+  · use b
+    constructor
+    · exact ⟨hb_dang, hab_ne.symm, reachable_in_component_lifts n L u b hab_reach⟩
+    · intro w ⟨hw_dang, hw_ne, hw_reach⟩
+      have hw_deg_comp : vertexDegreeIn n comp w = vertexDegreeIn n L w := by
+        exact edgeComponentOf_degree_eq n L u w hw_reach
+      have hw_dangling_deg : vertexDegreeIn n L w = 1 := by
+        simp only [danglingEndpoints, Finset.mem_filter] at hw_dang
+        unfold degreeProfile leftDegreeAt at hw_dang
+        exact hw_dang.2
+      have hw_comp_deg1 : vertexDegreeIn n comp w = 1 := by omega
+      have : w = u ∨ w = b := hab_only w hw_comp_deg1
+      rcases this with rfl | rfl
+      · exact absurd rfl hw_ne
+      · rfl
+  · use a
+    constructor
+    · exact ⟨ha_dang, hab_ne, hab_reach.symm |> reachable_in_component_lifts n L u a⟩
+    · intro w ⟨hw_dang, hw_ne, hw_reach⟩
+      have hw_deg_comp : vertexDegreeIn n comp w = vertexDegreeIn n L w := by
+        exact edgeComponentOf_degree_eq n L u w hw_reach
+      have hw_dangling_deg : vertexDegreeIn n L w = 1 := by
+        simp only [danglingEndpoints, Finset.mem_filter] at hw_dang
+        unfold degreeProfile leftDegreeAt at hw_dang
+        exact hw_dang.2
+      have hw_comp_deg1 : vertexDegreeIn n comp w = 1 := by omega
+      have : w = a ∨ w = u := hab_only w hw_comp_deg1
+      rcases this with rfl | rfl
+      · rfl
+      · exact absurd rfl hw_ne
 
 private lemma deg1_vertex_reachable_to_other_deg1
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)

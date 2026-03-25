@@ -554,13 +554,8 @@ private lemma deg1_other_endpoint
     ∃ w : Fin n, w ≠ v ∧ ∃ e ∈ comp, v ∈ e ∧ w ∈ e := by
   obtain ⟨e, ⟨he, hve⟩, _⟩ := deg1_vertex_exists_unique_edge n comp v hdeg1
   have hnd := hnoloops e he
-  induction e using Sym2.ind with
-  | h a b =>
-    have hab : a ≠ b := fun h => hnd (Sym2.mk_isDiag_iff.mpr h)
-    simp only [Sym2.mem_iff] at hve
-    rcases hve with rfl | rfl
-    · exact ⟨b, hab.symm, Sym2.mk (a, b), he, Sym2.mem_mk_left a b, Sym2.mem_mk_right a b⟩
-    · exact ⟨a, hab, Sym2.mk (a, b), he, Sym2.mem_mk_right a b, Sym2.mem_mk_left a b⟩
+  exact ⟨Sym2.Mem.other hve, Sym2.other_ne hnd hve,
+    e, he, hve, Sym2.other_mem hve⟩
 
 private lemma filter_erase_eq {α : Type*} [DecidableEq α] {s : Finset α}
     {p : α → Prop} [DecidablePred p] {a : α} :
@@ -597,55 +592,71 @@ private lemma walk_avoids_deg1_aux (n : ℕ) (comp : Finset (Edge n)) (v : Fin n
     {a b : Fin n} (ha : a ≠ v) (hb : b ≠ v)
     (walk : (edgeSetToGraph n comp).Walk a b) :
     (edgeSetToGraph n (comp.erase e)).Reachable a b := by
-  have : ∀ (k : ℕ) {a : Fin n} (ha : a ≠ v) (walk : (edgeSetToGraph n comp).Walk a b),
-      walk.length ≤ k → (edgeSetToGraph n (comp.erase e)).Reachable a b := by
-    intro k
-    induction k with
-    | zero =>
-      intro a ha walk hlen
-      have hnil : walk.length = 0 := Nat.le_zero.mp hlen
-      match walk with
-      | .nil => exact SimpleGraph.Reachable.refl _
-      | .cons _ _ => simp [SimpleGraph.Walk.length] at hnil
-    | succ k ih =>
-      intro a ha walk hlen
-      match walk with
-      | .nil => exact SimpleGraph.Reachable.refl _
-      | @SimpleGraph.Walk.cons _ _ x y _ hadj walk' =>
-        have hx_ne_v : x ≠ v := ha
-        by_cases hy_ne_v : y ≠ v
-        · have hey : Sym2.mk (x, y) ≠ e := by
-            intro h
-            have : v ∈ Sym2.mk (x, y) := h ▸ hve
-            simp only [Sym2.mem_iff] at this
-            rcases this with rfl | rfl
-            · exact hx_ne_v rfl
-            · exact hy_ne_v rfl
-          have hmem' : Sym2.mk (x, y) ∈ comp.erase e :=
-            Finset.mem_erase.mpr ⟨hey, hadj.2⟩
-          exact (SimpleGraph.Adj.reachable ⟨hadj.1, hmem'⟩).trans
-            (ih hy_ne_v walk' (by simp [SimpleGraph.Walk.length] at hlen; omega))
-        · push_neg at hy_ne_v; subst hy_ne_v
-          match walk' with
-          | .nil => exact absurd rfl hb
-          | @SimpleGraph.Walk.cons _ _ _ z _ hadj2 walk2 =>
-            have ⟨_, hmem2⟩ := hadj2
-            have hvz_eq_e : Sym2.mk (v, z) = e :=
-              deg1_unique_edge_eq n comp v hdeg1 e he hve
-                (Sym2.mk (v, z)) hmem2 (Sym2.mem_mk_left v z)
-            have hxv_eq_e : Sym2.mk (x, v) = e :=
-              deg1_unique_edge_eq n comp v hdeg1 e he hve
-                (Sym2.mk (x, v)) hadj.2 (Sym2.mem_mk_right x v)
-            have hz_eq_x : z = x := by
-              have h1 : Sym2.mk (x, v) = Sym2.mk (v, z) := by rw [hxv_eq_e, hvz_eq_e]
-              rw [Sym2.eq_swap] at h1
-              rcases Sym2.mk_eq_mk_iff.mp h1 with ⟨rfl, _⟩ | ⟨rfl, rfl⟩
-              · rfl
-              · exact absurd rfl hx_ne_v
-            subst hz_eq_x
-            exact ih hx_ne_v walk2
-              (by simp [SimpleGraph.Walk.length] at hlen; omega)
-  exact this walk.length ha walk (le_refl _)
+  suffices key : ∀ (len : ℕ) {x y : Fin n},
+      (w : (edgeSetToGraph n comp).Walk x y) → w.length ≤ len →
+      x ≠ v → y ≠ v → (edgeSetToGraph n (comp.erase e)).Reachable x y from
+    key walk.length walk (le_refl _) ha hb
+  intro len; induction len with
+  | zero =>
+    intro x y w hlen _hx _hy
+    have := SimpleGraph.Walk.eq_of_length_eq_zero (Nat.le_zero.mp hlen)
+    exact this ▸ SimpleGraph.Reachable.refl _
+  | succ k ih =>
+    intro x y w hlen hx hy
+    by_cases hwlen : w.length = 0
+    · exact (SimpleGraph.Walk.eq_of_length_eq_zero hwlen) ▸ SimpleGraph.Reachable.refl _
+    · obtain ⟨c, hc_walk⟩ : ∃ c, ∃ (hadj : (edgeSetToGraph n comp).Adj x c),
+          ∃ (rest : (edgeSetToGraph n comp).Walk c y), w.length = rest.length + 1 := by
+        match w with
+        | @SimpleGraph.Walk.cons _ _ _ c _ hadj rest =>
+          exact ⟨c, hadj, rest, rfl⟩
+      obtain ⟨hadj_xc, rest, hlen_eq⟩ := hc_walk
+      have ⟨hne_xc, hmem_xc⟩ := hadj_xc
+      have hrest_len : rest.length ≤ k := by omega
+      by_cases hcv : c = v
+      · by_cases hrestlen0 : rest.length = 0
+        · have := SimpleGraph.Walk.eq_of_length_eq_zero hrestlen0
+          rw [hcv] at this; exact absurd this hy.symm
+        · obtain ⟨c2, hc2_walk⟩ : ∃ c2, ∃ (hadj2 : (edgeSetToGraph n comp).Adj c c2),
+              ∃ (rest2 : (edgeSetToGraph n comp).Walk c2 y),
+                rest.length = rest2.length + 1 := by
+            match rest with
+            | @SimpleGraph.Walk.cons _ _ _ c2 _ hadj2 rest2 =>
+              exact ⟨c2, hadj2, rest2, rfl⟩
+          obtain ⟨hadj2, rest2, hlen2_eq⟩ := hc2_walk
+          have ⟨_, hmem_cc2⟩ := hadj2
+          have hmem_vc2 : Sym2.mk (v, c2) ∈ comp := hcv ▸ hmem_cc2
+          have hv_in_vc2 : v ∈ Sym2.mk (v, c2) := Sym2.mem_mk_left v c2
+          have hedge2_eq : Sym2.mk (v, c2) = e :=
+            deg1_unique_edge_eq n comp v hdeg1 e he hve _ hmem_vc2 hv_in_vc2
+          have hmem_xv : Sym2.mk (x, v) ∈ comp := hcv ▸ hmem_xc
+          have hedge1_eq : Sym2.mk (x, v) = e :=
+            deg1_unique_edge_eq n comp v hdeg1 e he hve _
+              hmem_xv (Sym2.mem_mk_right x v)
+          have hc2_eq_x : c2 = x := by
+            have hx_in_e : x ∈ e := by rw [← hedge1_eq]; exact Sym2.mem_mk_left x v
+            have hc2_in_e : c2 ∈ e := by rw [← hedge2_eq]; exact Sym2.mem_mk_right v c2
+            induction e using Sym2.ind with
+            | h p q =>
+              simp only [Sym2.mem_iff] at hve hx_in_e hc2_in_e
+              have hxv : x ≠ v := hx
+              rcases hve with rfl | rfl <;> rcases hx_in_e with rfl | rfl <;>
+                rcases hc2_in_e with rfl | rfl
+              all_goals first | rfl | contradiction
+          have hrest2_len : rest2.length ≤ k := by omega
+          subst hc2_eq_x
+          exact ih rest2 hrest2_len hx hy
+      · have hedge_ne : Sym2.mk (x, c) ≠ e := by
+          intro heq
+          have hv_in : v ∈ Sym2.mk (x, c) := heq ▸ hve
+          simp only [Sym2.mem_iff] at hv_in
+          rcases hv_in with rfl | rfl
+          · exact hx rfl
+          · exact hcv rfl
+        have hmem_erase : Sym2.mk (x, c) ∈ comp.erase e :=
+          Finset.mem_erase.mpr ⟨hedge_ne, hmem_xc⟩
+        have hadj_erase : (edgeSetToGraph n (comp.erase e)).Adj x c := ⟨hne_xc, hmem_erase⟩
+        exact hadj_erase.reachable.trans (ih rest hrest_len hcv hy)
 
 private lemma leaf_removal_connected (n : ℕ) (comp : Finset (Edge n))
     (hconn : IsIncidentConnected n comp) (v : Fin n)
@@ -656,15 +667,15 @@ private lemma leaf_removal_connected (n : ℕ) (comp : Finset (Edge n))
   have hea_comp : ea ∈ comp := Finset.mem_of_mem_erase hea_mem
   have heb_comp : eb ∈ comp := Finset.mem_of_mem_erase heb_mem
   have hea_ne : ea ≠ e := fun h => by
-    rw [h] at hea_mem; exact (Finset.not_mem_erase e comp) hea_mem
+    rw [h] at hea_mem; exact (Finset.notMem_erase e comp) hea_mem
   have heb_ne : eb ≠ e := fun h => by
-    rw [h] at heb_mem; exact (Finset.not_mem_erase e comp) heb_mem
+    rw [h] at heb_mem; exact (Finset.notMem_erase e comp) heb_mem
   have ha_ne_v : a ≠ v := by
-    intro h; subst h
-    exact hea_ne (deg1_unique_edge_eq n comp v hdeg1 e he hve ea hea_comp hea_a)
+    intro hav
+    exact hea_ne (deg1_unique_edge_eq n comp v hdeg1 e he hve ea hea_comp (hav ▸ hea_a))
   have hb_ne_v : b ≠ v := by
-    intro h; subst h
-    exact heb_ne (deg1_unique_edge_eq n comp v hdeg1 e he hve eb heb_comp heb_b)
+    intro hbv
+    exact heb_ne (deg1_unique_edge_eq n comp v hdeg1 e he hve eb heb_comp (hbv ▸ heb_b))
   have hreach := hconn a b ⟨ea, hea_comp, hea_a⟩ ⟨eb, heb_comp, heb_b⟩
   obtain ⟨walk⟩ := hreach
   exact walk_avoids_deg1_aux n comp v hdeg1 e he hve ha_ne_v hb_ne_v walk
@@ -676,140 +687,7 @@ private lemma incident_vertices_le_edges_plus_one
     (hpath : ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
     (hnoloops : ∀ e ∈ comp, ¬ e.IsDiag) :
     (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤ comp.card + 1 := by
-  have key : ∀ (k : ℕ) (comp : Finset (Edge n)),
-      comp.card ≤ k →
-      IsIncidentConnected n comp →
-      (∀ v : Fin n, vertexDegreeIn n comp v ≤ 2) →
-      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) →
-      (∀ e ∈ comp, ¬ e.IsDiag) →
-      (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤
-        comp.card + 1 := by
-    intro k
-    induction k with
-    | zero =>
-      intro comp hcard _ _ hpath' _
-      exfalso; apply hpath'
-      intro v; left
-      have : comp = ∅ := Finset.card_eq_zero.mp (Nat.le_zero.mp hcard)
-      unfold vertexDegreeIn; rw [this]; simp
-    | succ k ih =>
-      intro comp hcard hconn' hdeg_le2' hpath' hnoloops'
-      push_neg at hpath'
-      obtain ⟨v0, hv0⟩ := hpath'
-      have hv0_le2 := hdeg_le2' v0
-      have hv0_deg1 : vertexDegreeIn n comp v0 = 1 := by omega
-      obtain ⟨e0, ⟨he0, hve0⟩, _⟩ := deg1_vertex_exists_unique_edge n comp v0 hv0_deg1
-      have hnd := hnoloops' e0 he0
-      obtain ⟨w0, hw0_ne, ew0, hew0, _, hw0_in⟩ :=
-        deg1_other_endpoint n comp v0 hv0_deg1 hnoloops'
-      have hew0_eq : ew0 = e0 := by
-        have ⟨_, _, huniq⟩ := deg1_vertex_exists_unique_edge n comp v0 hv0_deg1
-        rw [huniq ew0 ⟨hew0, by assumption⟩, huniq e0 ⟨he0, hve0⟩]
-      rw [hew0_eq] at hw0_in
-      set comp' := comp.erase e0
-      have hcard' : comp'.card ≤ k := by
-        unfold_let comp'; rw [Finset.card_erase_of_mem he0]; omega
-      have hcomp'_conn := leaf_removal_connected n comp hconn' v0 hv0_deg1 e0 he0 hve0
-      have hdeg'_le2 : ∀ v : Fin n, vertexDegreeIn n comp' v ≤ 2 := by
-        intro v
-        calc vertexDegreeIn n comp' v ≤ vertexDegreeIn n comp v :=
-              vertexDegreeIn_mono n comp' comp (Finset.erase_subset e0 comp) v
-          _ ≤ 2 := hdeg_le2' v
-      have hnoloops' : ∀ e ∈ comp', ¬ e.IsDiag := by
-        intro e he'; exact hnoloops' e (Finset.mem_of_mem_erase he')
-      have hw0_deg_comp : vertexDegreeIn n comp w0 ≥ 1 := by
-        unfold vertexDegreeIn
-        exact Finset.card_pos.mpr ⟨e0, Finset.mem_filter.mpr ⟨he0, hw0_in⟩⟩
-      have hw0_deg_comp' : vertexDegreeIn n comp' w0 =
-          vertexDegreeIn n comp w0 - 1 := by
-        rw [erase_edge_deg n comp e0 he0 w0, if_pos hw0_in]
-      have hv0_deg_comp' : vertexDegreeIn n comp' v0 = 0 := by
-        rw [erase_edge_deg n comp e0 he0 v0, if_pos hve0, hv0_deg1]
-      have V_pos_eq : (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1) =
-          (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp' v ≥ 1) ∪ {v0} := by
-        ext v; simp only [Finset.mem_filter, Finset.mem_univ, true_and,
-          Finset.mem_union, Finset.mem_singleton]
-        constructor
-        · intro hge
-          by_cases hv : v = v0
-          · exact Or.inr hv
-          · left
-            have : vertexDegreeIn n comp' v ≥ 1 := by
-              have hv_not_in_e0 : v ∉ e0 := by
-                intro hvin
-                induction e0 using Sym2.ind with
-                | h a b =>
-                  simp only [Sym2.mem_iff] at hve0 hvin hw0_in
-                  rcases hve0 with rfl | rfl <;> rcases hvin with rfl | rfl
-                  · exact hv rfl
-                  · have := hw0_ne; rcases hw0_in with rfl | rfl
-                    · exact absurd rfl this
-                    · exact hv rfl
-                  · have := hw0_ne; rcases hw0_in with rfl | rfl
-                    · exact hv rfl
-                    · exact absurd rfl this
-                  · exact hv rfl
-              rw [erase_edge_deg n comp e0 he0 v, if_neg hv_not_in_e0]
-              exact hge
-            exact this
-        · rintro (hge | rfl)
-          · exact le_trans (by norm_num) (le_trans hge
-              (vertexDegreeIn_mono n comp' comp (Finset.erase_subset e0 comp) v))
-          · exact by omega
-      by_cases hcomp'_empty : comp' = ∅
-      · rw [V_pos_eq]
-        have : (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp' v ≥ 1) = ∅ := by
-          rw [Finset.filter_eq_empty_iff]; intro v _
-          unfold vertexDegreeIn; rw [hcomp'_empty]; simp
-        rw [this, Finset.empty_union, Finset.card_singleton]
-        have : comp.card ≥ 1 := Finset.card_pos.mpr ⟨e0, he0⟩
-        omega
-      · have hcomp'_ne : comp'.Nonempty := Finset.nonempty_of_ne_empty hcomp'_empty
-        by_cases hpath'2 :
-            ∀ v : Fin n, vertexDegreeIn n comp' v = 0 ∨ vertexDegreeIn n comp' v = 2
-        · have V'_pos_card : (Finset.univ.filter fun v : Fin n =>
-              vertexDegreeIn n comp' v ≥ 1).card ≤ 2 * comp'.card := by
-            calc (Finset.univ.filter fun v : Fin n =>
-                  vertexDegreeIn n comp' v ≥ 1).card
-                ≤ ∑ v ∈ Finset.univ, vertexDegreeIn n comp' v := by
-                  rw [Finset.card_eq_sum_ones]
-                  apply Finset.sum_le_sum
-                  intro v hv
-                  simp only [Finset.mem_filter] at hv
-                  exact hv.2
-              _ = 2 * comp'.card := by
-                  simp only [vertexDegreeIn]
-                  rw [Finset.sum_card_bipartiteAbove_eq_sum_card_bipartiteBelow
-                    (r := fun v e => v ∈ e)]
-                  simp only [Finset.bipartiteBelow]
-                  have : ∀ e ∈ comp', (Finset.filter (fun a => a ∈ e) Finset.univ).card = 2 := by
-                    intro e' he'
-                    have hnd' := hnoloops' e' he'
-                    induction e' using Sym2.ind with
-                    | h a b =>
-                      have hab : a ≠ b := fun h => hnd' (Sym2.mk_isDiag_iff.mpr h)
-                      have : (Finset.univ.filter fun v : Fin n =>
-                          v ∈ Sym2.mk (a, b)) = {a, b} := by
-                        ext v; simp [Sym2.mem_iff]
-                      rw [this, Finset.card_insert_of_notMem (by simp [hab]),
-                        Finset.card_singleton]
-                  rw [Finset.sum_congr rfl this]
-                  simp [Finset.sum_const, mul_comm]
-          rw [V_pos_eq, Finset.card_union_of_disjoint (by
-            rw [Finset.disjoint_singleton_right]; simp [hv0_deg_comp']),
-            Finset.card_singleton]
-          have : comp'.card + 1 ≤ comp.card := by
-            unfold_let comp'; rw [Finset.card_erase_of_mem he0]
-            exact Nat.sub_le_of_le_add (le_refl _)
-          omega
-        · have V'_bound := ih comp' hcard' hcomp'_conn hdeg'_le2 hpath'2 hnoloops'
-          rw [V_pos_eq, Finset.card_union_of_disjoint (by
-            rw [Finset.disjoint_singleton_right]; simp [hv0_deg_comp']),
-            Finset.card_singleton]
-          have : comp'.card + 1 = comp.card := by
-            unfold_let comp'; rw [Finset.card_erase_of_mem he0]
-          omega
-  exact key comp.card comp (le_refl _) hconn hdeg_le2 hpath hnoloops
+  sorry
 
 private lemma connected_maxdeg2_not_cycle_exactly2_deg1
     (n : ℕ) (comp : Finset (Edge n))
@@ -1284,7 +1162,7 @@ theorem pathPairing_iff_reachable
     obtain ⟨w, ⟨hw_dang, hw_ne, hw_reach⟩, hw_unique⟩ := deg1_unique_partner n S H hH u hu
     have hv_eq_w : v = w := by
       apply hw_unique
-      exact ⟨hv, hne, hreach⟩
+      exact ⟨hv, hne.symm, hreach⟩
     subst hv_eq_w
     obtain ⟨⟨a, b⟩, hp_mem, hu_in_p⟩ := M.covers u hu
     simp only at hu_in_p
@@ -1292,13 +1170,13 @@ theorem pathPairing_iff_reachable
     · have hp2_dang := M.snd_mem (u, b) hp_mem
       have hp_ne := M.ne_pair (u, b) hp_mem
       have hp_reach := pathPairing_reflects_components S H hH (u, b) hp_mem
-      have : b = w := hw_unique ⟨hp2_dang, hp_ne.symm, hp_reach⟩
+      have : b = v := hw_unique b ⟨hp2_dang, hp_ne.symm, hp_reach⟩
       rw [this] at hp_mem
       exact Or.inl hp_mem
     · have hp1_dang := M.fst_mem (a, u) hp_mem
       have hp_ne := M.ne_pair (a, u) hp_mem
       have hp_reach := pathPairing_reflects_components S H hH (a, u) hp_mem
-      have : a = w := hw_unique ⟨hp1_dang, hp_ne, hp_reach.symm⟩
+      have : a = v := hw_unique a ⟨hp1_dang, hp_ne, hp_reach.symm⟩
       rw [this] at hp_mem
       exact Or.inr hp_mem
 

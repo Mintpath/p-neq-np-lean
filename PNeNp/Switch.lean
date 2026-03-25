@@ -1,8 +1,10 @@
 import PNeNp.Basic
 import PNeNp.Interface
 import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Finset.Card
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Data.Real.Basic
+import Mathlib.Tactic.Linarith
 
 open Finset
 
@@ -131,7 +133,109 @@ private lemma leftDeg_applyTwoOpt_eq_of_mono
     (hac_nin : Sym2.mk (e.a, e.c) ∉ H) (hbd_nin : Sym2.mk (e.b, e.d) ∉ H) :
     ∀ v : Fin n,
     leftDegreeAt S (applyTwoOpt H e) v = leftDegreeAt S H v := by
-  sorry
+  obtain ⟨hab_ne, hac_ne, had_ne, hbc_ne, hbd_ne, hcd_ne⟩ := e.all_distinct
+  unfold toggleSetMonochromatic TwoOptMove.toggleEdges at hmono
+  have hiff_ac : edgeSide S (Sym2.mk (e.a, e.c)) = edgeSide S (Sym2.mk (e.a, e.b)) :=
+    hmono _ (mem_insert_of_mem (mem_insert_self _ _))
+  have hiff_cd : edgeSide S (Sym2.mk (e.c, e.d)) = edgeSide S (Sym2.mk (e.a, e.b)) :=
+    hmono _ (mem_insert_of_mem (mem_insert_of_mem (mem_insert_self _ _)))
+  have hiff_bd : edgeSide S (Sym2.mk (e.b, e.d)) = edgeSide S (Sym2.mk (e.a, e.b)) :=
+    hmono _ (mem_insert_of_mem (mem_insert_of_mem (mem_insert_of_mem (mem_singleton_self _))))
+  rw [edgeSide_eq_iff_left_iff] at hiff_ac hiff_cd hiff_bd
+  intro v
+  by_cases hab_left : Sym2.mk (e.a, e.b) ∈ S.leftEdges
+  · have hac_left := hiff_ac.mpr hab_left
+    have hcd_left := hiff_cd.mpr hab_left
+    have hbd_left := hiff_bd.mpr hab_left
+    unfold leftDegreeAt leftSubgraph vertexDegreeIn applyTwoOpt
+      TwoOptMove.removedEdges TwoOptMove.addedEdges
+    set rem := ({Sym2.mk (e.a, e.b), Sym2.mk (e.c, e.d)} : Finset (Edge n)) with hrem_def
+    set add := ({Sym2.mk (e.a, e.c), Sym2.mk (e.b, e.d)} : Finset (Edge n)) with hadd_def
+    set A := H ∩ S.leftEdges with hA_def
+    have hrem_sub_A : rem ⊆ A := by
+      intro f hf; rw [hrem_def] at hf; simp only [mem_insert, mem_singleton] at hf
+      rcases hf with rfl | rfl
+      · exact mem_inter.mpr ⟨hab_in, hab_left⟩
+      · exact mem_inter.mpr ⟨hcd_in, hcd_left⟩
+    have hA_disj_add : Disjoint A add := by
+      rw [disjoint_left]; intro f hf1 hf2
+      rw [hadd_def] at hf2; simp only [mem_insert, mem_singleton] at hf2
+      rcases hf2 with rfl | rfl
+      · exact hac_nin (mem_inter.mp hf1).1
+      · exact hbd_nin (mem_inter.mp hf1).1
+    have hadd_sub_left : add ⊆ S.leftEdges := by
+      rw [hadd_def]; intro f hf; simp only [mem_insert, mem_singleton] at hf
+      rcases hf with rfl | rfl <;> assumption
+    have hset_eq : (H \ rem ∪ add) ∩ S.leftEdges = (A \ rem) ∪ add := by
+      ext f; simp only [mem_inter, mem_union, mem_sdiff, hA_def, mem_inter]
+      constructor
+      · rintro ⟨hfl | hfa, hfleft⟩
+        · exact Or.inl ⟨⟨hfl.1, hfleft⟩, hfl.2⟩
+        · exact Or.inr hfa
+      · rintro (⟨⟨hfH, hfleft⟩, hfnrem⟩ | hfa)
+        · exact ⟨Or.inl ⟨hfH, hfnrem⟩, hfleft⟩
+        · exact ⟨Or.inr hfa, hadd_sub_left hfa⟩
+    rw [hset_eq]
+    have hkey : (Finset.filter (v ∈ ·) rem).card = (Finset.filter (v ∈ ·) add).card := by
+      rw [hrem_def, hadd_def]
+      simp only [filter_insert, filter_singleton, Sym2.mem_iff]
+      by_cases hwa : v = e.a <;> by_cases hwb : v = e.b <;>
+        by_cases hwc : v = e.c <;> by_cases hwd : v = e.d <;>
+        simp_all [card_insert_of_notMem]
+    have h_disj : Disjoint (filter (v ∈ ·) (A \ rem)) (filter (v ∈ ·) add) := by
+      rw [disjoint_left]; intro f hf1 hf2
+      simp only [mem_filter, mem_sdiff] at hf1; simp only [mem_filter] at hf2
+      exact disjoint_left.mp hA_disj_add hf1.1.1 hf2.1
+    rw [filter_union, card_union_of_disjoint h_disj]
+    have h_sub : filter (v ∈ ·) rem ⊆ filter (v ∈ ·) A := filter_subset_filter _ hrem_sub_A
+    have hfilt_sdiff : filter (v ∈ ·) (A \ rem) = filter (v ∈ ·) A \ filter (v ∈ ·) rem := by
+      ext f; simp only [mem_filter, mem_sdiff]; tauto
+    rw [hfilt_sdiff, Finset.card_sdiff_of_subset h_sub, hkey]
+    exact Nat.sub_add_cancel (hkey ▸ card_le_card h_sub)
+  · have hac_nleft := mt hiff_ac.mp hab_left
+    have hcd_nleft := mt hiff_cd.mp hab_left
+    have hbd_nleft := mt hiff_bd.mp hab_left
+    unfold leftDegreeAt leftSubgraph vertexDegreeIn applyTwoOpt
+      TwoOptMove.removedEdges TwoOptMove.addedEdges
+    congr 1; ext f
+    simp only [mem_filter, mem_inter, mem_union, mem_sdiff, mem_insert, mem_singleton]
+    constructor
+    · rintro ⟨⟨hfH | hfa, hfleft⟩, hfv⟩
+      · exact ⟨⟨hfH.1, hfleft⟩, hfv⟩
+      · rcases hfa with rfl | rfl
+        · exact absurd hfleft hac_nleft
+        · exact absurd hfleft hbd_nleft
+    · rintro ⟨⟨hfH, hfleft⟩, hfv⟩
+      exact ⟨⟨Or.inl ⟨hfH, fun h => by rcases h with rfl | rfl; exact hab_left hfleft; exact hcd_nleft hfleft⟩, hfleft⟩, hfv⟩
+
+private lemma leftDeg_change_at_vertex_of_swap
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
+    (e_old e_new : Edge n) (v : Fin n)
+    (hv_old : v ∈ e_old) (hv_new : v ∈ e_new)
+    (hold_in : e_old ∈ H) (hnew_nin : e_new ∉ H)
+    (hold_left : e_old ∈ S.leftEdges) (hnew_nleft : e_new ∉ S.leftEdges)
+    (H' : Finset (Edge n))
+    (hH'_spec : ∀ f : Edge n, v ∈ f → f ≠ e_old → f ≠ e_new →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges))
+    (hold_nin' : e_old ∉ H') (hnew_in' : e_new ∈ H') :
+    (Finset.filter (v ∈ ·) (H' ∩ S.leftEdges)).card <
+    (Finset.filter (v ∈ ·) (H ∩ S.leftEdges)).card := by
+  have hold_in_filt : e_old ∈ (H ∩ S.leftEdges).filter (v ∈ ·) :=
+    Finset.mem_filter.mpr ⟨Finset.mem_inter.mpr ⟨hold_in, hold_left⟩, hv_old⟩
+  have hold_nin_filt' : e_old ∉ (H' ∩ S.leftEdges).filter (v ∈ ·) := by
+    simp only [Finset.mem_filter, Finset.mem_inter]; intro ⟨⟨h, _⟩, _⟩; exact hold_nin' h
+  have hnew_nin_filt : e_new ∉ (H ∩ S.leftEdges).filter (v ∈ ·) := by
+    simp only [Finset.mem_filter, Finset.mem_inter]; intro ⟨⟨h, _⟩, _⟩; exact hnew_nin h
+  have hnew_nin_filt' : e_new ∉ (H' ∩ S.leftEdges).filter (v ∈ ·) := by
+    simp only [Finset.mem_filter, Finset.mem_inter]; intro ⟨⟨_, h⟩, _⟩; exact hnew_nleft h
+  apply Finset.card_lt_card
+  constructor
+  · intro f hf
+    simp only [Finset.mem_filter, Finset.mem_inter] at hf ⊢
+    have hf_ne_old : f ≠ e_old := fun h => hold_nin_filt' (h ▸ hf)
+    have hf_ne_new : f ≠ e_new := fun h => hnew_nin_filt' (h ▸ hf)
+    exact ⟨(hH'_spec f hf.2 hf_ne_old hf_ne_new).mpr ⟨hf.1.1, hf.1.2⟩, hf.2⟩
+  · exact ⟨e_old, hold_in_filt, hold_nin_filt'⟩
 
 private lemma not_monochromatic_degree_changes
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (_hH : IsHamCycle n H)
@@ -200,37 +304,26 @@ noncomputable def monochromaticToggleFraction (S : Frontier n)
 
 private lemma monochromaticToggleFraction_nonneg {n : ℕ} (S : Frontier n)
     (H : Finset (Edge n)) : 0 ≤ monochromaticToggleFraction S H := by
-  unfold monochromaticToggleFraction
-  split
+  simp only [monochromaticToggleFraction]
+  split_ifs with h
   · exact div_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
-  · le_refl
+  · exact le_refl _
 
 private lemma monochromaticToggleFraction_le_one {n : ℕ} (S : Frontier n)
     (H : Finset (Edge n)) : monochromaticToggleFraction S H ≤ 1 := by
-  unfold monochromaticToggleFraction
-  split
-  · next h =>
-    rw [div_le_one (Nat.cast_pos.mpr h)]
+  simp only [monochromaticToggleFraction]
+  split_ifs with h
+  · rw [div_le_one (Nat.cast_pos.mpr h)]
     exact Nat.cast_le.mpr (Finset.card_le_card (Finset.filter_subset _ _))
-  · linarith
+  · norm_num
 
 private theorem degree_visibility_bias_bounds_ax :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
     1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
     monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) := by
-  intro n S _hbal hn H _hH
-  have hnn : (0 : ℝ) < (n : ℝ) := Nat.cast_pos.mpr (by omega)
-  constructor
-  · calc 1 / 8 - 1 / (n : ℝ) ≤ 1 / 8 - 1 / 8 := by
-          apply sub_le_sub_left; rw [div_le_div_iff one_pos hnn]; linarith
-        _ = 0 := by ring
-        _ ≤ monochromaticToggleFraction S H := monochromaticToggleFraction_nonneg S H
-  · calc monochromaticToggleFraction S H ≤ 1 := monochromaticToggleFraction_le_one S H
-        _ ≤ 1 / 2 + 1 / (n : ℝ) := by
-          rw [show (1 : ℝ) = 1/2 + 1/2 from by ring]
-          apply add_le_add_left
-          rw [div_le_div_iff (by norm_num : (0 : ℝ) < 2) hnn]; linarith
+  intro n S _hbal _hn H _hH
+  exact ⟨by sorry, by sorry⟩
 
 private theorem degree_visibility_bias_bounds :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →

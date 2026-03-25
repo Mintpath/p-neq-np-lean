@@ -680,6 +680,44 @@ private lemma leaf_removal_connected (n : ℕ) (comp : Finset (Edge n))
   obtain ⟨walk⟩ := hreach
   exact walk_avoids_deg1_aux n comp v hdeg1 e he hve ha_ne_v hb_ne_v walk
 
+private lemma reachable_from_deg0_eq (n : ℕ) (edges : Finset (Edge n))
+    (u v : Fin n) (hdeg0 : vertexDegreeIn n edges u = 0)
+    (hreach : (edgeSetToGraph n edges).Reachable u v) :
+    v = u := by
+  obtain ⟨walk⟩ := hreach
+  by_cases huv : u = v
+  · exact huv.symm
+  · obtain ⟨w, hadj, _, rfl⟩ := SimpleGraph.Walk.exists_eq_cons_of_ne huv walk
+    have hpos : 0 < vertexDegreeIn n edges u := by
+      unfold vertexDegreeIn
+      rw [Finset.card_pos]
+      exact ⟨Sym2.mk (u, w), Finset.mem_filter.mpr ⟨hadj.2, Sym2.mem_mk_left u w⟩⟩
+    omega
+
+private lemma sum_vertexDegrees_eq_twice_card
+    (n : ℕ) (comp : Finset (Edge n))
+    (hnoloops : ∀ e ∈ comp, ¬ e.IsDiag) :
+    ∑ v ∈ (Finset.univ : Finset (Fin n)), vertexDegreeIn n comp v = 2 * comp.card := by
+  have edge_card_two : ∀ e ∈ comp,
+      (Finset.univ.filter fun v : Fin n => v ∈ e).card = 2 := by
+    intro e he
+    have hnd := hnoloops e he
+    induction e using Sym2.ind with
+    | h a b =>
+      have hab : a ≠ b := fun h => hnd (Sym2.mk_isDiag_iff.mpr h)
+      have : (Finset.univ.filter fun v : Fin n => v ∈ Sym2.mk (a, b)) = {a, b} := by
+        ext v
+        simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_insert,
+          Finset.mem_singleton, Sym2.mem_iff]
+      rw [this, Finset.card_insert_of_notMem (by simp [hab]), Finset.card_singleton]
+  simp only [vertexDegreeIn]
+  have hdc := Finset.sum_card_bipartiteAbove_eq_sum_card_bipartiteBelow
+    (s := Finset.univ) (t := comp) (r := fun (v : Fin n) (e : Edge n) => v ∈ e)
+  simp only [Finset.bipartiteAbove, Finset.bipartiteBelow] at hdc
+  rw [hdc]
+  rw [Finset.sum_congr rfl edge_card_two]
+  simp [Finset.sum_const, mul_comm]
+
 private lemma incident_vertices_le_edges_plus_one
     (n : ℕ) (comp : Finset (Edge n))
     (hconn : IsIncidentConnected n comp)
@@ -687,7 +725,173 @@ private lemma incident_vertices_le_edges_plus_one
     (hpath : ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
     (hnoloops : ∀ e ∈ comp, ¬ e.IsDiag) :
     (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤ comp.card + 1 := by
-  sorry
+  have key : ∀ (k : ℕ) (comp : Finset (Edge n)),
+      comp.card ≤ k →
+      IsIncidentConnected n comp →
+      (∀ v : Fin n, vertexDegreeIn n comp v ≤ 2) →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) →
+      (∀ e ∈ comp, ¬ e.IsDiag) →
+      (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤
+        comp.card + 1 := by
+    intro k
+    induction k with
+    | zero =>
+      intro comp hcard _ _ hpath' _
+      exfalso
+      apply hpath'
+      intro v
+      left
+      have : comp = ∅ := Finset.card_eq_zero.mp (Nat.le_zero.mp hcard)
+      unfold vertexDegreeIn
+      rw [this]
+      simp
+    | succ k ih =>
+      intro comp hcard hconn' hdeg_le2' hpath' hnoloops'
+      push_neg at hpath'
+      obtain ⟨v0, hv0⟩ := hpath'
+      have hv0_le2 := hdeg_le2' v0
+      have hv0_deg1 : vertexDegreeIn n comp v0 = 1 := by omega
+      obtain ⟨e0, ⟨he0, hve0⟩, _⟩ := deg1_vertex_exists_unique_edge n comp v0 hv0_deg1
+      obtain ⟨w0, hw0_ne, ew0, hew0, _, hw0_in⟩ :=
+        deg1_other_endpoint n comp v0 hv0_deg1 hnoloops'
+      have hew0_eq : ew0 = e0 := by
+        have ⟨_, _, huniq⟩ := deg1_vertex_exists_unique_edge n comp v0 hv0_deg1
+        rw [huniq ew0 ⟨hew0, by assumption⟩, huniq e0 ⟨he0, hve0⟩]
+      rw [hew0_eq] at hw0_in
+      set comp' := comp.erase e0
+      have hcard' : comp'.card ≤ k := by
+        rw [show comp' = comp.erase e0 by rfl]
+        rw [Finset.card_erase_of_mem he0]
+        omega
+      have hcomp'_conn := leaf_removal_connected n comp hconn' v0 hv0_deg1 e0 he0 hve0
+      have hdeg'_le2 : ∀ v : Fin n, vertexDegreeIn n comp' v ≤ 2 := by
+        intro v
+        calc
+          vertexDegreeIn n comp' v ≤ vertexDegreeIn n comp v :=
+            vertexDegreeIn_mono n comp' comp (Finset.erase_subset e0 comp) v
+          _ ≤ 2 := hdeg_le2' v
+      have hnoloops'' : ∀ e ∈ comp', ¬ e.IsDiag := by
+        intro e he'
+        exact hnoloops' e (Finset.mem_of_mem_erase he')
+      have hw0_deg_comp' : vertexDegreeIn n comp' w0 =
+          vertexDegreeIn n comp w0 - 1 := by
+        rw [erase_edge_deg n comp e0 he0 w0, if_pos hw0_in]
+      have hv0_deg_comp' : vertexDegreeIn n comp' v0 = 0 := by
+        rw [erase_edge_deg n comp e0 he0 v0, if_pos hve0, hv0_deg1]
+      by_cases hcomp'_empty : comp' = ∅
+      · have hV_le_sum :
+            (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤
+              ∑ v ∈ (Finset.univ : Finset (Fin n)), vertexDegreeIn n comp v := by
+          rw [Finset.card_eq_sum_ones]
+          have h₁ :
+              (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).sum
+                  (fun _ => (1 : ℕ)) ≤
+                (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).sum
+                  (fun v => vertexDegreeIn n comp v) := by
+            apply Finset.sum_le_sum
+            intro v hv
+            simp only [Finset.mem_filter] at hv
+            omega
+          have h₂ :
+              (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).sum
+                  (fun v => vertexDegreeIn n comp v) ≤
+                ∑ v ∈ (Finset.univ : Finset (Fin n)), vertexDegreeIn n comp v := by
+            exact Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _) fun _ _ _ => by
+              exact Nat.zero_le _
+          exact h₁.trans h₂
+        have hcard_one : comp.card = 1 := by
+          have hcard_zero : comp'.card = 0 := by simpa [hcomp'_empty]
+          rw [show comp' = comp.erase e0 by rfl, Finset.card_erase_of_mem he0] at hcard_zero
+          have hcomp_pos : 0 < comp.card := Finset.card_pos.mpr ⟨e0, he0⟩
+          omega
+        have hsum := sum_vertexDegrees_eq_twice_card n comp hnoloops'
+        rw [hcard_one] at hsum
+        have hbound : (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1).card ≤ 2 := by
+          exact hV_le_sum.trans (by simpa [hsum])
+        simpa [hcard_one] using hbound
+      · have hcomp'_ne : comp'.Nonempty := Finset.nonempty_of_ne_empty hcomp'_empty
+        have hw0_deg_comp : vertexDegreeIn n comp w0 = 2 := by
+          have hw0_pos : 0 < vertexDegreeIn n comp w0 := by
+            unfold vertexDegreeIn
+            rw [Finset.card_pos]
+            exact ⟨e0, Finset.mem_filter.mpr ⟨he0, hw0_in⟩⟩
+          have hw0_ne1 : vertexDegreeIn n comp w0 ≠ 1 := by
+            intro hw0_deg1
+            have hw0_deg0' : vertexDegreeIn n comp' w0 = 0 := by
+              rw [hw0_deg_comp', hw0_deg1]
+            obtain ⟨e', he'⟩ := hcomp'_ne
+            have hnd' := hnoloops'' e' he'
+            have hx : ∃ x : Fin n, x ∈ e' ∧ x ≠ w0 := by
+              induction e' using Sym2.ind with
+              | h a b =>
+                have hab : a ≠ b := fun h' => hnd' (Sym2.mk_isDiag_iff.mpr h')
+                by_cases haw : a = w0
+                · refine ⟨b, Sym2.mem_mk_right a b, ?_⟩
+                  intro hbw
+                  exact hab (haw.trans hbw.symm)
+                · exact ⟨a, Sym2.mem_mk_left a b, haw⟩
+            obtain ⟨x, hx_in, hx_ne⟩ := hx
+            have hx_ne_v0 : x ≠ v0 := by
+              intro hxv0
+              have he'_in_comp : e' ∈ comp := Finset.mem_of_mem_erase he'
+              have he'_ne : e' ≠ e0 := by
+                rw [show comp' = comp.erase e0 by rfl] at he'
+                exact (Finset.mem_erase.mp he').1
+              exact he'_ne <|
+                deg1_unique_edge_eq n comp v0 hv0_deg1 e0 he0 hve0 e' he'_in_comp (hxv0 ▸ hx_in)
+            have hreach : (edgeSetToGraph n comp).Reachable w0 x :=
+              hconn' w0 x ⟨e0, he0, hw0_in⟩ ⟨e', Finset.mem_of_mem_erase he', hx_in⟩
+            obtain ⟨walk⟩ := hreach
+            have hreach' : (edgeSetToGraph n comp').Reachable w0 x :=
+              walk_avoids_deg1_aux n comp v0 hv0_deg1 e0 he0 hve0 hw0_ne hx_ne_v0 walk
+            have : x = w0 := reachable_from_deg0_eq n comp' w0 x hw0_deg0' hreach'
+            exact hx_ne this
+          have hw0_le2 := hdeg_le2' w0
+          omega
+        have hw0_deg1' : vertexDegreeIn n comp' w0 = 1 := by
+          rw [hw0_deg_comp']
+          omega
+        have hpath'' : ¬(∀ v : Fin n, vertexDegreeIn n comp' v = 0 ∨ vertexDegreeIn n comp' v = 2) := by
+          intro hall
+          rcases hall w0 with h0 | h2 <;> omega
+        have V_pos_eq :
+            (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp v ≥ 1) =
+              (Finset.univ.filter fun v : Fin n => vertexDegreeIn n comp' v ≥ 1) ∪ {v0} := by
+          ext v
+          simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_union,
+            Finset.mem_singleton]
+          constructor
+          · intro hge
+            by_cases hv : v = v0
+            · exact Or.inr hv
+            · left
+              by_cases hw : v = w0
+              · simpa [hw, hw0_deg1']
+              · have hv_not_in_e0 : v ∉ e0 := by
+                  intro hvin
+                  have he0_pair : e0 = Sym2.mk (v0, w0) := by
+                    exact (Sym2.mem_and_mem_iff hw0_ne.symm).mp ⟨hve0, hw0_in⟩
+                  have : v = v0 ∨ v = w0 := by
+                    rw [he0_pair] at hvin
+                    simpa [Sym2.mem_iff] using hvin
+                  rcases this with h | h
+                  · exact hv h
+                  · exact hw h
+                rw [erase_edge_deg n comp e0 he0 v, if_neg hv_not_in_e0]
+                exact hge
+          · rintro (hge | rfl)
+            · exact le_trans hge <|
+                vertexDegreeIn_mono n comp' comp (Finset.erase_subset e0 comp) v
+            · omega
+        have V'_bound := ih comp' hcard' hcomp'_conn hdeg'_le2 hpath'' hnoloops''
+        rw [V_pos_eq, Finset.card_union_of_disjoint (by
+          rw [Finset.disjoint_singleton_right]
+          simp [hv0_deg_comp']), Finset.card_singleton]
+        have : comp'.card + 1 = comp.card := by
+          rw [show comp' = comp.erase e0 by rfl, Finset.card_erase_of_mem he0]
+          exact Nat.sub_add_cancel (Finset.card_pos.mpr ⟨e0, he0⟩)
+        omega
+  exact key comp.card comp (le_refl _) hconn hdeg_le2 hpath hnoloops
 
 private lemma connected_maxdeg2_not_cycle_exactly2_deg1
     (n : ℕ) (comp : Finset (Edge n))
@@ -1112,12 +1316,173 @@ private lemma deg1_vertex_reachable_to_other_deg1
   obtain ⟨v, ⟨hv, hne, hreach⟩, _⟩ := deg1_unique_partner n S H hH u hu
   exact ⟨v, hv, hne, hreach⟩
 
+open Classical in
+private noncomputable def partnerVertex
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : {v // v ∈ danglingEndpoints S H}) :
+    {v // v ∈ danglingEndpoints S H} :=
+  ⟨Classical.choose (ExistsUnique.exists (deg1_unique_partner n S H hH u.1 u.2)),
+    (Classical.choose_spec (ExistsUnique.exists (deg1_unique_partner n S H hH u.1 u.2))).1⟩
+
+private lemma partnerVertex_ne
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : {v // v ∈ danglingEndpoints S H}) :
+    (partnerVertex n S H hH u).1 ≠ u.1 := by
+  exact (Classical.choose_spec (ExistsUnique.exists (deg1_unique_partner n S H hH u.1 u.2))).2.1
+
+private lemma partnerVertex_reachable
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : {v // v ∈ danglingEndpoints S H}) :
+    (edgeSetToGraph n (leftSubgraph S H)).Reachable u.1 (partnerVertex n S H hH u).1 := by
+  exact (Classical.choose_spec (ExistsUnique.exists (deg1_unique_partner n S H hH u.1 u.2))).2.2
+
+private lemma partnerVertex_invol
+    (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (u : {v // v ∈ danglingEndpoints S H}) :
+    partnerVertex n S H hH (partnerVertex n S H hH u) = u := by
+  apply Subtype.ext
+  obtain ⟨v, hvprop, huniq⟩ := deg1_unique_partner n S H hH
+    (partnerVertex n S H hH u).1 (partnerVertex n S H hH u).2
+  have hchoose : (partnerVertex n S H hH (partnerVertex n S H hH u)).1 = v :=
+    huniq _ (Classical.choose_spec (ExistsUnique.exists (deg1_unique_partner n S H hH
+      (partnerVertex n S H hH u).1 (partnerVertex n S H hH u).2)))
+  have hu : u.1 = v := huniq _ ⟨u.2, (partnerVertex_ne n S H hH u).symm,
+    (partnerVertex_reachable n S H hH u).symm⟩
+  exact hchoose.trans hu.symm
+
 private lemma deg1_components_pair_into_matching
     (n : ℕ) (S : Frontier n) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
     ∃ M : PerfectMatching (danglingEndpoints S H),
       ∀ p ∈ M.pairs,
         (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2 := by
-  sorry
+  classical
+  let U := danglingEndpoints S H
+  let partner : {v // v ∈ U} → {v // v ∈ U} := partnerVertex n S H hH
+  let A : Finset {v // v ∈ U} := U.attach.filter fun u => u.1 < (partner u).1
+  let pairs : Finset (Fin n × Fin n) := A.image fun u => (u.1, (partner u).1)
+  have hpair_mem :
+      ∀ p ∈ pairs, (edgeSetToGraph n (leftSubgraph S H)).Reachable p.1 p.2 := by
+    intro p hp
+    rcases Finset.mem_image.mp hp with ⟨u, huA, rfl⟩
+    exact partnerVertex_reachable n S H hH u
+  have hfst_mem : ∀ p ∈ pairs, p.1 ∈ U := by
+    intro p hp
+    rcases Finset.mem_image.mp hp with ⟨u, huA, rfl⟩
+    exact u.2
+  have hsnd_mem : ∀ p ∈ pairs, p.2 ∈ U := by
+    intro p hp
+    rcases Finset.mem_image.mp hp with ⟨u, huA, rfl⟩
+    exact (partner u).2
+  have hne_pair : ∀ p ∈ pairs, p.1 ≠ p.2 := by
+    intro p hp
+    rcases Finset.mem_image.mp hp with ⟨u, huA, rfl⟩
+    simpa [partner] using (partnerVertex_ne n S H hH u).symm
+  have hpair_of_mem :
+      ∀ u : {v // v ∈ U}, ∀ p ∈ pairs,
+        (u.1 = p.1 ∨ u.1 = p.2) →
+        p =
+          if hlt : u.1 < (partner u).1 then
+            (u.1, (partner u).1)
+          else
+            ((partner u).1, u.1) := by
+    intro u p hp hu
+    rcases Finset.mem_image.mp hp with ⟨a, haA, rfl⟩
+    have ha_lt : a.1 < (partner a).1 := (Finset.mem_filter.mp haA).2
+    rcases hu with h | h
+    · have hua : a = u := Subtype.ext h.symm
+      subst hua
+      simp [ha_lt]
+    · have hpa : partner a = u := Subtype.ext h.symm
+      have hpu : partner u = a := by
+        simpa [partner, hpa] using partnerVertex_invol n S H hH a
+      have hnot : ¬ u.1 < (partner u).1 := by
+        simpa [partner, hpu, hpa] using not_lt_of_gt ha_lt
+      have hEq : (a.1, (partner a).1) = ((partner u).1, u.1) := by
+        simp [hpu, hpa]
+      simpa [hnot] using hEq
+  have hcovers : ∀ u ∈ U, ∃ p ∈ pairs, u = p.1 ∨ u = p.2 := by
+    intro u hu
+    let uu : {v // v ∈ U} := ⟨u, hu⟩
+    by_cases hlt : u < (partner uu).1
+    · refine ⟨(u, (partner uu).1), ?_, Or.inl rfl⟩
+      apply Finset.mem_image.mpr
+      refine ⟨uu, Finset.mem_filter.mpr ?_, rfl⟩
+      exact ⟨Finset.mem_attach U uu, hlt⟩
+    · have hgt : (partner uu).1 < u := by
+        exact lt_of_le_of_ne (le_of_not_gt hlt) (by
+          simpa [partner, uu] using (partnerVertex_ne n S H hH uu))
+      refine ⟨((partner uu).1, u), ?_, Or.inr rfl⟩
+      apply Finset.mem_image.mpr
+      refine ⟨partner uu, Finset.mem_filter.mpr ?_, ?_⟩
+      · exact ⟨Finset.mem_attach U (partner uu), by
+          simpa [partner, partnerVertex_invol n S H hH uu] using hgt⟩
+      · change ((partner uu).1, (partner (partner uu)).1) = ((partner uu).1, u)
+        simp [partner, partnerVertex_invol n S H hH uu]
+        rfl
+  have hunique :
+      ∀ u ∈ U, ∀ p₁ ∈ pairs, ∀ p₂ ∈ pairs,
+        (u = p₁.1 ∨ u = p₁.2) → (u = p₂.1 ∨ u = p₂.2) → p₁ = p₂ := by
+    intro u hu p₁ hp₁ p₂ hp₂ hu₁ hu₂
+    let uu : {v // v ∈ U} := ⟨u, hu⟩
+    have hp₁_eq := hpair_of_mem uu p₁ hp₁ hu₁
+    have hp₂_eq := hpair_of_mem uu p₂ hp₂ hu₂
+    exact hp₁_eq.trans hp₂_eq.symm
+  have hA_card_eq_pairs : A.card = pairs.card := by
+    unfold pairs
+    symm
+    exact Finset.card_image_of_injOn (by
+      intro u hu v hv huv
+      apply Subtype.ext
+      exact congrArg Prod.fst huv)
+  let B : Finset {v // v ∈ U} := U.attach.filter fun u => (partner u).1 < u.1
+  have hAB_disj : Disjoint A B := by
+    rw [Finset.disjoint_left]
+    intro u huA huB
+    exact (lt_asymm (Finset.mem_filter.mp huA).2 (Finset.mem_filter.mp huB).2).elim
+  have hAB_union : U.attach = A ∪ B := by
+    ext u
+    simp only [A, B, Finset.mem_attach, true_and, Finset.mem_filter, Finset.mem_union]
+    constructor
+    · intro huA
+      have hne : u.1 ≠ (partner u).1 := by
+        simpa [partner] using (partnerVertex_ne n S H hH u).symm
+      by_cases hlt : u.1 < (partner u).1
+      · exact Or.inl hlt
+      · exact Or.inr (lt_of_le_of_ne (le_of_not_gt hlt) hne.symm)
+    · intro huAB
+      trivial
+  have hA_card_eq_B : A.card = B.card := by
+    apply Finset.card_bij (fun u hu => partner u)
+    · intro u hu
+      exact Finset.mem_filter.mpr ⟨Finset.mem_attach U (partner u), by
+        simpa [partner, partnerVertex_invol n S H hH u] using (Finset.mem_filter.mp hu).2⟩
+    · intro u hu v hv huv
+      have := congrArg partner huv
+      simpa [partner, partnerVertex_invol n S H hH u, partnerVertex_invol n S H hH v] using this
+    · intro v hv
+      refine ⟨partner v, ?_, ?_⟩
+      · exact Finset.mem_filter.mpr ⟨Finset.mem_attach U (partner v), by
+          simpa [partner, partnerVertex_invol n S H hH v] using (Finset.mem_filter.mp hv).2⟩
+      · simpa [partner] using partnerVertex_invol n S H hH v
+  have hcard_eq : 2 * pairs.card = U.card := by
+    have hU_attach : U.card = A.card + B.card := by
+      calc
+        U.card = U.attach.card := by rw [Finset.card_attach]
+        _ = (A ∪ B).card := by rw [hAB_union]
+        _ = A.card + B.card := Finset.card_union_of_disjoint hAB_disj
+    have hpairs : pairs.card = A.card := hA_card_eq_pairs.symm
+    have hU_pairs : U.card = pairs.card + pairs.card := by
+      simpa [hpairs, hA_card_eq_B] using hU_attach
+    omega
+  refine ⟨{
+    pairs := pairs
+    fst_mem := hfst_mem
+    snd_mem := hsnd_mem
+    ne_pair := hne_pair
+    covers := hcovers
+    unique := hunique
+    card_eq := hcard_eq
+  }, hpair_mem⟩
 
 def PathPairingReflectsComponents (n : ℕ) (S : Frontier n) (H : Finset (Edge n))
     (M : PerfectMatching (danglingEndpoints S H)) : Prop :=
@@ -1432,6 +1797,25 @@ theorem mixed_degree_eq (S : Frontier n) (H H' : Finset (Edge n))
     exact this.symm
   rw [hd_eq]
   exact leftDeg_add_rightDeg_eq_two S H hH v
+
+private lemma danglingEndpoints_eq_of_degreeProfile_eq
+    (S : Frontier n) (H H' : Finset (Edge n))
+    (hd : degreeProfile S H = degreeProfile S H') :
+    danglingEndpoints S H = danglingEndpoints S H' := by
+  unfold danglingEndpoints
+  ext v
+  simp only [Finset.mem_filter]
+  constructor
+  · rintro ⟨hvb, hvd⟩
+    simp [degreeProfile] at hvd ⊢
+    have hval : leftDegreeAt S H v = leftDegreeAt S H' v := by
+      simpa [degreeProfile] using congrArg (fun f => f v) hd
+    exact ⟨hvb, hval ▸ hvd⟩
+  · rintro ⟨hvb, hvd⟩
+    simp [degreeProfile] at hvd ⊢
+    have hval : leftDegreeAt S H v = leftDegreeAt S H' v := by
+      simpa [degreeProfile] using congrArg (fun f => f v) hd
+    exact ⟨hvb, hval.symm ▸ hvd⟩
 
 /-! ### Stitchability connectivity: Theorem 4.3 core
 
@@ -1782,13 +2166,14 @@ section PairingMismatch
 theorem disconnected_overlay_not_connected :
   ∀ {n : ℕ} (S : Frontier n) (H H' : Finset (Edge n))
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (hS : S.isBalanced)
     (hd : degreeProfile S H = degreeProfile S H')
     (hU : danglingEndpoints S H = danglingEndpoints S H')
     (hDisconnected : overlayIsDisconnected
       (hU ▸ pathPairing S H' hH')
       (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH)),
     ¬ IsConnectedEdgeSet n (mixedGraph S H H') := by
-  intro n S H H' hH hH' hd hU hDisconnected hconn
+  intro n S H H' hH hH' hS hd hU hDisconnected hconn
   unfold overlayIsDisconnected at hDisconnected
   unfold overlayComponentCount at hDisconnected
   have boundary_multigraph_disconnected :
@@ -1836,7 +2221,7 @@ theorem disconnected_overlay_not_connected :
   exact hnreach overlay_components_biject_mixed_components
 
 theorem pairing_mismatch_not_hamiltonian
-    (S : Frontier n) (_hS : S.isBalanced)
+    (S : Frontier n) (hS : S.isBalanced)
     (H H' : Finset (Edge n))
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
     (hd : degreeProfile S H = degreeProfile S H')
@@ -1846,7 +2231,7 @@ theorem pairing_mismatch_not_hamiltonian
       (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH)) :
     ¬ IsHamCycle n (mixedGraph S H H') := by
   intro hMham
-  exact disconnected_overlay_not_connected S H H' hH hH' hd hU hDisconnected hMham.connected
+  exact disconnected_overlay_not_connected S H H' hH hH' hS hd hU hDisconnected hMham.connected
 
 theorem pairing_mismatch_collision_forces_error {m : ℕ}
     (C : BooleanCircuit m) (S : Frontier n)

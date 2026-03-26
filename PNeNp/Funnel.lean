@@ -6,6 +6,7 @@ import Mathlib.Data.Finset.Card
 import Mathlib.Data.Finset.Sort
 import Mathlib.Data.Fintype.Basic
 import Mathlib.Data.List.FinRange
+import Mathlib.Data.List.GetD
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.Nat.Log
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
@@ -1491,30 +1492,27 @@ private theorem subformulaGateCount_le_size {m : ℕ} (C : BooleanCircuit m)
       Finset.card_le_card (subformulaGateSet_subset_range C root)
     _ = C.gates.length := Finset.card_range _
 
-private inductive ProtocolPartitionTree (n : ℕ) (S : Frontier n)
-    (I : Finset (Finset (Edge n))) where
+private inductive ProtocolPartitionTree (n : ℕ) (S : Frontier n) where
   | zeroLeaf
   | oneLeaf (R : Finset (Finset (Edge n)))
   | branch (gate : ℕ) (kind : GateKind)
-      (left right : ProtocolPartitionTree n S I)
+      (left right : ProtocolPartitionTree n S)
 
 private def ProtocolPartitionTree.oneLeafCount {n : ℕ} {S : Frontier n}
-    {I : Finset (Finset (Edge n))} :
-    ProtocolPartitionTree n S I → ℕ
+    : ProtocolPartitionTree n S → ℕ
   | .zeroLeaf => 0
   | .oneLeaf _ => 1
   | .branch _ _ left right => left.oneLeafCount + right.oneLeafCount
 
 private def ProtocolPartitionTree.oneLeafRectangles {n : ℕ} {S : Frontier n}
-    {I : Finset (Finset (Edge n))} :
-    ProtocolPartitionTree n S I → Finset (Finset (Finset (Edge n)))
+    : ProtocolPartitionTree n S → Finset (Finset (Finset (Edge n)))
   | .zeroLeaf => ∅
   | .oneLeaf R => {R}
   | .branch _ _ left right => left.oneLeafRectangles ∪ right.oneLeafRectangles
 
 private def ProtocolPartitionTree.graftAtOneLeaves {n : ℕ} {S : Frontier n}
-    {I : Finset (Finset (Edge n))} (rhs : ProtocolPartitionTree n S I) :
-    ProtocolPartitionTree n S I → ProtocolPartitionTree n S I
+    (rhs : ProtocolPartitionTree n S) :
+    ProtocolPartitionTree n S → ProtocolPartitionTree n S
   | .zeroLeaf => .zeroLeaf
   | .oneLeaf _ => rhs
   | .branch gate kind left right =>
@@ -1541,25 +1539,188 @@ private def formulaTreeOf {m : ℕ} (C : BooleanCircuit m)
           omega
         let g := C.gates[j]'hj
         let hInputs := formula_gate_inputs_lt C hFormula j hj
+        have hm_le : m ≤ root := Nat.le_of_not_lt hInput
+        have hmj_eq : m + j = root := Nat.add_sub_cancel' hm_le
+        have hInput1_lt_root : g.input1 < root := by
+          show (C.gates[j]'hj).input1 < root
+          have h := hInputs.1; omega
+        have hInput2_lt_root : g.input2 < root := by
+          show (C.gates[j]'hj).input2 < root
+          have h := hInputs.2; omega
+        have hInput1 : g.input1 < m + C.gates.length := by
+          exact lt_of_lt_of_le hInputs.1 (by omega)
+        have hInput2 : g.input2 < m + C.gates.length := by
+          exact lt_of_lt_of_le hInputs.2 (by omega)
         match g.kind with
         | GateKind.NOT =>
-            .notNode j
-              (formulaTreeOf g.input1 hInputs.1)
+            .notNode root
+              (formulaTreeOf C hFormula g.input1 hInput1)
         | GateKind.AND =>
-            .andNode j
-              (formulaTreeOf g.input1 hInputs.1)
-              (formulaTreeOf g.input2 hInputs.2)
+            .andNode root
+              (formulaTreeOf C hFormula g.input1 hInput1)
+              (formulaTreeOf C hFormula g.input2 hInput2)
         | GateKind.OR =>
-            .orNode j
-              (formulaTreeOf g.input1 hInputs.1)
-              (formulaTreeOf g.input2 hInputs.2)
-termination_by root
+            .orNode root
+              (formulaTreeOf C hFormula g.input1 hInput1)
+              (formulaTreeOf C hFormula g.input2 hInput2)
+termination_by root hroot => root
 decreasing_by
-  all_goals omega
+  all_goals assumption
 
 private noncomputable def gateValueOnGraph {n m : ℕ} (C : BooleanCircuit m)
     (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) (idx : ℕ) : Bool :=
   (evalAllGates C (E.encode H)).getD idx false
+
+private def evalStep (acc : List Bool) (g : Gate) : List Bool :=
+  let v1 := acc.getD g.input1 false
+  let v2 := acc.getD g.input2 false
+  let result := match g.kind with
+    | GateKind.AND => v1 && v2
+    | GateKind.OR  => v1 || v2
+    | GateKind.NOT => !v1
+  acc ++ [result]
+
+private theorem evalStep_length (acc : List Bool) (g : Gate) :
+    (evalStep acc g).length = acc.length + 1 := by
+  unfold evalStep
+  simp
+
+private theorem evalFold_length (gates : List Gate) (acc : List Bool) :
+    (gates.foldl (init := acc) evalStep).length = acc.length + gates.length := by
+  induction gates generalizing acc with
+  | nil =>
+      simp
+  | cons g gates ih =>
+      rw [List.foldl_cons, ih]
+      simp [evalStep_length, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+
+private theorem evalFold_getD_of_lt
+    (gates : List Gate) (acc : List Bool) (idx : ℕ)
+    (hidx : idx < acc.length) :
+    (gates.foldl (init := acc) evalStep).getD idx false = acc.getD idx false := by
+  induction gates generalizing acc with
+  | nil =>
+      simp
+  | cons g gates ih =>
+      rw [List.foldl_cons]
+      have hkeep :
+          (evalStep acc g).getD idx false = acc.getD idx false := by
+        unfold evalStep
+        simpa using List.getD_append acc [match g.kind with
+          | GateKind.AND => acc.getD g.input1 false && acc.getD g.input2 false
+          | GateKind.OR => acc.getD g.input1 false || acc.getD g.input2 false
+          | GateKind.NOT => !(acc.getD g.input1 false)] false idx hidx
+      calc
+        (gates.foldl (init := evalStep acc g) evalStep).getD idx false
+            = (evalStep acc g).getD idx false := by
+              apply ih
+              have hlt : idx < acc.length + 1 := Nat.lt_succ_of_lt hidx
+              simpa [evalStep_length, Nat.add_comm] using hlt
+        _ = acc.getD idx false := hkeep
+
+private theorem gateValueOnGraph_input_eq {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n))
+    (i : ℕ) (hi : i < m) :
+    gateValueOnGraph C E H i = E.encode H ⟨i, hi⟩ := by
+  unfold gateValueOnGraph evalAllGates
+  have hkeep := evalFold_getD_of_lt C.gates (List.ofFn (E.encode H)) i (by simpa)
+  have hi' : i < (List.ofFn (E.encode H)).length := by
+    simpa using hi
+  calc
+    (C.gates.foldl (init := List.ofFn (E.encode H)) evalStep).getD i false
+        = (List.ofFn (E.encode H)).getD i false := hkeep
+    _ = (List.ofFn (E.encode H)).get ⟨i, hi'⟩ := by
+      rw [List.getD_eq_get (l := List.ofFn (E.encode H)) (d := false) ⟨i, hi'⟩]
+    _ = E.encode H ⟨i, hi⟩ := by
+      simp [List.getElem_ofFn]
+
+private noncomputable def gateEvalFromInputs {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n))
+    (j : ℕ) (hj : j < C.gates.length) : Bool :=
+  let g := C.gates[j]'hj
+  let v1 := gateValueOnGraph C E H g.input1
+  let v2 := gateValueOnGraph C E H g.input2
+  match g.kind with
+  | GateKind.AND => v1 && v2
+  | GateKind.OR => v1 || v2
+  | GateKind.NOT => !v1
+
+private theorem evalAllGates_eq_foldl_evalStep {m : ℕ} (C : BooleanCircuit m)
+    (input : Fin m → Bool) :
+    evalAllGates C input = C.gates.foldl (init := List.ofFn input) evalStep := by
+  unfold evalAllGates evalStep
+  rfl
+
+private theorem prefixFold_getD_eq {m : ℕ} (C : BooleanCircuit m) (input : Fin m → Bool)
+    (j : ℕ) (hj : j ≤ C.gates.length) (idx : ℕ) (hidx : idx < m + j) :
+    ((C.gates.take j).foldl (init := List.ofFn input) evalStep).getD idx false =
+      (evalAllGates C input).getD idx false := by
+  rw [evalAllGates_eq_foldl_evalStep]
+  have hlen : ((C.gates.take j).foldl (init := List.ofFn input) evalStep).length = m + j := by
+    rw [evalFold_length]; simp [List.length_take, min_eq_left hj]
+  have hsplit : C.gates.foldl (init := List.ofFn input) evalStep =
+      (C.gates.drop j).foldl (init :=
+        (C.gates.take j).foldl (init := List.ofFn input) evalStep) evalStep := by
+    conv_lhs => rw [show C.gates = C.gates.take j ++ C.gates.drop j from
+      (List.take_append_drop j C.gates).symm]
+    rw [List.foldl_append]
+  rw [hsplit]
+  symm
+  apply evalFold_getD_of_lt
+  rw [hlen]
+  exact hidx
+
+private theorem gateValueOnGraph_gate_eq {n m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n))
+    (j : ℕ) (hj : j < C.gates.length) :
+    gateValueOnGraph C E H (m + j) = gateEvalFromInputs C E H j hj := by
+  have hsplit :
+      C.gates = C.gates.take j ++ [C.gates[j]'hj] ++ C.gates.drop (j + 1) := by
+    calc
+      C.gates = C.gates.take j ++ C.gates.drop j := by
+        symm
+        exact List.take_append_drop j C.gates
+      _ = C.gates.take j ++ [C.gates[j]'hj] ++ C.gates.drop (j + 1) := by
+        rw [List.drop_eq_getElem_cons hj]
+        simp
+  let acc := (C.gates.take j).foldl (init := List.ofFn (E.encode H)) evalStep
+  have haccLen : acc.length = m + j := by
+    dsimp [acc]
+    rw [evalFold_length]
+    simp [List.length_take, min_eq_left (Nat.le_of_lt hj)]
+  have hpreserve :
+      ((C.gates.drop (j + 1)).foldl (init := evalStep acc (C.gates[j]'hj)) evalStep).getD (m + j) false =
+        (evalStep acc (C.gates[j]'hj)).getD (m + j) false := by
+    apply evalFold_getD_of_lt
+    rw [evalStep_length, haccLen]
+    omega
+  unfold gateValueOnGraph evalAllGates
+  rw [hsplit, List.foldl_append, List.foldl_append, List.foldl_cons]
+  dsimp [acc]
+  calc
+    ((C.gates.drop (j + 1)).foldl
+        (init := evalStep ((C.gates.take j).foldl (init := List.ofFn (E.encode H)) evalStep)
+          (C.gates[j]'hj)) evalStep).getD (m + j) false
+        =
+        (evalStep ((C.gates.take j).foldl (init := List.ofFn (E.encode H)) evalStep)
+          (C.gates[j]'hj)).getD (m + j) false := hpreserve
+    _ = gateEvalFromInputs C E H j hj := by
+          show (evalStep acc (C.gates[j]'hj)).getD (m + j) false = _
+          unfold evalStep
+          show (acc ++ [_]).getD (m + j) false = _
+          rw [List.getD_append_right acc _ false (m + j) (by omega)]
+          simp only [haccLen, Nat.add_sub_cancel]
+          unfold gateEvalFromInputs gateValueOnGraph
+          have hfw := formula_gate_inputs_lt C hFormula j hj
+          have hpf1 := prefixFold_getD_eq C (E.encode H) j (Nat.le_of_lt hj)
+            (C.gates[j]'hj).input1 hfw.1
+          have hpf2 := prefixFold_getD_eq C (E.encode H) j (Nat.le_of_lt hj)
+            (C.gates[j]'hj).input2 hfw.2
+          simp only [List.getD, Nat.sub_self, evalAllGates_eq_foldl_evalStep] at hpf1 hpf2 ⊢
+          simp only [List.getElem?_cons_zero, Option.getD_some]
+          dsimp [acc]
+          rw [hpf1, hpf2]
 
 private noncomputable def filterByGateValue {n m : ℕ} (C : BooleanCircuit m)
     (E : NaturalEdgeEncoding n m) (I : Finset (Finset (Edge n)))
@@ -1568,35 +1729,61 @@ private noncomputable def filterByGateValue {n m : ℕ} (C : BooleanCircuit m)
 
 private noncomputable def formulaProtocolTree {n m : ℕ}
     (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
-    (S : Frontier n) (I : Finset (Finset (Edge n))) :
-    Bool → FormulaTree → ProtocolPartitionTree n S I
-  | true, .input i =>
+    (S : Frontier n) :
+    (I : Finset (Finset (Edge n))) → Bool → FormulaTree → ProtocolPartitionTree n S
+  | I, true, .input i =>
       .oneLeaf (filterByGateValue C E I i true)
-  | false, .input _ =>
+  | I, false, .input _ =>
+      let _ := I
       .zeroLeaf
-  | b, .notNode gate child =>
+  | I, b, .notNode gate child =>
       .branch gate GateKind.NOT
         (formulaProtocolTree C E S I (!b) child)
         .zeroLeaf
-  | true, .andNode gate left right =>
+  | I, true, .andNode gate left right =>
       let I' := filterByGateValue C E I gate true
       let leftTree := formulaProtocolTree C E S I' true left
       let rightTree := formulaProtocolTree C E S I' true right
       .branch gate GateKind.AND
         (leftTree.graftAtOneLeaves rightTree)
         .zeroLeaf
-  | false, .andNode gate left right =>
+  | I, false, .andNode gate left right =>
       .branch gate GateKind.AND
         (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
         (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
-  | true, .orNode gate left right =>
+  | I, true, .orNode gate left right =>
       .branch gate GateKind.OR
         (formulaProtocolTree C E S (filterByGateValue C E I gate true) true left)
         (formulaProtocolTree C E S (filterByGateValue C E I gate true) true right)
-  | false, .orNode gate left right =>
+  | I, false, .orNode gate left right =>
       .branch gate GateKind.OR
         (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
         (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
+
+private inductive FormulaTreeContainsGate : FormulaTree → ℕ → Prop where
+  | root_input {i} :
+      FormulaTreeContainsGate (.input i) i
+  | root_not {gate child} :
+      FormulaTreeContainsGate (.notNode gate child) gate
+  | root_and {gate left right} :
+      FormulaTreeContainsGate (.andNode gate left right) gate
+  | root_or {gate left right} :
+      FormulaTreeContainsGate (.orNode gate left right) gate
+  | child_not {gate child j} :
+      FormulaTreeContainsGate child j →
+      FormulaTreeContainsGate (.notNode gate child) j
+  | left_and {gate left right j} :
+      FormulaTreeContainsGate left j →
+      FormulaTreeContainsGate (.andNode gate left right) j
+  | right_and {gate left right j} :
+      FormulaTreeContainsGate right j →
+      FormulaTreeContainsGate (.andNode gate left right) j
+  | left_or {gate left right j} :
+      FormulaTreeContainsGate left j →
+      FormulaTreeContainsGate (.orNode gate left right) j
+  | right_or {gate left right j} :
+      FormulaTreeContainsGate right j →
+      FormulaTreeContainsGate (.orNode gate left right) j
 
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →

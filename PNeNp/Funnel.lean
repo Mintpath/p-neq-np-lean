@@ -1378,6 +1378,39 @@ private theorem natural_encoding_mixed_eq_of_right
       E.encode (mixedGraph S H H') i = E.encode H i :=
   E.mixed_right S H H' i
 
+private inductive SubformulaNodeOf {m : ℕ} (C : BooleanCircuit m) (root : ℕ) : ℕ → Prop where
+  | root :
+      SubformulaNodeOf C root root
+  | input1 {j : ℕ} (hj : SubformulaNodeOf C root (m + j))
+      (hget : j < C.gates.length) :
+      SubformulaNodeOf C root ((C.gates.get ⟨j, hget⟩).input1)
+  | input2 {j : ℕ} (hj : SubformulaNodeOf C root (m + j))
+      (hget : j < C.gates.length) :
+      SubformulaNodeOf C root ((C.gates.get ⟨j, hget⟩).input2)
+
+private noncomputable def subformulaGateSet {m : ℕ} (C : BooleanCircuit m)
+    (root : ℕ) : Finset ℕ := by
+  classical
+  let p : ℕ → Bool := fun j => decide (SubformulaNodeOf C root (m + j))
+  exact (Finset.range C.gates.length).filter
+    (fun j => p j)
+
+private theorem subformulaGateSet_subset_range {m : ℕ} (C : BooleanCircuit m)
+    (root : ℕ) :
+    subformulaGateSet C root ⊆ Finset.range C.gates.length := by
+  intro j hj
+  unfold subformulaGateSet at hj
+  exact (Finset.mem_filter.mp hj).1
+
+private theorem subformulaGateCount_le_size {m : ℕ} (C : BooleanCircuit m)
+    (root : ℕ) :
+    (subformulaGateSet C root).card ≤ C.size := by
+  unfold BooleanCircuit.size
+  calc
+    (subformulaGateSet C root).card ≤ (Finset.range C.gates.length).card :=
+      Finset.card_le_card (subformulaGateSet_subset_range C root)
+    _ = C.gates.length := Finset.card_range _
+
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),

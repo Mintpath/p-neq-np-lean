@@ -1491,6 +1491,113 @@ private theorem subformulaGateCount_le_size {m : ℕ} (C : BooleanCircuit m)
       Finset.card_le_card (subformulaGateSet_subset_range C root)
     _ = C.gates.length := Finset.card_range _
 
+private inductive ProtocolPartitionTree (n : ℕ) (S : Frontier n)
+    (I : Finset (Finset (Edge n))) where
+  | zeroLeaf
+  | oneLeaf (R : Finset (Finset (Edge n)))
+  | branch (gate : ℕ) (kind : GateKind)
+      (left right : ProtocolPartitionTree n S I)
+
+private def ProtocolPartitionTree.oneLeafCount {n : ℕ} {S : Frontier n}
+    {I : Finset (Finset (Edge n))} :
+    ProtocolPartitionTree n S I → ℕ
+  | .zeroLeaf => 0
+  | .oneLeaf _ => 1
+  | .branch _ _ left right => left.oneLeafCount + right.oneLeafCount
+
+private def ProtocolPartitionTree.oneLeafRectangles {n : ℕ} {S : Frontier n}
+    {I : Finset (Finset (Edge n))} :
+    ProtocolPartitionTree n S I → Finset (Finset (Finset (Edge n)))
+  | .zeroLeaf => ∅
+  | .oneLeaf R => {R}
+  | .branch _ _ left right => left.oneLeafRectangles ∪ right.oneLeafRectangles
+
+private def ProtocolPartitionTree.graftAtOneLeaves {n : ℕ} {S : Frontier n}
+    {I : Finset (Finset (Edge n))} (rhs : ProtocolPartitionTree n S I) :
+    ProtocolPartitionTree n S I → ProtocolPartitionTree n S I
+  | .zeroLeaf => .zeroLeaf
+  | .oneLeaf _ => rhs
+  | .branch gate kind left right =>
+      .branch gate kind
+        (graftAtOneLeaves rhs left)
+        (graftAtOneLeaves rhs right)
+
+private inductive FormulaTree where
+  | input (i : ℕ)
+  | notNode (gate : ℕ) (child : FormulaTree)
+  | andNode (gate : ℕ) (left right : FormulaTree)
+  | orNode (gate : ℕ) (left right : FormulaTree)
+
+private def formulaTreeOf {m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula) :
+    (root : ℕ) → root < m + C.gates.length → FormulaTree
+  | root, hroot =>
+      if hInput : root < m then
+        .input root
+      else
+        let j := root - m
+        have hj : j < C.gates.length := by
+          dsimp [j]
+          omega
+        let g := C.gates[j]'hj
+        let hInputs := formula_gate_inputs_lt C hFormula j hj
+        match g.kind with
+        | GateKind.NOT =>
+            .notNode j
+              (formulaTreeOf g.input1 hInputs.1)
+        | GateKind.AND =>
+            .andNode j
+              (formulaTreeOf g.input1 hInputs.1)
+              (formulaTreeOf g.input2 hInputs.2)
+        | GateKind.OR =>
+            .orNode j
+              (formulaTreeOf g.input1 hInputs.1)
+              (formulaTreeOf g.input2 hInputs.2)
+termination_by root
+decreasing_by
+  all_goals omega
+
+private noncomputable def gateValueOnGraph {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) (idx : ℕ) : Bool :=
+  (evalAllGates C (E.encode H)).getD idx false
+
+private noncomputable def filterByGateValue {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (I : Finset (Finset (Edge n)))
+    (idx : ℕ) (b : Bool) : Finset (Finset (Edge n)) :=
+  I.filter fun H => gateValueOnGraph C E H idx == b
+
+private noncomputable def formulaProtocolTree {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (I : Finset (Finset (Edge n))) :
+    Bool → FormulaTree → ProtocolPartitionTree n S I
+  | true, .input i =>
+      .oneLeaf (filterByGateValue C E I i true)
+  | false, .input _ =>
+      .zeroLeaf
+  | b, .notNode gate child =>
+      .branch gate GateKind.NOT
+        (formulaProtocolTree C E S I (!b) child)
+        .zeroLeaf
+  | true, .andNode gate left right =>
+      let I' := filterByGateValue C E I gate true
+      let leftTree := formulaProtocolTree C E S I' true left
+      let rightTree := formulaProtocolTree C E S I' true right
+      .branch gate GateKind.AND
+        (leftTree.graftAtOneLeaves rightTree)
+        .zeroLeaf
+  | false, .andNode gate left right =>
+      .branch gate GateKind.AND
+        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
+        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
+  | true, .orNode gate left right =>
+      .branch gate GateKind.OR
+        (formulaProtocolTree C E S (filterByGateValue C E I gate true) true left)
+        (formulaProtocolTree C E S (filterByGateValue C E I gate true) true right)
+  | false, .orNode gate left right =>
+      .branch gate GateKind.OR
+        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
+        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
+
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),

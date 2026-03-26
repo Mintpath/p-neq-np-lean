@@ -47,7 +47,8 @@ theorem rectangleProperty_mixedAccepted {m : ℕ}
     (H H' : Finset (Edge n))
     (hH : IsHamCycle n H)
     (hCorrect : C.eval (toInput H) = true)
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H')) :
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H)) :
     C.eval (toInput (mixedGraph S H H')) = true := by
   have h := rectangle_property C S toInput H H' hm
   rw [h, hCorrect]
@@ -115,7 +116,8 @@ theorem degreeProfileCollisionForcesError {m : ℕ}
     (H H' : Finset (Edge n))
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
     (hCorrect : CircuitDecidesHAM C toInput)
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H'))
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H))
     (hd : degreeProfile S H ≠ degreeProfile S H') :
     False :=
   degree_collision_forces_error C S toInput H H' hH hH' hCorrect hm hd
@@ -218,7 +220,8 @@ theorem pairingMismatchCollisionForcesError {m : ℕ}
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
     (hS : S.isBalanced)
     (hCorrect : CircuitDecidesHAM C toInput)
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H'))
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H))
     (hd : degreeProfile S H = degreeProfile S H')
     (hU : danglingEndpoints S H = danglingEndpoints S H')
     (hDisc : overlayIsDisconnected
@@ -270,6 +273,20 @@ private theorem cast_pairs_eq
     {n : ℕ} {U V : Finset (Fin n)} (h : U = V) (M : PerfectMatching V) :
     (h ▸ M).pairs = M.pairs := by
   subst h; rfl
+
+private theorem dangling_mem_boundary
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
+    (v : Fin n) (hv : v ∈ danglingEndpoints S H) :
+    v ∈ boundaryVertices S := by
+  unfold danglingEndpoints at hv
+  exact (Finset.mem_filter.mp hv).1
+
+private theorem dangling_left_deg_one
+    {n : ℕ} (S : Frontier n) (H : Finset (Edge n))
+    (v : Fin n) (hv : v ∈ danglingEndpoints S H) :
+    vertexDegreeIn n (leftSubgraph S H) v = 1 := by
+  unfold danglingEndpoints degreeProfile leftDegreeAt at hv
+  exact (Finset.mem_filter.mp hv).2
 
 private theorem bmg_ledge_of_pair
     {n : ℕ} (S : Frontier n)

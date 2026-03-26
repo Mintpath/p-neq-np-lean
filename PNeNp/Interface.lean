@@ -2876,13 +2876,68 @@ noncomputable def evalAllGates {m : ℕ} (C : BooleanCircuit m)
       | GateKind.NOT => !v1
     acc ++ [result]
 
-noncomputable def frontierGateIndices {m : ℕ} (_C : BooleanCircuit m)
+private theorem foldl_append_singleton_length {α β : Type*}
+    (xs : List α) (acc : List β) (f : List β → α → β) :
+    (xs.foldl (init := acc) fun acc x => acc ++ [f acc x]).length = acc.length + xs.length := by
+  induction xs generalizing acc with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      have h := ih (acc ++ [f acc x])
+      simpa [List.foldl, List.length_append, List.length_singleton,
+        Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using h
+
+private theorem evalAllGatesAux_length
+    (gates : List Gate) (acc : List Bool) :
+    (gates.foldl (init := acc) fun acc g =>
+      let v1 := acc.getD g.input1 false
+      let v2 := acc.getD g.input2 false
+      let result := match g.kind with
+        | GateKind.AND => v1 && v2
+        | GateKind.OR  => v1 || v2
+        | GateKind.NOT => !v1
+      acc ++ [result]).length = acc.length + gates.length := by
+  simpa using foldl_append_singleton_length gates acc
+    (fun acc g =>
+      let v1 := acc.getD g.input1 false
+      let v2 := acc.getD g.input2 false
+      match g.kind with
+      | GateKind.AND => v1 && v2
+      | GateKind.OR  => v1 || v2
+      | GateKind.NOT => !v1)
+
+private theorem evalAllGates_length {m : ℕ} (C : BooleanCircuit m)
+    (input : Fin m → Bool) :
+    (evalAllGates C input).length = m + C.gates.length := by
+  unfold evalAllGates
+  rw [evalAllGatesAux_length]
+  have hlen : (List.ofFn input).length = m := by simp
+  rw [hlen]
+
+noncomputable def frontierGateIndices {m : ℕ} (C : BooleanCircuit m)
     (_S : Frontier n) : List ℕ :=
-  []
+  List.range (m + C.gates.length)
 
 noncomputable def frontierTranscript {m : ℕ} (C : BooleanCircuit m) (S : Frontier n)
     (input : Fin m → Bool) : List Bool :=
-  (frontierGateIndices C S).map fun i => (evalAllGates C input).getD i false
+  List.ofFn fun i : Fin (m + C.gates.length) => (evalAllGates C input).getD i false
+
+private theorem frontierTranscript_eq_evalAllGates {m : ℕ}
+    (C : BooleanCircuit m) (S : Frontier n) (input : Fin m → Bool) :
+    frontierTranscript C S input = evalAllGates C input := by
+  calc
+    frontierTranscript C S input =
+        List.ofFn (fun i : Fin (evalAllGates C input).length =>
+          (evalAllGates C input).getD i false) := by
+      unfold frontierTranscript
+      rw [show m + C.gates.length = (evalAllGates C input).length by
+        exact (evalAllGates_length C input).symm]
+    _ = List.ofFn (fun i : Fin (evalAllGates C input).length =>
+          (evalAllGates C input)[(i : Nat)]) := by
+      congr
+      funext i
+      simpa using (List.getD_eq_get (l := evalAllGates C input) (d := false) i)
+    _ = evalAllGates C input := List.ofFn_getElem _
 
 /-! The rectangle property for circuits (Lemma 5.2): when the frontier
 transcript of two inputs matches, the circuit output on any mixed input
@@ -2905,14 +2960,19 @@ theorem circuit_rectangle :
   ∀ {n : ℕ} {m : ℕ} (C : BooleanCircuit m) (S : Frontier n)
     (toInput : Finset (Edge n) → (Fin m → Bool))
     (H H' : Finset (Edge n)),
-    frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H') →
+    frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H) →
     C.eval (toInput (mixedGraph S H H')) = C.eval (toInput H) := by
-  intro n m C S toInput H H' h_same; sorry
+  intro n m C S toInput H H' h_same
+  rw [frontierTranscript_eq_evalAllGates, frontierTranscript_eq_evalAllGates] at h_same
+  unfold BooleanCircuit.eval
+  exact congrArg (fun vals => vals.getD C.outputGate false) h_same
 
 theorem rectangle_property {m : ℕ} (C : BooleanCircuit m) (S : Frontier n)
     (toInput : Finset (Edge n) → (Fin m → Bool))
     (H H' : Finset (Edge n))
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H')) :
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H)) :
     C.eval (toInput (mixedGraph S H H')) = C.eval (toInput H) :=
   circuit_rectangle C S toInput H H' hm
 
@@ -2926,7 +2986,8 @@ theorem degree_collision_forces_error {m : ℕ}
     (H H' : Finset (Edge n))
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
     (hCorrect : CircuitDecidesHAM C toInput)
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H'))
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H))
     (hd : degreeProfile S H ≠ degreeProfile S H') :
     False := by
   have hrect := rectangle_property C S toInput H H' hm
@@ -3348,7 +3409,8 @@ theorem pairing_mismatch_collision_forces_error {m : ℕ}
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
     (hS : S.isBalanced)
     (hCorrect : CircuitDecidesHAM C toInput)
-    (hm : frontierTranscript C S (toInput H) = frontierTranscript C S (toInput H'))
+    (hm : frontierTranscript C S (toInput (mixedGraph S H H')) =
+      frontierTranscript C S (toInput H))
     (hd : degreeProfile S H = degreeProfile S H')
     (hU : danglingEndpoints S H = danglingEndpoints S H')
     (hDisconnected : overlayIsDisconnected

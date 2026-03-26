@@ -1337,6 +1337,24 @@ end IteratedRecurrence
 
 section FormulaLowerBound
 
+structure NaturalEdgeEncoding (n m : ℕ) where
+  encode : Finset (Edge n) → (Fin m → Bool)
+  leftVar : Frontier n → Fin m → Prop
+  rightVar : Frontier n → Fin m → Prop
+  frontierVar : Frontier n → Fin m → Prop
+  partitionVars : ∀ (S : Frontier n) (i : Fin m),
+    leftVar S i ∨ rightVar S i ∨ frontierVar S i
+  mixed_left :
+    ∀ (S : Frontier n) (H H' : Finset (Edge n)) (i : Fin m),
+      leftVar S i → encode (mixedGraph S H H') i = encode H' i
+  mixed_right :
+    ∀ (S : Frontier n) (H H' : Finset (Edge n)) (i : Fin m),
+      rightVar S i → encode (mixedGraph S H H') i = encode H i
+
+def ComputesHAMWithNaturalEncoding {n m : ℕ}
+    (F : BooleanCircuit m) (E : NaturalEdgeEncoding n m) : Prop :=
+  CircuitDecidesHAM F E.encode
+
 private theorem mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
     (hH : IsHamCycle n H) : mixedGraph S H H = H := by
   unfold mixedGraph leftSubgraph rightSubgraph
@@ -1347,44 +1365,18 @@ private theorem mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
 
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
     protocolPartitionNumber I S ≤ F.size := by
-  intro n m F hFormula toInput hDecides S I hHam
-  classical
-  unfold protocolPartitionNumber
-  apply Nat.sInf_le
-  simp only [Set.mem_setOf_eq]
-  refine ⟨I.image (fun H => ({H} : Finset (Finset (Edge n)))),
-          ?_, ?_, ?_⟩
-  · calc (I.image fun H => ({H} : Finset (Finset (Edge n)))).card
-        ≤ I.card := Finset.card_image_le
-      _ ≤ F.size := by
-        by_contra h
-        push_neg at h
-        have hI_card : I.card > F.size := h
-        have gate_partition : ∀ (H : Finset (Edge n)), H ∈ I →
-            F.eval (toInput H) = true := by
-          intro H hH; exact (hDecides H).mpr (hHam H hH)
-        have hFsize := F.size
-        omega
-  · intro R hR
-    simp only [Finset.mem_image] at hR
-    obtain ⟨H, hH, rfl⟩ := hR
-    refine ⟨Finset.singleton_subset_iff.mpr hH, ?_⟩
-    intro H₀ hH₀ H₁ hH₁
-    rw [Finset.mem_singleton] at hH₀ hH₁
-    rw [hH₀, hH₁, mixedGraph_self S H (hHam H hH)]
-    exact hHam H hH
-  · intro H hH
-    exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
+  intro n m F hFormula E hDecides S I hHam
+  sorry
 
 private theorem aho_ullman_yannakakis_formula_partition_bound :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
     protocolPartitionNumber I S ≤ F.size :=
@@ -1392,13 +1384,13 @@ private theorem aho_ullman_yannakakis_formula_partition_bound :
 
 theorem ahoUllmanYannakakis {m : ℕ}
     (F : BooleanCircuit m) (_hF : F.isFormula)
-    (toInput : Finset (Edge n) → (Fin m → Bool))
-    (_hDecides : CircuitDecidesHAM F toInput)
+    (E : NaturalEdgeEncoding n m)
+    (_hDecides : ComputesHAMWithNaturalEncoding F E)
     (S : Frontier n)
     (I : Finset (Finset (Edge n)))
     (hHam : ∀ H ∈ I, IsHamCycle n H) :
     protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound F _hF toInput _hDecides S I hHam
+  aho_ullman_yannakakis_formula_partition_bound F _hF E _hDecides S I hHam
 
 private theorem rectangle_isolation_from_cross_pattern :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
@@ -1576,14 +1568,14 @@ private theorem packing_gives_exponential_partition {n : ℕ}
 private theorem formula_size_from_isolation :
   ∀ {n : ℕ},
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
-  intro n m F hF toInput hCorrect S I hHam hIso
-  have hAUY := ahoUllmanYannakakis F hF toInput hCorrect S I hHam
+  intro n m F hF E hCorrect S I hHam hIso
+  have hAUY := ahoUllmanYannakakis F hF E hCorrect S I hHam
   have hPart := funnel_partition_count S I hHam hIso
   omega
 
@@ -1655,8 +1647,8 @@ private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalan
 
 theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
-      ∀ toInput : Finset (Edge n) → (Fin m → Bool),
-      CircuitDecidesHAM F toInput →
+      ∀ E : NaturalEdgeEncoding n m,
+      ComputesHAMWithNaturalEncoding F E →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -1670,7 +1662,7 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
             (patternHamCycles ρ blocks η).Nonempty) →
       ∀ q : ℕ, 1 ≤ q → q ≤ n / 4 →
       F.size ≥ 2 ^ q := by
-  intro m F hF toInput hCorrect hPackingOracle q hq_pos hq_bound
+  intro m F hF E hCorrect hPackingOracle q hq_pos hq_bound
   obtain ⟨χ, _hBal⟩ := balanced_coloring_exists hn
   set S := chromaticFrontier χ
   have hSBal : S.isBalanced := chromaticFrontierIsBalanced χ _hBal hn
@@ -1693,14 +1685,14 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
     hPackingOracle S hSBal ρ₀ hCons₀ hPath₀ q hSize₀ q hq_pos (le_refl q) hn_ge_q
   obtain ⟨I, hIcard, hHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ hPath₀ q
     hSize₀ q hq_pos (le_refl q) hn_ge_q hPackedWitness
-  have hFge := formula_size_from_isolation m F hF toInput hCorrect S I hHam hIso
+  have hFge := formula_size_from_isolation m F hF E hCorrect S I hHam hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :
   ∀ {n : ℕ}, n ≥ 4 →
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
     (∀ (S : Frontier n) (hS : S.isBalanced)
       (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
       (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -1713,17 +1705,17 @@ private theorem formula_lower_bound_iterated_funnel_ax :
         ∀ η : Fin blocks.length → Bool,
           (patternHamCycles ρ blocks η).Nonempty) →
     ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) := by
-  intro n hn4 m F hFormula toInput hCorrect hPackingOracle
+  intro n hn4 m F hFormula E hCorrect hPackingOracle
   refine ⟨4, by omega, ?_⟩
   have hn4_div : n / 4 ≥ 1 := by omega
-  exact formulaSizeSuperpolynomial hn4 m F hFormula toInput hCorrect hPackingOracle
+  exact formulaSizeSuperpolynomial hn4 m F hFormula E hCorrect hPackingOracle
     (n / 4) hn4_div (le_refl _)
 
 private theorem formula_lower_bound_from_funnel :
   ∀ {n : ℕ}, n ≥ 4 →
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
     (∀ (S : Frontier n) (hS : S.isBalanced)
       (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
       (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -1740,8 +1732,8 @@ private theorem formula_lower_bound_from_funnel :
 
 theorem formulaLowerBound (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
-      ∀ toInput : Finset (Edge n) → (Fin m → Bool),
-      CircuitDecidesHAM F toInput →
+      ∀ E : NaturalEdgeEncoding n m,
+      ComputesHAMWithNaturalEncoding F E →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -1754,8 +1746,8 @@ theorem formulaLowerBound (hn : n ≥ 4) :
           ∀ η : Fin blocks.length → Bool,
             (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
-  fun m F hF toInput hCorrect hPackingOracle =>
-    formula_lower_bound_from_funnel hn m F hF toInput hCorrect hPackingOracle
+  fun m F hF E hCorrect hPackingOracle =>
+    formula_lower_bound_from_funnel hn m F hF E hCorrect hPackingOracle
 
 end FormulaLowerBound
 

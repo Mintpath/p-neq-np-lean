@@ -1449,8 +1449,14 @@ private theorem formula_unique_parent_index {m : ℕ} (C : BooleanCircuit m)
       (by simpa [p] using hkParent)
   have hcount_le : C.gates.countP p ≤ 1 := by
     simpa [BooleanCircuit.isFormula, BooleanCircuit.fanOut, p, List.countP_eq_length_filter] using
-      hFormula i hi
+      hFormula.1 i hi
   omega
+
+private theorem formula_gate_inputs_lt {m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula) (j : ℕ) (hj : j < C.gates.length) :
+    let g := C.gates[j]'hj
+    g.input1 < m + j ∧ g.input2 < m + j :=
+  hFormula.2 j hj
 
 private inductive SubformulaNodeOf {m : ℕ} (C : BooleanCircuit m) (root : ℕ) : ℕ → Prop where
   | root :

@@ -57,7 +57,10 @@ def BooleanCircuit.fanOut {m : ℕ} (C : BooleanCircuit m) (i : ℕ) : ℕ :=
   (C.gates.filter fun g => g.input1 = i ∨ g.input2 = i).length
 
 def BooleanCircuit.isFormula {m : ℕ} (C : BooleanCircuit m) : Prop :=
-  ∀ i : ℕ, i < C.gates.length + m → C.fanOut i ≤ 1
+  (∀ i : ℕ, i < C.gates.length + m → C.fanOut i ≤ 1) ∧
+  (∀ j : ℕ, ∀ hj : j < C.gates.length,
+    let g := C.gates[j]'hj
+    g.input1 < m + j ∧ g.input2 < m + j)
 
 end BooleanCircuit
 

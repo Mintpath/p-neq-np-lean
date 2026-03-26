@@ -27,12 +27,13 @@ section AUYCharacterization
 
 theorem auy_characterization
     {m : ℕ} (F : BooleanCircuit m) (hF : F.isFormula)
-    (toInput : Finset (Edge n) → (Fin m → Bool))
-    (hDecides : CircuitDecidesHAM F toInput)
+    (E : NaturalEdgeEncoding n m)
+    (hDecides : ComputesHAMWithNaturalEncoding F E)
     (S : Frontier n)
-    (I : Finset (Finset (Edge n))) :
+    (I : Finset (Finset (Edge n)))
+    (hHam : ∀ H ∈ I, IsHamCycle n H) :
     protocolPartitionNumber I S ≤ F.size :=
-  ahoUllmanYannakakis F hF toInput hDecides S I
+  ahoUllmanYannakakis F hF E hDecides S I hHam
 
 end AUYCharacterization
 
@@ -243,7 +244,15 @@ private theorem chromatic_frontier_balanced_ax :
       simp only [decide_eq_false_iff_not]; exact hcd⟩
 
 private theorem seed_step_existence_proof
-    (hn : n ≥ 4) (χ : Coloring n) (hχ : χ.isBalanced) :
+    (hn : n ≥ 4) (χ : Coloring n) (hχ : χ.isBalanced)
+    (hPackedWitness :
+      ∃ (blocks : List (SwitchBlock n)),
+        blocks.length = Nat.log 2 n ∧
+        blocksVertexDisjoint blocks ∧
+        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible (chromaticFrontier χ)) ∧
+        (∀ i : Fin blocks.length, blocks[i].isOpen (⟨∅, ∅⟩ : Restriction n)) ∧
+        ∀ η : Fin blocks.length → Bool,
+          (patternHamCycles (⟨∅, ∅⟩ : Restriction n) blocks η).Nonempty) :
     ∃ (q : ℕ) (blocks : List (SwitchBlock n)),
       q = Nat.log 2 n ∧
       blocks.length = q ∧
@@ -251,22 +260,19 @@ private theorem seed_step_existence_proof
       (∀ i : Fin blocks.length, blocks[i].isDegreeVisible (chromaticFrontier χ)) ∧
       ∀ η : Fin blocks.length → Bool,
         (patternHamCycles ⟨∅, ∅⟩ blocks η).Nonempty := by
-  let S := chromaticFrontier χ
   let q := Nat.log 2 n
-  have hq_pos : q ≥ 1 := Nat.log_pos (by omega) (by omega)
-  have hS_bal : S.isBalanced := chromatic_frontier_balanced_ax n hn χ hχ
-  let ρ : Restriction n := ⟨∅, ∅⟩
-  have hcons : ρ.consistent := by
-    unfold Restriction.consistent
-    exact Finset.disjoint_empty_right ∅
-  have hsize : ρ.size ≤ q := by
-    unfold Restriction.size ρ
-    norm_num
-  have hPacking := disjointOpenSwitchPacking S hS_bal ρ hcons q hsize hn q hq_pos (le_refl q)
-  obtain ⟨blocks, hLen, hDisj, hVis, _, hOpen⟩ := hPacking
-  exact ⟨q, blocks, rfl, hLen, hDisj, hVis, hOpen⟩
+  obtain ⟨blocks, hLen, hDisj, hVis, _hOpen, hPat⟩ := hPackedWitness
+  exact ⟨q, blocks, rfl, hLen, hDisj, hVis, hPat⟩
 
-theorem seedStep (hn : n ≥ 4) (χ : Coloring n) (hχ : χ.isBalanced) :
+theorem seedStep (hn : n ≥ 4) (χ : Coloring n) (hχ : χ.isBalanced)
+    (hPackedWitness :
+      ∃ (blocks : List (SwitchBlock n)),
+        blocks.length = Nat.log 2 n ∧
+        blocksVertexDisjoint blocks ∧
+        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible (chromaticFrontier χ)) ∧
+        (∀ i : Fin blocks.length, blocks[i].isOpen (⟨∅, ∅⟩ : Restriction n)) ∧
+        ∀ η : Fin blocks.length → Bool,
+          (patternHamCycles (⟨∅, ∅⟩ : Restriction n) blocks η).Nonempty) :
     ∃ (q : ℕ) (blocks : List (SwitchBlock n)),
       q = Nat.log 2 n ∧
       blocks.length = q ∧
@@ -274,7 +280,7 @@ theorem seedStep (hn : n ≥ 4) (χ : Coloring n) (hχ : χ.isBalanced) :
       (∀ i : Fin blocks.length, blocks[i].isDegreeVisible (chromaticFrontier χ)) ∧
       ∀ η : Fin blocks.length → Bool,
         (patternHamCycles ⟨∅, ∅⟩ blocks η).Nonempty :=
-  seed_step_existence_proof hn χ hχ
+  seed_step_existence_proof hn χ hχ hPackedWitness
 
 private theorem gamma_pos_formula (q N : ℕ) : Gamma q N ≥ 1 := by
   unfold Gamma
@@ -388,20 +394,42 @@ theorem funnelIteration (n q : ℕ) (hq : q = Nat.log 2 n)
 
 theorem formulaLowerBound_cor83 (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
-      ∀ toInput : Finset (Edge n) → (Fin m → Bool),
-      CircuitDecidesHAM F toInput →
+      ∀ E : NaturalEdgeEncoding n m,
+      ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (hS : S.isBalanced)
+        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = q ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
   formulaLowerBound hn
 
 private theorem formula_lower_bound_explicit_ax :
   ∀ {n : ℕ}, n ≥ 4 →
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
-    ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
-    CircuitDecidesHAM F toInput →
+    ∀ (E : NaturalEdgeEncoding n m),
+    ComputesHAMWithNaturalEncoding F E →
+    (∀ (S : Frontier n) (hS : S.isBalanced)
+      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+      ∃ (blocks : List (SwitchBlock n)),
+        blocks.length = q ∧
+        blocksVertexDisjoint blocks ∧
+        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+        ∀ η : Fin blocks.length → Bool,
+          (patternHamCycles ρ blocks η).Nonempty) →
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) := by
-  intro n hn m F hF toInput hCorrect
+  intro n hn m F hF E hCorrect hPackingOracle
   by_cases hq : n / (4 * Nat.log 2 n + 4) = 0
-  · have h := formulaSizeSuperpolynomial hn m F hF toInput hCorrect 1 le_rfl (by omega)
+  · have h := formulaSizeSuperpolynomial hn m F hF E hCorrect hPackingOracle 1 le_rfl (by omega)
     rw [hq]; norm_num at h ⊢; omega
   · have hq_pos : 1 ≤ n / (4 * Nat.log 2 n + 4) := Nat.one_le_iff_ne_zero.mpr hq
     have hq_bound : n / (4 * Nat.log 2 n + 4) ≤ n / 4 := by
@@ -413,23 +441,46 @@ private theorem formula_lower_bound_explicit_ax :
       calc 4 * k ≤ d * k := Nat.mul_le_mul_right k h1
         _ = k * d := Nat.mul_comm d k
         _ ≤ n := h2
-    exact formulaSizeSuperpolynomial hn m F hF toInput hCorrect _ hq_pos hq_bound
+    exact formulaSizeSuperpolynomial hn m F hF E hCorrect hPackingOracle _ hq_pos hq_bound
 
 private theorem formula_lower_bound_explicit_proof
     (hn : n ≥ 4)
     (m : ℕ) (F : BooleanCircuit m) (hF : F.isFormula)
-    (toInput : Finset (Edge n) → (Fin m → Bool))
-    (hCorrect : CircuitDecidesHAM F toInput) :
+    (E : NaturalEdgeEncoding n m)
+    (hCorrect : ComputesHAMWithNaturalEncoding F E)
+    (hPackingOracle :
+      ∀ (S : Frontier n) (hS : S.isBalanced)
+        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = q ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty) :
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  formula_lower_bound_explicit_ax hn m F hF toInput hCorrect
+  formula_lower_bound_explicit_ax hn m F hF E hCorrect hPackingOracle
 
 theorem formulaLowerBound_exponential (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
-      ∀ toInput : Finset (Edge n) → (Fin m → Bool),
-      CircuitDecidesHAM F toInput →
+      ∀ E : NaturalEdgeEncoding n m,
+      ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (hS : S.isBalanced)
+        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = q ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty) →
       F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  fun m F hF toInput hCorrect =>
-    formula_lower_bound_explicit_proof hn m F hF toInput hCorrect
+  fun m F hF E hCorrect hPackingOracle =>
+    formula_lower_bound_explicit_proof hn m F hF E hCorrect hPackingOracle
 
 end FormulaLowerBoundCorollary
 

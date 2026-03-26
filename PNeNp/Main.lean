@@ -122,18 +122,8 @@ private theorem lambda_lower_bound_core :
       rw [show Nat.log 2 n = q from rfl, hq1] at hlt
       omega
   obtain ⟨c, hc_pos, hc_bound⟩ := iteratedRecurrence q n hq2 hn
-  refine ⟨c * n / (2 * q), ?_, hc_bound⟩
-  apply Nat.div_pos _ (by omega)
-  have hqq : q ≤ q * q := le_mul_of_one_le_right (Nat.zero_le _) hq_pos
-  have hq2 : q ≤ q ^ 2 := by rw [sq]; exact hqq
-  have hn_ge : n ≥ 4 * q := by
-    have h4q2 : 4 * q ≤ 4 * q ^ 2 := Nat.mul_le_mul_left 4 hq2
-    have h4q2_1 : 4 * q ^ 2 + 1 ≤ n := hn
-    linarith
-  calc c * n ≥ 1 * n := Nat.mul_le_mul_right n (by omega)
-    _ = n := Nat.one_mul n
-    _ ≥ 4 * q := hn_ge
-    _ ≥ 2 * q := by omega
+  refine ⟨c, hc_pos, ?_⟩
+  simpa [Lambda', q] using hc_bound
 
 theorem lambda_lower_bound (hn2 : n ≥ 2) (hn : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
     ∃ c : ℕ, c > 0 ∧ Lambda' n ≥ 2 ^ c :=

@@ -1378,6 +1378,80 @@ private theorem natural_encoding_mixed_eq_of_right
       E.encode (mixedGraph S H H') i = E.encode H i :=
   E.mixed_right S H H' i
 
+private theorem list_countP_ge_two_of_two_indices {α : Type} (p : α → Bool) :
+    ∀ (l : List α) {j k : ℕ},
+      (hj : j < l.length) →
+      (hk : k < l.length) →
+      j ≠ k →
+      p (l[j]'hj) →
+      p (l[k]'hk) →
+      2 ≤ l.countP p := by
+  intro l
+  induction l with
+  | nil =>
+      intro j k hj
+      simp at hj
+  | cons a l ih =>
+      intro j k hj hk hne hpj hpk
+      cases j with
+      | zero =>
+          cases k with
+          | zero =>
+              exact (hne rfl).elim
+          | succ k =>
+              have htailk : k < l.length := by simpa using hk
+              have htailCount : 1 ≤ l.countP p := by
+                rw [List.one_le_countP_iff]
+                exact ⟨l[k], List.getElem_mem htailk, by simpa using hpk⟩
+              have hhead : p a := by simpa using hpj
+              rw [List.countP_cons_of_pos hhead]
+              omega
+      | succ j =>
+          cases k with
+          | zero =>
+              have htailj : j < l.length := by simpa using hj
+              have htailCount : 1 ≤ l.countP p := by
+                rw [List.one_le_countP_iff]
+                exact ⟨l[j], List.getElem_mem htailj, by simpa using hpj⟩
+              have hhead : p a := by simpa using hpk
+              rw [List.countP_cons_of_pos hhead]
+              omega
+          | succ k =>
+              have htailj : j < l.length := by simpa using hj
+              have htailk : k < l.length := by simpa using hk
+              have htailNe : j ≠ k := by
+                intro h
+                exact hne (congrArg Nat.succ h)
+              have htail :
+                  2 ≤ l.countP p := by
+                exact ih (j := j) (k := k) htailj htailk htailNe
+                  (by simpa using hpj) (by simpa using hpk)
+              by_cases hhead : p a
+              · rw [List.countP_cons_of_pos hhead]
+                omega
+              · rw [List.countP_cons_of_neg hhead]
+                exact htail
+
+private theorem formula_unique_parent_index {m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula) {i j k : ℕ}
+    (hi : i < C.gates.length + m)
+    (hj : j < C.gates.length) (hk : k < C.gates.length)
+    (hjParent :
+      (C.gates[j]'hj).input1 = i ∨ (C.gates[j]'hj).input2 = i)
+    (hkParent :
+      (C.gates[k]'hk).input1 = i ∨ (C.gates[k]'hk).input2 = i) :
+    j = k := by
+  by_contra hne
+  let p : Gate → Bool := fun g => g.input1 = i ∨ g.input2 = i
+  have hcount_ge : 2 ≤ C.gates.countP p := by
+    exact list_countP_ge_two_of_two_indices p C.gates hj hk hne
+      (by simpa [p] using hjParent)
+      (by simpa [p] using hkParent)
+  have hcount_le : C.gates.countP p ≤ 1 := by
+    simpa [BooleanCircuit.isFormula, BooleanCircuit.fanOut, p, List.countP_eq_length_filter] using
+      hFormula i hi
+  omega
+
 private inductive SubformulaNodeOf {m : ℕ} (C : BooleanCircuit m) (root : ℕ) : ℕ → Prop where
   | root :
       SubformulaNodeOf C root root

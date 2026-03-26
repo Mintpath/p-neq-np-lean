@@ -50,6 +50,22 @@ theorem crossPatternRectIsolation
     ¬IsHamCycle n (mixedGraph S H₁ H₀) :=
   rectangleIsolation S ρ blocks hDisjoint hVisible η η' hNeq H₀ H₁ hH₀ hH₁
 
+private theorem patternHamCycles_isHamCycle_local
+    {n : ℕ} (ρ : Restriction n) (blocks : List (SwitchBlock n))
+    (η : Fin blocks.length → Bool) (H : Finset (Edge n))
+    (hH : H ∈ patternHamCycles ρ blocks η) : IsHamCycle n H := by
+  unfold patternHamCycles restrictedHamCycles at hH
+  simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hH
+  exact hH.2.2
+
+private theorem mixedGraph_self_local (S : Frontier n) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) : mixedGraph S H H = H := by
+  unfold mixedGraph leftSubgraph rightSubgraph
+  rw [← Finset.inter_union_distrib_left, S.partition]
+  exact Finset.inter_eq_left.mpr (fun e he => by
+    simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
+    exact hH.noLoops e he)
+
 private theorem cross_pattern_rect_isolation_pp_bound_ax :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
     (blocks : List (SwitchBlock n)),
@@ -64,12 +80,6 @@ private theorem cross_pattern_rect_isolation_pp_bound_ax :
     protocolPartitionNumber I S ≥
       (Finset.univ : Finset (Fin blocks.length → Bool)).card := by
   intro n S ρ blocks hDisjoint hVisible hOpen I hIHam hI
-  have hIso : ∀ (η η' : Fin blocks.length → Bool), η ≠ η' →
-      ∀ (H₀ : Finset (Edge n)), H₀ ∈ patternHamCycles ρ blocks η →
-      ∀ (H₁ : Finset (Edge n)), H₁ ∈ patternHamCycles ρ blocks η' →
-      ¬IsHamCycle n (mixedGraph S H₁ H₀) := by
-    intro η η' hNeq H₀ hH₀ H₁ hH₁
-    exact rectangleIsolation S ρ blocks hDisjoint hVisible η η' hNeq H₀ H₁ hH₀ hH₁
   classical
   let rep : (Fin blocks.length → Bool) → Finset (Edge n) :=
     fun η => (hOpen η).choose
@@ -77,62 +87,58 @@ private theorem cross_pattern_rect_isolation_pp_bound_ax :
     fun η => (hOpen η).choose_spec
   have hRepInI : ∀ η, rep η ∈ I := fun η => hI η _ (hRepMem η)
   have hRepHam : ∀ η, IsHamCycle n (rep η) :=
-    fun η => patternHamCycles_isHamCycle ρ blocks η _ (hRepMem η)
-  have hRepInj : Function.Injective rep := by
-    intro η₀ η₁ h
-    by_contra hne
-    have : ¬IsHamCycle n (mixedGraph S (rep η₁) (rep η₁)) :=
-      hIso η₀ η₁ hne (rep η₁) (h ▸ hRepMem η₀) (rep η₁) (hRepMem η₁)
-    rw [mixedGraph_self S _ (hRepHam η₁)] at this
-    exact this (hRepHam η₁)
-  have hRepNoShare : ∀ η₀ η₁ : Fin blocks.length → Bool, η₀ ≠ η₁ →
-      ∀ (R : Finset (Finset (Edge n))), IsOneRectangle I S R →
-      ¬(rep η₀ ∈ R ∧ rep η₁ ∈ R) := by
-    intro η₀ η₁ hne R ⟨_, hRrect⟩ ⟨h₀, h₁⟩
-    exact hIso η₀ η₁ hne _ (hRepMem η₀) _ (hRepMem η₁) (hRrect _ h₀ _ h₁)
-  by_contra hlt
-  push_neg at hlt
-  unfold protocolPartitionNumber at hlt
-  set coverSet := { k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
-      P.card = k ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧
-      (∀ H ∈ I, ∃ R ∈ P, H ∈ R) } with hCoverSet_def
-  have hne : coverSet.Nonempty := by
-    refine ⟨I.card, I.image (fun H => {H}), ?_, ?_, ?_⟩
+    fun η => patternHamCycles_isHamCycle_local ρ blocks η _ (hRepMem η)
+  have hRepNoShare :
+      ∀ (η₀ η₁ : Fin blocks.length → Bool), η₀ ≠ η₁ →
+      ∀ (R : Finset (Finset (Edge n))),
+        (∀ H₀ ∈ R, ∀ H₁ ∈ R, IsHamCycle n (mixedGraph S H₁ H₀)) →
+        ¬(rep η₀ ∈ R ∧ rep η₁ ∈ R) := by
+    intro η₀ η₁ hne R hRrect ⟨h₀, h₁⟩
+    have hNo := rectangleIsolation S ρ blocks hDisjoint hVisible η₀ η₁ hne
+      (rep η₀) (rep η₁) (hRepMem η₀) (hRepMem η₁)
+    exact hNo (hRrect _ h₀ _ h₁)
+  unfold protocolPartitionNumber
+  apply le_csInf
+  · refine ⟨I.card, I.image (fun H => ({H} : Finset (Finset (Edge n)))), ?_, ?_, ?_⟩
     · exact Finset.card_image_of_injective _ Finset.singleton_injective
     · intro R hR
       simp only [Finset.mem_image] at hR
       obtain ⟨H, hH, rfl⟩ := hR
-      refine ⟨Finset.singleton_subset_iff.mpr hH, fun H₀ hH₀ H₁ hH₁ => ?_⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hH, ?_⟩
+      intro H₀ hH₀ H₁ hH₁
       rw [Finset.mem_singleton] at hH₀ hH₁
-      rw [hH₀, hH₁, mixedGraph_self S _ (hIHam H hH)]
+      rw [hH₀, hH₁, mixedGraph_self_local S H (hIHam H hH)]
       exact hIHam H hH
     · intro H hH
       exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
-  obtain ⟨k, ⟨P, hPcard, hRect, hCover⟩, hk_lt⟩ :=
-    (csInf_lt_iff (OrderBot.bddBelow _) hne).mp hlt
-  rw [← hPcard] at hk_lt
-  have hAssign : ∀ η : Fin blocks.length → Bool, ∃ R ∈ P, rep η ∈ R := by
-    intro η; exact hCover (rep η) (hRepInI η)
-  have hAtMostOne : ∀ R ∈ P, ∀ η₀ η₁ : Fin blocks.length → Bool,
-      rep η₀ ∈ R → rep η₁ ∈ R → η₀ = η₁ := by
-    intro R hR η₀ η₁ h₀ h₁
-    by_contra hne
-    exact hRepNoShare η₀ η₁ hne R (hRect R hR) ⟨h₀, h₁⟩
-  let assign : (Fin blocks.length → Bool) → Finset (Finset (Edge n)) :=
-    fun η => (hAssign η).choose
-  have hAssignMem : ∀ η, assign η ∈ P := fun η => (hAssign η).choose_spec.1
-  have hAssignIn : ∀ η, rep η ∈ assign η := fun η => (hAssign η).choose_spec.2
-  have hAssignInj : Function.Injective assign := by
-    intro η₀ η₁ h
-    exact hAtMostOne (assign η₀) (hAssignMem η₀) η₀ η₁ (hAssignIn η₀) (h ▸ hAssignIn η₁)
-  have : (Finset.univ : Finset (Fin blocks.length → Bool)).card ≤ P.card := by
-    calc (Finset.univ : Finset (Fin blocks.length → Bool)).card
-        = (Finset.univ.image assign).card :=
-          (Finset.card_image_of_injective _ hAssignInj).symm
-      _ ≤ P.card := Finset.card_le_card (fun R hR => by
-          simp only [Finset.mem_image, Finset.mem_univ, true_and] at hR
-          obtain ⟨η, rfl⟩ := hR; exact hAssignMem η)
-  omega
+  · intro k hk
+    rcases hk with ⟨P, hPcard, hRect, hCover⟩
+    rw [← hPcard]
+    have hAssign : ∀ η : Fin blocks.length → Bool, ∃ R ∈ P, rep η ∈ R := by
+      intro η
+      exact hCover (rep η) (hRepInI η)
+    let assign : (Fin blocks.length → Bool) → Finset (Finset (Edge n)) :=
+      fun η => (hAssign η).choose
+    have hAssignMem : ∀ η, assign η ∈ P := fun η => (hAssign η).choose_spec.1
+    have hAssignIn : ∀ η, rep η ∈ assign η := fun η => (hAssign η).choose_spec.2
+    have hAssignInj : Function.Injective assign := by
+      intro η₀ η₁ hEq
+      by_contra hne
+      have hRectMono : ∀ H₀ ∈ assign η₀, ∀ H₁ ∈ assign η₀, IsHamCycle n (mixedGraph S H₁ H₀) := by
+        exact (hRect (assign η₀) (hAssignMem η₀)).2
+      have hBoth : rep η₀ ∈ assign η₀ ∧ rep η₁ ∈ assign η₀ := by
+        refine ⟨hAssignIn η₀, ?_⟩
+        simpa [assign, hEq] using hAssignIn η₁
+      exact hRepNoShare η₀ η₁ hne (assign η₀) hRectMono hBoth
+    have hImageSub : (Finset.univ.image assign) ⊆ P := by
+      intro R hR
+      simp only [Finset.mem_image, Finset.mem_univ, true_and] at hR
+      obtain ⟨η, rfl⟩ := hR
+      exact hAssignMem η
+    calc
+      (Finset.univ : Finset (Fin blocks.length → Bool)).card = (Finset.univ.image assign).card := by
+        rw [Finset.card_image_of_injective _ hAssignInj]
+      _ ≤ P.card := Finset.card_le_card hImageSub
 
 private theorem cross_pattern_rect_isolation_pp_bound_proof
     (S : Frontier n) (ρ : Restriction n)
@@ -384,17 +390,6 @@ theorem formulaLowerBound_cor83 (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ toInput : Finset (Edge n) → (Fin m → Bool),
       CircuitDecidesHAM F toInput →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
   formulaLowerBound hn
 
@@ -403,21 +398,10 @@ private theorem formula_lower_bound_explicit_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
     CircuitDecidesHAM F toInput →
-    (∀ (S : Frontier n) (hS : S.isBalanced)
-      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-      ∃ (blocks : List (SwitchBlock n)),
-        blocks.length = q ∧
-        blocksVertexDisjoint blocks ∧
-        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-        ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ blocks η).Nonempty) →
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) := by
-  intro n hn m F hF toInput hCorrect hPackingOracle
+  intro n hn m F hF toInput hCorrect
   by_cases hq : n / (4 * Nat.log 2 n + 4) = 0
-  · have h := formulaSizeSuperpolynomial hn m F hF toInput hCorrect hPackingOracle 1 le_rfl (by omega)
+  · have h := formulaSizeSuperpolynomial hn m F hF toInput hCorrect 1 le_rfl (by omega)
     rw [hq]; norm_num at h ⊢; omega
   · have hq_pos : 1 ≤ n / (4 * Nat.log 2 n + 4) := Nat.one_le_iff_ne_zero.mpr hq
     have hq_bound : n / (4 * Nat.log 2 n + 4) ≤ n / 4 := by
@@ -429,45 +413,23 @@ private theorem formula_lower_bound_explicit_ax :
       calc 4 * k ≤ d * k := Nat.mul_le_mul_right k h1
         _ = k * d := Nat.mul_comm d k
         _ ≤ n := h2
-    exact formulaSizeSuperpolynomial hn m F hF toInput hCorrect hPackingOracle _ hq_pos hq_bound
+    exact formulaSizeSuperpolynomial hn m F hF toInput hCorrect _ hq_pos hq_bound
 
 private theorem formula_lower_bound_explicit_proof
     (hn : n ≥ 4)
     (m : ℕ) (F : BooleanCircuit m) (hF : F.isFormula)
     (toInput : Finset (Edge n) → (Fin m → Bool))
-    (hCorrect : CircuitDecidesHAM F toInput)
-    (hPackingOracle : ∀ (S : Frontier n) (hS : S.isBalanced)
-      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-      ∃ (blocks : List (SwitchBlock n)),
-        blocks.length = q ∧
-        blocksVertexDisjoint blocks ∧
-        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-        ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ blocks η).Nonempty) :
+    (hCorrect : CircuitDecidesHAM F toInput) :
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  formula_lower_bound_explicit_ax hn m F hF toInput hCorrect hPackingOracle
+  formula_lower_bound_explicit_ax hn m F hF toInput hCorrect
 
 theorem formulaLowerBound_exponential (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ toInput : Finset (Edge n) → (Fin m → Bool),
       CircuitDecidesHAM F toInput →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  fun m F hF toInput hCorrect hPackingOracle =>
-    formula_lower_bound_explicit_proof hn m F hF toInput hCorrect hPackingOracle
+  fun m F hF toInput hCorrect =>
+    formula_lower_bound_explicit_proof hn m F hF toInput hCorrect
 
 end FormulaLowerBoundCorollary
 

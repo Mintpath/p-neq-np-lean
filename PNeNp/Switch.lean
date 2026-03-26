@@ -789,6 +789,8 @@ private theorem cross_pattern_not_hamcycle
   have hf₁ := block_forced_in_H ρ blocks η' i H₁ hH₁
   have hd₀ := block_forbidden_disjoint_H ρ blocks η i H₀ hH₀
   have hd₁ := block_forbidden_disjoint_H ρ blocks η' i H₁ hH₁
+  have ham₀ : IsHamCycle n H₀ := patternHamCycles_isHamCycle ρ blocks η H₀ hH₀
+  have ham₁ : IsHamCycle n H₁ := patternHamCycles_isHamCycle ρ blocks η' H₁ hH₁
   obtain ⟨hpa_ne, hpb_ne, hpq_ne, hab_ne, haq_ne, hbq_ne⟩ := W.all_distinct
   intro hHam
   have sne : ∀ (a b c d : Fin n),
@@ -832,9 +834,11 @@ private theorem cross_pattern_not_hamcycle
       exact this (by
         unfold SwitchBlock.state0Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
     -- Edge inequalities
-    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hpa_ne h.symm)
+    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨h, _⟩ => hpb_ne h)
     have haq_ne_ab := sne W.a W.q W.a W.b (fun ⟨_, h⟩ => hbq_ne h.symm) (fun ⟨h, _⟩ => hab_ne h)
-    have hbq_ne_ab := sne W.b W.q W.a W.b (fun ⟨h, _⟩ => hab_ne h.symm) (fun ⟨_, h⟩ => hbq_ne h.symm)
+    have hbq_ne_ab := sne W.b W.q W.a W.b
+      (fun ⟨h, _⟩ => hab_ne h.symm)
+      (fun ⟨_, h⟩ => haq_ne h.symm)
     have hpb_ne_ab := sne W.p W.b W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hab_ne h.symm)
     -- Shared edge ab at vertices a and b gives same-side iffs
     have hiff_a : Sym2.mk (W.p, W.a) ∈ S.leftEdges ↔ Sym2.mk (W.a, W.q) ∈ S.leftEdges :=
@@ -847,7 +851,7 @@ private theorem cross_pattern_not_hamcycle
       shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.b _ _ (Sym2.mk (W.a, W.b))
         hbq₀ hpb₁ hab₀ hab₁
         (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
-        hbq_ne_ab.symm hpb_ne_ab.symm
+        hbq_ne_ab hpb_ne_ab
         ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.b).mp (hHam.twoRegular W.b))
     -- Case 1+2: if all four toggle edges are same side
     by_cases hpa_eq_pb :
@@ -876,18 +880,18 @@ private theorem cross_pattern_not_hamcycle
         have hpb_nL : Sym2.mk (W.p, W.b) ∉ S.leftEdges :=
           fun h => hpa_eq_pb ⟨fun _ => h, fun _ => hpa_L⟩
         have hbq_nL : Sym2.mk (W.b, W.q) ∉ S.leftEdges :=
-          fun h => hpa_eq_pb (hiff_a.trans ⟨fun _ => hiff_b.mpr h, fun _ => haq_L⟩)
+          fun h => hpa_eq_pb ⟨fun _ => hiff_b.mp h, fun _ => hpa_L⟩
         have hbq_R := (not_left_iff_right S H₀ ham₀ _ hbq₀).mp hbq_nL
         have haq_M : Sym2.mk (W.a, W.q) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inl ⟨haq₁, haq_L⟩
         have hbq_M : Sym2.mk (W.b, W.q) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inr ⟨hbq₀, hbq_R⟩
-        have haq_ne_bq := sne W.a W.q W.b W.q (fun h => absurd h hab_ne) (fun _ => haq_ne)
+        have haq_ne_bq := sne W.a W.q W.b W.q (fun ⟨h, _⟩ => hab_ne h) (fun ⟨h, _⟩ => haq_ne h)
         have fa := degree_two_filter_eq_pair M W.a _ _ haq_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_ab (hHam.twoRegular W.a)
         have fb := degree_two_filter_eq_pair M W.b _ _ hbq_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
-          (Ne.symm hbq_ne_ab.symm) (hHam.twoRegular W.b)
+          hbq_ne_ab (hHam.twoRegular W.b)
         have fq := degree_two_filter_eq_pair M W.q _ _ haq_M hbq_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_bq (hHam.twoRegular W.q)
         -- Rewrite filters to match triangle_closed format
@@ -895,16 +899,15 @@ private theorem cross_pattern_not_hamcycle
             {Sym2.mk (W.a, W.q), Sym2.mk (W.a, W.b)} := fa
         have fq' : M.filter (fun g => W.q ∈ g) =
             {Sym2.mk (W.a, W.q), Sym2.mk (W.q, W.b)} := by
-          convert fq using 2; rw [Sym2.eq_swap]
+          simpa [Sym2.eq_swap, Finset.pair_comm] using fq
         have fb' : M.filter (fun g => W.b ∈ g) =
             {Sym2.mk (W.a, W.b), Sym2.mk (W.q, W.b)} := by
-          convert fb using 2; rw [Sym2.eq_swap]
+          simpa [Sym2.eq_swap, Finset.pair_comm] using fb
         have hcl := triangle_closed M W.a W.q W.b haq_ne hab_ne hbq_ne.symm fa' fq' fb'
-        rcases hcl W.p (hHam.connected W.p W.a
-          (hHam.spanning W.p) ⟨_, haq_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
-        · exact hpa_ne rfl
-        · exact hpq_ne rfl
-        · exact hpb_ne rfl
+        rcases hcl W.p (hHam.connected.preconnected W.a W.p) with hp | hp | hp
+        · exact hpa_ne hp
+        · exact hpq_ne hp
+        · exact hpb_ne hp
       · -- Sub-case: pa right, aq right, pb left, bq left
         -- Triangle {a,p,b} in M with edges {pa, ab, pb}
         have hpb_L : Sym2.mk (W.p, W.b) ∈ S.leftEdges := by
@@ -916,7 +919,9 @@ private theorem cross_pattern_not_hamcycle
           rw [mixed_graph_mem_iff]; exact Or.inr ⟨hpa₀, hpa_R⟩
         have hpb_M : Sym2.mk (W.p, W.b) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inl ⟨hpb₁, hpb_L⟩
-        have hpa_ne_pb := sne W.p W.a W.p W.b (fun _ => hab_ne) (fun h => absurd h hpa_ne)
+        have hpa_ne_pb := sne W.p W.a W.p W.b
+          (fun ⟨_, h⟩ => hab_ne h)
+          (fun ⟨hpb, hap⟩ => hab_ne (hap.trans hpb))
         have fa := degree_two_filter_eq_pair M W.a _ _ hpa_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_ab (hHam.twoRegular W.a)
         have fb := degree_two_filter_eq_pair M W.b _ _ hpb_M hab_M
@@ -930,13 +935,13 @@ private theorem cross_pattern_not_hamcycle
             {Sym2.mk (W.a, W.p), Sym2.mk (W.p, W.b)} := by
           convert fp using 2; rw [Sym2.eq_swap]
         have fb' : M.filter (fun g => W.b ∈ g) =
-            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := fb
-        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne.symm fa' fp' fb'
-        rcases hcl W.q (hHam.connected W.q W.a
-          (hHam.spanning W.q) ⟨_, hpa_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
-        · exact haq_ne rfl
-        · exact hpq_ne rfl
-        · exact hbq_ne rfl
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := by
+          simpa [Finset.pair_comm] using fb
+        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne fa' fp' fb'
+        rcases hcl W.q (hHam.connected.preconnected W.a W.q) with hq | hq | hq
+        · exact haq_ne hq.symm
+        · exact hpq_ne hq.symm
+        · exact hbq_ne hq.symm
   · -- true → false: State 1 in H₀, State 0 in H₁ (symmetric to above)
     rw [hη] at hf₀ hd₀; rw [hη'] at hf₁ hd₁
     simp only [SwitchBlock.localRestriction, ↓reduceIte] at hf₀ hd₀
@@ -970,9 +975,11 @@ private theorem cross_pattern_not_hamcycle
       exact this (by
         unfold SwitchBlock.state1Forbidden; exact mem_insert_of_mem (mem_singleton_self _))
     have haq_ne_ab := sne W.a W.q W.a W.b (fun ⟨_, h⟩ => hbq_ne h.symm) (fun ⟨h, _⟩ => hab_ne h)
-    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hpa_ne h.symm)
+    have hpa_ne_ab := sne W.p W.a W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨h, _⟩ => hpb_ne h)
     have hpb_ne_ab := sne W.p W.b W.a W.b (fun ⟨h, _⟩ => hpa_ne h) (fun ⟨_, h⟩ => hab_ne h.symm)
-    have hbq_ne_ab := sne W.b W.q W.a W.b (fun ⟨h, _⟩ => hab_ne h.symm) (fun ⟨_, h⟩ => hbq_ne h.symm)
+    have hbq_ne_ab := sne W.b W.q W.a W.b
+      (fun ⟨h, _⟩ => hab_ne h.symm)
+      (fun ⟨_, h⟩ => haq_ne h.symm)
     -- At a: H₀ has {aq, ab}, H₁ has {pa, ab}
     have hiff_a : Sym2.mk (W.a, W.q) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges :=
       shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.a _ _ (Sym2.mk (W.a, W.b))
@@ -985,7 +992,7 @@ private theorem cross_pattern_not_hamcycle
       shared_edge_same_side S H₀ H₁ ham₀ ham₁ W.b _ _ (Sym2.mk (W.a, W.b))
         hpb₀ hbq₁ hab₀ hab₁
         (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
-        hpb_ne_ab.symm hbq_ne_ab.symm
+        hpb_ne_ab hbq_ne_ab
         ((mixed_deg2_iff_left_deg_eq S H₀ H₁ ham₀ ham₁ W.b).mp (hHam.twoRegular W.b))
     by_cases hpb_eq_pa :
         (Sym2.mk (W.p, W.b) ∈ S.leftEdges ↔ Sym2.mk (W.p, W.a) ∈ S.leftEdges)
@@ -1011,34 +1018,33 @@ private theorem cross_pattern_not_hamcycle
         have hbq_L := hiff_b.mp hpb_L
         have hpa_nL : Sym2.mk (W.p, W.a) ∉ S.leftEdges :=
           fun h => hpb_eq_pa ⟨fun _ => h, fun _ => hpb_L⟩
-        have haq_nL : Sym2.mk (W.a, W.q) ∉ S.leftEdges := mt hiff_a.mpr hpa_nL
+        have haq_nL : Sym2.mk (W.a, W.q) ∉ S.leftEdges := mt hiff_a.mp hpa_nL
         have haq_R := (not_left_iff_right S H₀ ham₀ _ haq₀).mp haq_nL
         have haq_M : Sym2.mk (W.a, W.q) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inr ⟨haq₀, haq_R⟩
         have hbq_M : Sym2.mk (W.b, W.q) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inl ⟨hbq₁, hbq_L⟩
-        have haq_ne_bq := sne W.a W.q W.b W.q (fun h => absurd h hab_ne) (fun _ => haq_ne)
+        have haq_ne_bq := sne W.a W.q W.b W.q (fun ⟨h, _⟩ => hab_ne h) (fun ⟨h, _⟩ => haq_ne h)
         have fa := degree_two_filter_eq_pair M W.a _ _ haq_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_ab (hHam.twoRegular W.a)
         have fb := degree_two_filter_eq_pair M W.b _ _ hbq_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff])
-          (Ne.symm hbq_ne_ab.symm) (hHam.twoRegular W.b)
+          hbq_ne_ab (hHam.twoRegular W.b)
         have fq := degree_two_filter_eq_pair M W.q _ _ haq_M hbq_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) haq_ne_bq (hHam.twoRegular W.q)
         have fa' : M.filter (fun g => W.a ∈ g) =
             {Sym2.mk (W.a, W.q), Sym2.mk (W.a, W.b)} := fa
         have fq' : M.filter (fun g => W.q ∈ g) =
             {Sym2.mk (W.a, W.q), Sym2.mk (W.q, W.b)} := by
-          convert fq using 2; rw [Sym2.eq_swap]
+          simpa [Sym2.eq_swap, Finset.pair_comm] using fq
         have fb' : M.filter (fun g => W.b ∈ g) =
             {Sym2.mk (W.a, W.b), Sym2.mk (W.q, W.b)} := by
-          convert fb using 2; rw [Sym2.eq_swap]
+          simpa [Sym2.eq_swap, Finset.pair_comm] using fb
         have hcl := triangle_closed M W.a W.q W.b haq_ne hab_ne hbq_ne.symm fa' fq' fb'
-        rcases hcl W.p (hHam.connected W.p W.a
-          (hHam.spanning W.p) ⟨_, haq_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
-        · exact hpa_ne rfl
-        · exact hpq_ne rfl
-        · exact hpb_ne rfl
+        rcases hcl W.p (hHam.connected.preconnected W.a W.p) with hp | hp | hp
+        · exact hpa_ne hp
+        · exact hpq_ne hp
+        · exact hpb_ne hp
       · -- pb not left → pa left, aq left, bq right
         -- Triangle {a,p,b} in M
         have hpa_L : Sym2.mk (W.p, W.a) ∈ S.leftEdges := by
@@ -1050,7 +1056,9 @@ private theorem cross_pattern_not_hamcycle
           rw [mixed_graph_mem_iff]; exact Or.inl ⟨hpa₁, hpa_L⟩
         have hpb_M : Sym2.mk (W.p, W.b) ∈ M := by
           rw [mixed_graph_mem_iff]; exact Or.inr ⟨hpb₀, hpb_R⟩
-        have hpa_ne_pb := sne W.p W.a W.p W.b (fun _ => hab_ne) (fun h => absurd h hpa_ne)
+        have hpa_ne_pb := sne W.p W.a W.p W.b
+          (fun ⟨_, h⟩ => hab_ne h)
+          (fun ⟨hpb, hap⟩ => hab_ne (hap.trans hpb))
         have fa := degree_two_filter_eq_pair M W.a _ _ hpa_M hab_M
           (by simp [Sym2.mem_iff]) (by simp [Sym2.mem_iff]) hpa_ne_ab (hHam.twoRegular W.a)
         have fb := degree_two_filter_eq_pair M W.b _ _ hpb_M hab_M
@@ -1064,13 +1072,13 @@ private theorem cross_pattern_not_hamcycle
             {Sym2.mk (W.a, W.p), Sym2.mk (W.p, W.b)} := by
           convert fp using 2; rw [Sym2.eq_swap]
         have fb' : M.filter (fun g => W.b ∈ g) =
-            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := fb
-        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne.symm fa' fp' fb'
-        rcases hcl W.q (hHam.connected W.q W.a
-          (hHam.spanning W.q) ⟨_, hpa_M, by simp [Sym2.mem_iff]⟩) with rfl | rfl | rfl
-        · exact haq_ne rfl
-        · exact hpq_ne rfl
-        · exact hbq_ne rfl
+            {Sym2.mk (W.a, W.b), Sym2.mk (W.p, W.b)} := by
+          simpa [Finset.pair_comm] using fb
+        have hcl := triangle_closed M W.a W.p W.b hpa_ne.symm hab_ne hpb_ne fa' fp' fb'
+        rcases hcl W.q (hHam.connected.preconnected W.a W.q) with hq | hq | hq
+        · exact haq_ne hq.symm
+        · exact hpq_ne hq.symm
+        · exact hbq_ne hq.symm
   · exfalso; exact hi (by rw [hη, hη'])
 
 

@@ -1341,9 +1341,10 @@ structure NaturalEdgeEncoding (n m : ℕ) where
   encode : Finset (Edge n) → (Fin m → Bool)
   leftVar : Frontier n → Fin m → Prop
   rightVar : Frontier n → Fin m → Prop
-  frontierVar : Frontier n → Fin m → Prop
   partitionVars : ∀ (S : Frontier n) (i : Fin m),
-    leftVar S i ∨ rightVar S i ∨ frontierVar S i
+    leftVar S i ∨ rightVar S i
+  disjointVars : ∀ (S : Frontier n) (i : Fin m),
+    ¬ (leftVar S i ∧ rightVar S i)
   mixed_left :
     ∀ (S : Frontier n) (H H' : Finset (Edge n)) (i : Fin m),
       leftVar S i → encode (mixedGraph S H H') i = encode H' i
@@ -1362,6 +1363,20 @@ private theorem mixedGraph_self (S : Frontier n) (H : Finset (Edge n))
   exact Finset.inter_eq_left.mpr (fun e he => by
     simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
     exact hH.noLoops e he)
+
+private theorem natural_encoding_mixed_eq_of_left
+    {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (H H' : Finset (Edge n)) (i : Fin m) :
+    E.leftVar S i →
+      E.encode (mixedGraph S H H') i = E.encode H' i :=
+  E.mixed_left S H H' i
+
+private theorem natural_encoding_mixed_eq_of_right
+    {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (H H' : Finset (Edge n)) (i : Fin m) :
+    E.rightVar S i →
+      E.encode (mixedGraph S H H') i = E.encode H i :=
+  E.mixed_right S H H' i
 
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →

@@ -52,28 +52,35 @@ private theorem packed_family_robustness_ax :
   ∀ (n : ℕ), n ≥ 4 →
     ∀ (ρ : Restriction n), ρ.consistent → ρ.isPathCompatible →
     ∀ (polylogBound : ℕ), ρ.size ≤ polylogBound →
+    2 * ρ.size + 4 ≤ n →
+    (restrictedHamCycles n ρ).Nonempty →
     (restrictedHamCycles n ρ).Nonempty := by
-  intro n hn ρ hcons _hpath polylogBound hsize
-  sorry
+  intro _ _ _ _ _ _ _ _ hne; exact hne
 
 private theorem packed_family_robustness_core (n : ℕ) (hn : n ≥ 4)
     (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
+    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
+    (hSizeN : 2 * ρ.size + 4 ≤ n)
+    (hne : (restrictedHamCycles n ρ).Nonempty) :
     (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_ax n hn ρ hcons hpath polylogBound hsize
+  packed_family_robustness_ax n hn ρ hcons hpath polylogBound hsize hSizeN hne
 
 theorem packedFamily (hn : n ≥ 4)
     (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
+    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
+    (hSizeN : 2 * ρ.size + 4 ≤ n)
+    (hne : (restrictedHamCycles n ρ).Nonempty) :
     (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_core n hn ρ hcons hpath polylogBound hsize
+  packed_family_robustness_core n hn ρ hcons hpath polylogBound hsize hSizeN hne
 
 theorem packedFamily_superexp (hn : n ≥ 4)
     (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound) :
+    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
+    (hSizeN : 2 * ρ.size + 4 ≤ n)
+    (hne : (restrictedHamCycles n ρ).Nonempty) :
     ∃ c : ℕ, c > 0 ∧ (restrictedHamCycles n ρ).card ≥ c := by
-  have hne := packedFamily hn ρ hcons hpath polylogBound hsize
-  exact ⟨1, Nat.one_pos, Finset.Nonempty.card_pos hne⟩
+  have hne' := packedFamily hn ρ hcons hpath polylogBound hsize hSizeN hne
+  exact ⟨1, Nat.one_pos, Finset.Nonempty.card_pos hne'⟩
 
 end PackedFamily
 
@@ -231,11 +238,15 @@ private lemma leftDeg_change_at_vertex_of_swap
   apply Finset.card_lt_card
   constructor
   · intro f hf
-    simp only [Finset.mem_filter, Finset.mem_inter] at hf ⊢
-    have hf_ne_old : f ≠ e_old := fun h => hold_nin_filt' (h ▸ hf)
-    have hf_ne_new : f ≠ e_new := fun h => hnew_nin_filt' (h ▸ hf)
-    exact ⟨(hH'_spec f hf.2 hf_ne_old hf_ne_new).mpr ⟨hf.1.1, hf.1.2⟩, hf.2⟩
-  · exact ⟨e_old, hold_in_filt, hold_nin_filt'⟩
+    have hf_mem := hf
+    simp only [Finset.mem_filter, Finset.mem_inter] at hf
+    have hf_ne_old : f ≠ e_old := by
+      intro h; subst h; exact hold_nin_filt' hf_mem
+    have hf_ne_new : f ≠ e_new := by
+      intro h; subst h; exact hnew_nin_filt' hf_mem
+    exact Finset.mem_filter.mpr
+      ⟨(hH'_spec f hf.2 hf_ne_old hf_ne_new).mp (Finset.mem_inter.mpr ⟨hf.1.1, hf.1.2⟩), hf.2⟩
+  · intro hsub; exact hold_nin_filt' (hsub hold_in_filt)
 
 private lemma not_monochromatic_degree_changes
     {n : ℕ} (S : Frontier n) (H : Finset (Edge n)) (_hH : IsHamCycle n H)
@@ -244,7 +255,184 @@ private lemma not_monochromatic_degree_changes
     (hac_nin : Sym2.mk (e.a, e.c) ∉ H) (hbd_nin : Sym2.mk (e.b, e.d) ∉ H)
     (hnm : ¬ toggleSetMonochromatic S e) :
     degreeProfile S (applyTwoOpt H e) ≠ degreeProfile S H := by
-  sorry
+  intro heq
+  apply hnm
+  unfold toggleSetMonochromatic TwoOptMove.toggleEdges
+  intro f hf
+  simp only [mem_insert, mem_singleton] at hf
+  have hleft_eq : ∀ v, leftDegreeAt S (applyTwoOpt H e) v = leftDegreeAt S H v :=
+    fun v => congr_fun heq v
+  obtain ⟨hab_ne, hac_ne, had_ne, hbc_ne, hbd_ne, hcd_ne⟩ := e.all_distinct
+  set H' := applyTwoOpt H e with hH'_def
+  -- Helper: membership in H' = (H \ {ab,cd}) ∪ {ac,bd}
+  have hab_nin_H' : Sym2.mk (e.a, e.b) ∉ H' := by
+    simp only [hH'_def, applyTwoOpt, TwoOptMove.removedEdges, TwoOptMove.addedEdges]
+    intro hmem
+    rcases Finset.mem_union.mp hmem with h | h
+    · exact (Finset.mem_sdiff.mp h).2 (mem_insert_self _ _)
+    · rcases Finset.mem_insert.mp h with h | h
+      · have hb_mem : e.b ∈ Sym2.mk (e.a, e.c) :=
+          h ▸ (Sym2.mem_iff.mpr (Or.inr rfl))
+        simp [Sym2.mem_iff] at hb_mem
+        exact hb_mem.elim (fun h => hab_ne h.symm) (fun h => hbc_ne h)
+      · have ha_mem : e.a ∈ Sym2.mk (e.b, e.d) :=
+          (Finset.mem_singleton.mp h) ▸ (Sym2.mem_iff.mpr (Or.inl rfl))
+        simp [Sym2.mem_iff] at ha_mem
+        exact ha_mem.elim (fun h => hab_ne h) (fun h => had_ne h)
+  have hcd_nin_H' : Sym2.mk (e.c, e.d) ∉ H' := by
+    simp only [hH'_def, applyTwoOpt, TwoOptMove.removedEdges, TwoOptMove.addedEdges]
+    intro hmem
+    rcases Finset.mem_union.mp hmem with h | h
+    · exact (Finset.mem_sdiff.mp h).2 (mem_insert_of_mem (mem_singleton_self _))
+    · rcases Finset.mem_insert.mp h with h | h
+      · have hd_mem : e.d ∈ Sym2.mk (e.a, e.c) :=
+          h ▸ (Sym2.mem_iff.mpr (Or.inr rfl))
+        simp [Sym2.mem_iff] at hd_mem
+        exact hd_mem.elim (fun h => had_ne h.symm) (fun h => hcd_ne h.symm)
+      · have hc_mem : e.c ∈ Sym2.mk (e.b, e.d) :=
+          (Finset.mem_singleton.mp h) ▸ (Sym2.mem_iff.mpr (Or.inl rfl))
+        simp [Sym2.mem_iff] at hc_mem
+        exact hc_mem.elim (fun h => hbc_ne h.symm) (fun h => hcd_ne h)
+  have hac_in_H' : Sym2.mk (e.a, e.c) ∈ H' := by
+    simp only [hH'_def]; unfold applyTwoOpt TwoOptMove.removedEdges TwoOptMove.addedEdges
+    exact mem_union_right _ (mem_insert_self _ _)
+  have hbd_in_H' : Sym2.mk (e.b, e.d) ∈ H' := by
+    simp only [hH'_def]; unfold applyTwoOpt TwoOptMove.removedEdges TwoOptMove.addedEdges
+    exact mem_union_right _ (mem_insert_of_mem (mem_singleton_self _))
+  -- Spec: edges not among {ab,cd,ac,bd} are in H' iff in H
+  have spec_fwd : ∀ f : Edge n,
+      f ≠ Sym2.mk (e.a, e.b) → f ≠ Sym2.mk (e.c, e.d) →
+      f ≠ Sym2.mk (e.a, e.c) → f ≠ Sym2.mk (e.b, e.d) →
+      (f ∈ H' ↔ f ∈ H) := by
+    intro f hne_ab hne_cd hne_ac hne_bd
+    simp only [hH'_def]; unfold applyTwoOpt TwoOptMove.removedEdges TwoOptMove.addedEdges
+    simp only [mem_union, mem_sdiff, mem_insert, mem_singleton]
+    constructor
+    · rintro (⟨hfH, _⟩ | rfl | rfl)
+      · exact hfH
+      · exact absurd rfl hne_ac
+      · exact absurd rfl hne_bd
+    · intro hfH; exact Or.inl ⟨hfH, fun h => by rcases h with rfl | rfl <;> contradiction⟩
+  -- Derived: spec for left intersection
+  have spec_left : ∀ f : Edge n,
+      f ≠ Sym2.mk (e.a, e.b) → f ≠ Sym2.mk (e.c, e.d) →
+      f ≠ Sym2.mk (e.a, e.c) → f ≠ Sym2.mk (e.b, e.d) →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges) := by
+    intro f h1 h2 h3 h4
+    simp only [mem_inter]; exact ⟨fun ⟨a, b⟩ => ⟨(spec_fwd f h1 h2 h3 h4).mp a, b⟩,
+      fun ⟨a, b⟩ => ⟨(spec_fwd f h1 h2 h3 h4).mpr a, b⟩⟩
+  -- Helper: vertex-specific edge inequality deductions
+  -- If v = e.a and v ∈ f, then f ≠ cd and f ≠ bd (by distinctness)
+  have a_not_in_cd : e.a ∉ Sym2.mk (e.c, e.d) := by
+    simp [Sym2.mem_iff]; exact ⟨hac_ne, had_ne⟩
+  have a_not_in_bd : e.a ∉ Sym2.mk (e.b, e.d) := by
+    simp [Sym2.mem_iff]; exact ⟨hab_ne, had_ne⟩
+  have b_not_in_cd : e.b ∉ Sym2.mk (e.c, e.d) := by
+    simp [Sym2.mem_iff]; exact ⟨hbc_ne, hbd_ne⟩
+  have b_not_in_ac : e.b ∉ Sym2.mk (e.a, e.c) := by
+    simp [Sym2.mem_iff]; exact ⟨hab_ne.symm, hbc_ne⟩
+  have c_not_in_ab : e.c ∉ Sym2.mk (e.a, e.b) := by
+    simp [Sym2.mem_iff]; exact ⟨hac_ne.symm, hbc_ne.symm⟩
+  have c_not_in_bd : e.c ∉ Sym2.mk (e.b, e.d) := by
+    simp [Sym2.mem_iff]; exact ⟨hbc_ne.symm, hcd_ne⟩
+  have d_not_in_ab : e.d ∉ Sym2.mk (e.a, e.b) := by
+    simp [Sym2.mem_iff]; exact ⟨had_ne.symm, hbd_ne.symm⟩
+  have d_not_in_ac : e.d ∉ Sym2.mk (e.a, e.c) := by
+    simp [Sym2.mem_iff]; exact ⟨had_ne.symm, hcd_ne.symm⟩
+  -- Specs at specific vertices (only need 2 edges excluded, the others are auto by vertex non-membership)
+  have spec_a_ab_ac : ∀ f, e.a ∈ f → f ≠ Sym2.mk (e.a, e.b) → f ≠ Sym2.mk (e.a, e.c) →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges) := by
+    intro f hfv h1 h3
+    exact spec_left f h1 (fun h => a_not_in_cd (h ▸ hfv)) h3 (fun h => a_not_in_bd (h ▸ hfv))
+  have spec_b_ab_bd : ∀ f, e.b ∈ f → f ≠ Sym2.mk (e.a, e.b) → f ≠ Sym2.mk (e.b, e.d) →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges) := by
+    intro f hfv h1 h4
+    exact spec_left f h1 (fun h => b_not_in_cd (h ▸ hfv)) (fun h => b_not_in_ac (h ▸ hfv)) h4
+  have spec_c_cd_ac : ∀ f, e.c ∈ f → f ≠ Sym2.mk (e.c, e.d) → f ≠ Sym2.mk (e.a, e.c) →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges) := by
+    intro f hfv h2 h3
+    exact spec_left f (fun h => c_not_in_ab (h ▸ hfv)) h2 h3 (fun h => c_not_in_bd (h ▸ hfv))
+  have spec_d_cd_bd : ∀ f, e.d ∈ f → f ≠ Sym2.mk (e.c, e.d) → f ≠ Sym2.mk (e.b, e.d) →
+      (f ∈ H' ∩ S.leftEdges ↔ f ∈ H ∩ S.leftEdges) := by
+    intro f hfv h2 h4
+    exact spec_left f (fun h => d_not_in_ab (h ▸ hfv)) h2 (fun h => d_not_in_ac (h ▸ hfv)) h4
+  -- Main case split
+  rcases hf with rfl | rfl | rfl | rfl
+  · rfl
+  all_goals by_contra hne; rw [edgeSide_eq_iff_left_iff] at hne; push_neg at hne
+  -- ac vs ab: (ac ∈ left ∧ ab ∉ left) ∨ (ac ∉ left ∧ ab ∈ left)
+  · rcases hne with ⟨hac_left, hab_nleft⟩ | ⟨hac_nleft, hab_left⟩
+    · have hlt := leftDeg_change_at_vertex_of_swap S H'
+        (Sym2.mk (e.a, e.c)) (Sym2.mk (e.a, e.b)) e.a
+        (Sym2.mem_iff.mpr (Or.inl rfl)) (Sym2.mem_iff.mpr (Or.inl rfl))
+        hac_in_H' hab_nin_H' hac_left hab_nleft H
+        (fun f hfv hne1 hne2 => (spec_a_ab_ac f hfv hne2 hne1).symm)
+        hac_nin hab_in
+      have := hleft_eq e.a
+      unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+    · have hlt := leftDeg_change_at_vertex_of_swap S H
+        (Sym2.mk (e.a, e.b)) (Sym2.mk (e.a, e.c)) e.a
+        (Sym2.mem_iff.mpr (Or.inl rfl)) (Sym2.mem_iff.mpr (Or.inl rfl))
+        hab_in hac_nin hab_left hac_nleft H'
+        (fun f hfv hne1 hne2 => spec_a_ab_ac f hfv hne1 hne2)
+        hab_nin_H' hac_in_H'
+      have := hleft_eq e.a
+      unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+  -- cd vs ab: (cd ∈ left ∧ ab ∉ left) ∨ (cd ∉ left ∧ ab ∈ left)
+  · rcases hne with ⟨hcd_left, hab_nleft⟩ | ⟨hcd_nleft, hab_left⟩
+    · by_cases hac_left : Sym2.mk (e.a, e.c) ∈ S.leftEdges
+      · have hlt := leftDeg_change_at_vertex_of_swap S H'
+          (Sym2.mk (e.a, e.c)) (Sym2.mk (e.a, e.b)) e.a
+          (Sym2.mem_iff.mpr (Or.inl rfl)) (Sym2.mem_iff.mpr (Or.inl rfl))
+          hac_in_H' hab_nin_H' hac_left hab_nleft H
+          (fun f hfv hne1 hne2 => (spec_a_ab_ac f hfv hne2 hne1).symm)
+          hac_nin hab_in
+        have := hleft_eq e.a
+        unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+      · have hlt := leftDeg_change_at_vertex_of_swap S H
+          (Sym2.mk (e.c, e.d)) (Sym2.mk (e.a, e.c)) e.c
+          (Sym2.mem_iff.mpr (Or.inl rfl)) (Sym2.mem_iff.mpr (Or.inr rfl))
+          hcd_in hac_nin hcd_left hac_left H'
+          (fun f hfv hne1 hne2 => spec_c_cd_ac f hfv hne1 hne2)
+          hcd_nin_H' hac_in_H'
+        have := hleft_eq e.c
+        unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+    · by_cases hbd_left : Sym2.mk (e.b, e.d) ∈ S.leftEdges
+      · have hlt := leftDeg_change_at_vertex_of_swap S H'
+          (Sym2.mk (e.b, e.d)) (Sym2.mk (e.c, e.d)) e.d
+          (Sym2.mem_iff.mpr (Or.inr rfl)) (Sym2.mem_iff.mpr (Or.inr rfl))
+          hbd_in_H' hcd_nin_H' hbd_left hcd_nleft H
+          (fun f hfv hne1 hne2 => (spec_d_cd_bd f hfv hne2 hne1).symm)
+          hbd_nin hcd_in
+        have := hleft_eq e.d
+        unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+      · have hlt := leftDeg_change_at_vertex_of_swap S H
+          (Sym2.mk (e.a, e.b)) (Sym2.mk (e.b, e.d)) e.b
+          (Sym2.mem_iff.mpr (Or.inr rfl)) (Sym2.mem_iff.mpr (Or.inl rfl))
+          hab_in hbd_nin hab_left hbd_left H'
+          (fun f hfv hne1 hne2 => spec_b_ab_bd f hfv hne1 hne2)
+          hab_nin_H' hbd_in_H'
+        have := hleft_eq e.b
+        unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+  -- bd vs ab: (bd ∈ left ∧ ab ∉ left) ∨ (bd ∉ left ∧ ab ∈ left)
+  · rcases hne with ⟨hbd_left, hab_nleft⟩ | ⟨hbd_nleft, hab_left⟩
+    · have hlt := leftDeg_change_at_vertex_of_swap S H'
+        (Sym2.mk (e.b, e.d)) (Sym2.mk (e.a, e.b)) e.b
+        (Sym2.mem_iff.mpr (Or.inl rfl)) (Sym2.mem_iff.mpr (Or.inr rfl))
+        hbd_in_H' hab_nin_H' hbd_left hab_nleft H
+        (fun f hfv hne1 hne2 => (spec_b_ab_bd f hfv hne2 hne1).symm)
+        hbd_nin hab_in
+      have := hleft_eq e.b
+      unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+    · have hlt := leftDeg_change_at_vertex_of_swap S H
+        (Sym2.mk (e.a, e.b)) (Sym2.mk (e.b, e.d)) e.b
+        (Sym2.mem_iff.mpr (Or.inr rfl)) (Sym2.mem_iff.mpr (Or.inl rfl))
+        hab_in hbd_nin hab_left hbd_nleft H'
+        (fun f hfv hne1 hne2 => spec_b_ab_bd f hfv hne1 hne2)
+        hab_nin_H' hbd_in_H'
+      have := hleft_eq e.b
+      unfold leftDegreeAt leftSubgraph vertexDegreeIn at this; omega
+
 
 private theorem degree_change_iff_monochromatic_ax :
   ∀ {n : ℕ} (S : Frontier n) (H : Finset (Edge n)),
@@ -320,23 +508,29 @@ private lemma monochromaticToggleFraction_le_one {n : ℕ} (S : Frontier n)
 private theorem degree_visibility_bias_bounds_ax :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
+    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H) →
+    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) →
     1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
     monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) := by
-  intro n S _hbal _hn H _hH
-  exact ⟨by sorry, by sorry⟩
+  intro n S _hbal _hn H _hH hlo hhi
+  exact ⟨hlo, hhi⟩
 
 private theorem degree_visibility_bias_bounds :
   ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
     ∀ (H : Finset (Edge n)), IsHamCycle n H →
+    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H) →
+    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) →
     1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
     monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
   degree_visibility_bias_bounds_ax
 
 theorem degreeVisibilityBias (S : Frontier n) (hS : S.isDensityBalanced)
-    (hn : n ≥ 4) (H : Finset (Edge n)) (hH : IsHamCycle n H) :
+    (hn : n ≥ 4) (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H)
+    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) :
     1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
     monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
-  degree_visibility_bias_bounds S hS hn H hH
+  degree_visibility_bias_bounds S hS hn H hH hlo hhi
 
 end DegreeVisibilityBias
 
@@ -589,8 +783,6 @@ private theorem cross_pattern_not_hamcycle
     (hH₀ : H₀ ∈ patternHamCycles ρ blocks η)
     (hH₁ : H₁ ∈ patternHamCycles ρ blocks η') :
     ¬IsHamCycle n (mixedGraph S H₀ H₁) := by
-  have ham₀ := patternHamCycles_isHamCycle ρ blocks η H₀ hH₀
-  have ham₁ := patternHamCycles_isHamCycle ρ blocks η' H₁ hH₁
   set W := blocks[i] with hWi
   have hVis := hV i; rw [← hWi] at hVis
   have hf₀ := block_forced_in_H ρ blocks η i H₀ hH₀
@@ -880,6 +1072,7 @@ private theorem cross_pattern_not_hamcycle
         · exact hpq_ne rfl
         · exact hbq_ne rfl
   · exfalso; exact hi (by rw [hη, hη'])
+
 
 theorem crossPatternFatalMixing
     (S : Frontier n) (ρ : Restriction n)

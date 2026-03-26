@@ -384,6 +384,17 @@ theorem formulaLowerBound_cor83 (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ toInput : Finset (Edge n) → (Fin m → Bool),
       CircuitDecidesHAM F toInput →
+      (∀ (S : Frontier n) (hS : S.isBalanced)
+        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = q ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
   formulaLowerBound hn
 
@@ -392,10 +403,21 @@ private theorem formula_lower_bound_explicit_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (toInput : Finset (Edge n) → (Fin m → Bool)),
     CircuitDecidesHAM F toInput →
+    (∀ (S : Frontier n) (hS : S.isBalanced)
+      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+      ∃ (blocks : List (SwitchBlock n)),
+        blocks.length = q ∧
+        blocksVertexDisjoint blocks ∧
+        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+        ∀ η : Fin blocks.length → Bool,
+          (patternHamCycles ρ blocks η).Nonempty) →
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) := by
-  intro n hn m F hF toInput hCorrect
+  intro n hn m F hF toInput hCorrect hPackingOracle
   by_cases hq : n / (4 * Nat.log 2 n + 4) = 0
-  · have h := formulaSizeSuperpolynomial hn m F hF toInput hCorrect 1 le_rfl (by omega)
+  · have h := formulaSizeSuperpolynomial hn m F hF toInput hCorrect hPackingOracle 1 le_rfl (by omega)
     rw [hq]; norm_num at h ⊢; omega
   · have hq_pos : 1 ≤ n / (4 * Nat.log 2 n + 4) := Nat.one_le_iff_ne_zero.mpr hq
     have hq_bound : n / (4 * Nat.log 2 n + 4) ≤ n / 4 := by
@@ -407,23 +429,45 @@ private theorem formula_lower_bound_explicit_ax :
       calc 4 * k ≤ d * k := Nat.mul_le_mul_right k h1
         _ = k * d := Nat.mul_comm d k
         _ ≤ n := h2
-    exact formulaSizeSuperpolynomial hn m F hF toInput hCorrect _ hq_pos hq_bound
+    exact formulaSizeSuperpolynomial hn m F hF toInput hCorrect hPackingOracle _ hq_pos hq_bound
 
 private theorem formula_lower_bound_explicit_proof
     (hn : n ≥ 4)
     (m : ℕ) (F : BooleanCircuit m) (hF : F.isFormula)
     (toInput : Finset (Edge n) → (Fin m → Bool))
-    (hCorrect : CircuitDecidesHAM F toInput) :
+    (hCorrect : CircuitDecidesHAM F toInput)
+    (hPackingOracle : ∀ (S : Frontier n) (hS : S.isBalanced)
+      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+      ∃ (blocks : List (SwitchBlock n)),
+        blocks.length = q ∧
+        blocksVertexDisjoint blocks ∧
+        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+        ∀ η : Fin blocks.length → Bool,
+          (patternHamCycles ρ blocks η).Nonempty) :
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  formula_lower_bound_explicit_ax hn m F hF toInput hCorrect
+  formula_lower_bound_explicit_ax hn m F hF toInput hCorrect hPackingOracle
 
 theorem formulaLowerBound_exponential (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ toInput : Finset (Edge n) → (Fin m → Bool),
       CircuitDecidesHAM F toInput →
+      (∀ (S : Frontier n) (hS : S.isBalanced)
+        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
+        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
+        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
+        ∃ (blocks : List (SwitchBlock n)),
+          blocks.length = q ∧
+          blocksVertexDisjoint blocks ∧
+          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
+          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
+          ∀ η : Fin blocks.length → Bool,
+            (patternHamCycles ρ blocks η).Nonempty) →
       F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  fun m F hF toInput hCorrect =>
-    formula_lower_bound_explicit_proof hn m F hF toInput hCorrect
+  fun m F hF toInput hCorrect hPackingOracle =>
+    formula_lower_bound_explicit_proof hn m F hF toInput hCorrect hPackingOracle
 
 end FormulaLowerBoundCorollary
 

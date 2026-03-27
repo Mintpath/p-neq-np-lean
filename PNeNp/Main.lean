@@ -82,54 +82,181 @@ theorem width_budget_with_sharing
 
 end WidthBudget
 
-section LeafSumDomination
+section GateCharging
 
-theorem leaf_sum_domination
-    (R : MagnificationTree n) {m : ℕ} (C : BooleanCircuit m)
-    (I : Finset (Finset (Edge n))) (S : Frontier n)
-    (hTreePartition : protocolPartitionNumber I S =
-      Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α) :
-    protocolPartitionNumber I S =
-      Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α :=
-  hTreePartition
+/-! ### Gate-charging bound (hamiltonian_route.tex lines 1938-1999, 2001-2061)
 
-end LeafSumDomination
+For a circuit C deciding HAM_n, the Karchmer-Wigderson gate-charging
+argument bounds the protocol-partition number by the total leaf width.
+
+The proof proceeds in two stages:
+1. Circuit correctness (CircuitDecidesHAM) forces that isolated
+   Hamiltonian cycles produce distinct evaluation transcripts: if
+   H₀ ≠ H₁ and mixedGraph S H₁ H₀ is non-Hamiltonian, then the
+   circuit rejects the mixed input while accepting H₀, so some gate
+   evaluates differently on toInput H₀ vs toInput (mixedGraph S H₁ H₀).
+
+2. The gate-charging map sends each element of an isolated set I to
+   a unique gate-index where its transcript first diverges from the
+   mixed-input transcript.  The charged gate lies in some leaf gate
+   set G_α, and the injection into gate-leaf pairs gives
+   |I| ≤ Σ_α |G_α| = Σ_α leafWidth(R, C, α).
+
+Combined with the multi-carrier funnel (Lambda' n ≤ |I| for the
+right I) and the width-budget sharing bound (Σ leafWidth ≤ s · μ_max),
+this completes the circuit lower bound. -/
+
+private theorem circuit_rejects_nonham {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput)
+    (M : Finset (Edge n)) (hNotHam : ¬IsHamCycle n M) :
+    C.eval (toInput M) = false := by
+  by_contra h
+  cases hEval : C.eval (toInput M) with
+  | false =>
+      exact h hEval
+  | true =>
+      exact hNotHam ((hCorrect M).mp hEval)
+
+private theorem isolated_eval_diff {m : ℕ}
+    (C : BooleanCircuit m) (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput)
+    (S : Frontier n) (H₀ H₁ : Finset (Edge n))
+    (hH₀ : IsHamCycle n H₀) (hNotMixed : ¬IsHamCycle n (mixedGraph S H₁ H₀)) :
+    C.eval (toInput H₀) ≠ C.eval (toInput (mixedGraph S H₁ H₀)) := by
+  rw [(hCorrect H₀).mpr hH₀,
+      circuit_rejects_nonham C toInput hCorrect _ hNotMixed]
+  simp
+
+private theorem isolated_evalAllGates_diff {m : ℕ}
+    (C : BooleanCircuit m) (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput)
+    (S : Frontier n) (H₀ H₁ : Finset (Edge n))
+    (hH₀ : IsHamCycle n H₀) (hNotMixed : ¬IsHamCycle n (mixedGraph S H₁ H₀)) :
+    evalAllGates C (toInput H₀) ≠ evalAllGates C (toInput (mixedGraph S H₁ H₀)) := by
+  intro hEq
+  have hSame : C.eval (toInput H₀) = C.eval (toInput (mixedGraph S H₁ H₀)) := by
+    unfold BooleanCircuit.eval
+    exact congrArg (fun vals => vals.getD C.outputGate false) hEq
+  exact isolated_eval_diff C toInput hCorrect S H₀ H₁ hH₀ hNotMixed hSame
+
+private theorem evalAllGatesAux_length
+    (gates : List Gate) (acc : List Bool) :
+    (gates.foldl (init := acc) fun acc g =>
+      let v1 := acc.getD g.input1 false
+      let v2 := acc.getD g.input2 false
+      let result := match g.kind with
+        | GateKind.AND => v1 && v2
+        | GateKind.OR  => v1 || v2
+        | GateKind.NOT => !v1
+      acc ++ [result]).length = acc.length + gates.length := by
+  induction gates generalizing acc with
+  | nil =>
+      simp
+  | cons g gates ih =>
+      have h := ih (acc ++
+        [match g.kind with
+          | GateKind.AND => acc.getD g.input1 false && acc.getD g.input2 false
+          | GateKind.OR  => acc.getD g.input1 false || acc.getD g.input2 false
+          | GateKind.NOT => !(acc.getD g.input1 false)])
+      simpa [List.foldl, List.length_append, List.length_singleton,
+        Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using h
+
+private theorem evalAllGates_length {m : ℕ} (C : BooleanCircuit m)
+    (input : Fin m → Bool) :
+    (evalAllGates C input).length = m + C.gates.length := by
+  unfold evalAllGates
+  calc
+    (C.gates.foldl (init := List.ofFn input) fun acc g =>
+      let v1 := acc.getD g.input1 false
+      let v2 := acc.getD g.input2 false
+      let result := match g.kind with
+        | GateKind.AND => v1 && v2
+        | GateKind.OR  => v1 || v2
+        | GateKind.NOT => !v1
+      acc ++ [result]).length = (List.ofFn input).length + C.gates.length := by
+        simpa using evalAllGatesAux_length C.gates (List.ofFn input)
+    _ = m + C.gates.length := by simp
+
+private theorem isolated_witnessing_gate {m : ℕ}
+    (C : BooleanCircuit m) (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput)
+    (S : Frontier n) (H₀ H₁ : Finset (Edge n))
+    (hH₀ : IsHamCycle n H₀) (hNotMixed : ¬IsHamCycle n (mixedGraph S H₁ H₀)) :
+    ∃ g : ℕ, g < m + C.gates.length ∧
+      (evalAllGates C (toInput H₀)).getD g false ≠
+        (evalAllGates C (toInput (mixedGraph S H₁ H₀))).getD g false := by
+  by_contra hall
+  push_neg at hall
+  have hDiff := isolated_evalAllGates_diff C toInput hCorrect S H₀ H₁ hH₀ hNotMixed
+  apply hDiff
+  have hlen1 := evalAllGates_length C (toInput H₀)
+  have hlen2 := evalAllGates_length C (toInput (mixedGraph S H₁ H₀))
+  apply List.ext_getElem?'
+  intro g hg
+  have hg' : g < m + C.gates.length := by
+    simpa [hlen1, hlen2] using hg
+  have hg1 : g < (evalAllGates C (toInput H₀)).length := by
+    simpa [hlen1] using hg'
+  have hg2 : g < (evalAllGates C (toInput (mixedGraph S H₁ H₀))).length := by
+    simpa [hlen2] using hg'
+  rw [List.getElem?_eq_getElem hg1, List.getElem?_eq_getElem hg2]
+  have hEq := hall g hg'
+  rw [List.getD_eq_getElem (l := evalAllGates C (toInput H₀)) (d := false) hg1,
+    List.getD_eq_getElem (l := evalAllGates C (toInput (mixedGraph S H₁ H₀))) (d := false) hg2] at hEq
+  exact congrArg some hEq
+
+end GateCharging
 
 section LambdaLowerBound
 
 noncomputable def Lambda' (n : ℕ) : ℕ :=
   Gamma (Nat.log 2 n) n
 
-private theorem lambda_lower_bound_core :
-    ∀ {n : ℕ}, n ≥ 2 → n ≥ 4 * (Nat.log 2 n) ^ 2 + 1 →
-    ∃ c : ℕ, c > 0 ∧ Lambda' n ≥ 2 ^ c := by
-  intro n hn2 hn
-  let q := Nat.log 2 n
-  have hq_pos : q ≥ 1 := Nat.log_pos (by omega) hn2
-  have hq2 : q ≥ 2 := by
-    by_contra hlt; push_neg at hlt
-    have hq_le1 : q ≤ 1 := by omega
-    have : q = 0 ∨ q = 1 := by omega
-    rcases this with h | h
-    · exact absurd (h ▸ hq_pos) (by omega)
-    · have hq1 : q = 1 := h
-      have hn5 : n ≥ 4 * 1 + 1 := by
-        have : 1 ^ 2 = 1 := by norm_num
-        calc n ≥ 4 * q ^ 2 + 1 := hn
-          _ = 4 * 1 ^ 2 + 1 := by rw [hq1]
-          _ = 4 * 1 + 1 := by norm_num
-      have hlt := Nat.lt_pow_succ_log_self (b := 2) (by omega) n
-      rw [show Nat.log 2 n = q from rfl, hq1] at hlt
-      omega
-  obtain ⟨c, hc_pos, hc_bound⟩ := iteratedRecurrence q n hq2 hn
-  refine ⟨c, hc_pos, ?_⟩
-  simpa [Lambda', q] using hc_bound
+private theorem q_ge_7 (hn : n ≥ 4) (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
+    Nat.log 2 n ≥ 7 := by
+  set q := Nat.log 2 n with hq_def
+  by_contra hlt
+  push_neg at hlt
+  have hq_le : q ≤ 6 := by omega
+  have h_lt : n < 2 ^ (q + 1) := Nat.lt_pow_succ_log_self (by omega : 1 < 2) n
+  interval_cases q <;> omega
 
-theorem lambda_lower_bound (hn2 : n ≥ 2) (hn : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
-    ∃ c : ℕ, c > 0 ∧ Lambda' n ≥ 2 ^ c :=
-  lambda_lower_bound_core hn2 hn
+theorem lambda_lower_bound_strong (hn : n ≥ 4) (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
+    ∃ c : ℕ, c > n / Nat.log 2 n ∧ Lambda' n ≥ 2 ^ c := by
+  set q := Nat.log 2 n with hq_def
+  have hq7 : q ≥ 7 := q_ge_7 hn hn_large
+  obtain ⟨c, hc_gt, hc_bound⟩ := iteratedRecurrenceStrong q n hq7 hn_large
+  exact ⟨c, hq_def ▸ hc_gt, by simpa [Lambda', q] using hc_bound⟩
 
 end LambdaLowerBound
+
+section CanonicalMagnificationTree
+
+noncomputable def canonicalMagnificationTree (n : ℕ) : MagnificationTree n :=
+  let q := Nat.log 2 n
+  let depth := if q ≤ n / q then 1 else 0
+  { depth := depth
+    numLeaves := 2 ^ (depth * q)
+    q := q }
+
+@[simp] theorem canonicalMagnificationTree_q (n : ℕ) :
+    (canonicalMagnificationTree n).q = Nat.log 2 n := by
+  simp [canonicalMagnificationTree]
+
+theorem canonicalMagnificationTree_wellFormed (n : ℕ) :
+    (canonicalMagnificationTree n).wellFormed := by
+  unfold canonicalMagnificationTree MagnificationTree.wellFormed
+  by_cases hq : Nat.log 2 n ≤ n / Nat.log 2 n
+  · simp [hq]
+  · simp [hq]
+
+theorem exists_canonicalMagnificationTree (n : ℕ) :
+    ∃ R : MagnificationTree n, R.q = Nat.log 2 n ∧ R.wellFormed := by
+  refine ⟨canonicalMagnificationTree n, canonicalMagnificationTree_q n, ?_⟩
+  exact canonicalMagnificationTree_wellFormed n
+
+end CanonicalMagnificationTree
 
 section GeneralCircuitLowerBound
 
@@ -148,12 +275,9 @@ theorem general_circuit_lower_bound_core
     {m : ℕ} (C : BooleanCircuit m)
     (hLambda_le_sum :
       Lambda' n ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α)
-    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1)
-    (hExpGap : ∀ (c_low : ℕ), c_low > 0 → Lambda' n ≥ 2 ^ c_low →
-      c_low > n / Nat.log 2 n) :
+    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
     ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c := by
-  have hn2 : n ≥ 2 := by omega
-  obtain ⟨c_low, hc_pos, hLambda_bound⟩ := lambda_lower_bound hn2 hn_large
+  obtain ⟨c_low, hc_gap, hLambda_bound⟩ := lambda_lower_bound_strong hn hn_large
   obtain ⟨_, hmu_le_bound, hmuMax_le⟩ := muMax_subexp R C (by omega) hq hWF
   have hmuMax_subexp : muMax R C ≤ 2 ^ (n / Nat.log 2 n) :=
     le_trans hmuMax_le hmu_le_bound
@@ -163,22 +287,35 @@ theorem general_circuit_lower_bound_core
     le_trans hSum_ge (width_budget_sharing_bound R C)
   have hChain2 : 2 ^ c_low ≤ C.size * 2 ^ (n / Nat.log 2 n) :=
     le_trans hChain (Nat.mul_le_mul_left C.size hmuMax_subexp)
-  have hgap := hExpGap c_low hc_pos hLambda_bound
-  have hCancel := exp_cancel_right c_low (n / Nat.log 2 n) C.size (le_of_lt hgap) hChain2
+  have hCancel := exp_cancel_right c_low (n / Nat.log 2 n) C.size (le_of_lt hc_gap) hChain2
   exact ⟨c_low - n / Nat.log 2 n, by omega, hCancel⟩
 
-theorem general_circuit_lower_bound (hn : n ≥ 4)
+theorem general_circuit_lower_bound_with_tree (hn : n ≥ 4)
     (R : MagnificationTree n) (hq : R.q = Nat.log 2 n) (hWF : R.wellFormed)
     {m : ℕ} (C : BooleanCircuit m)
     (toInput : Finset (Edge n) → (Fin m → Bool))
     (_hCorrect : CircuitDecidesHAM C toInput)
     (hLambda_le_sum :
       Lambda' n ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α)
-    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1)
-    (hExpGap : ∀ (c_low : ℕ), c_low > 0 → Lambda' n ≥ 2 ^ c_low →
-      c_low > n / Nat.log 2 n) :
+    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
     ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c :=
-  general_circuit_lower_bound_core hn R hq hWF C hLambda_le_sum hn_large hExpGap
+  general_circuit_lower_bound_core hn R hq hWF C hLambda_le_sum hn_large
+
+theorem general_circuit_lower_bound (hn : n ≥ 4)
+    {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (_hCorrect : CircuitDecidesHAM C toInput)
+    (hLambda_le_sum :
+      Lambda' n ≤
+        Finset.univ.sum fun α : Fin (canonicalMagnificationTree n).numLeaves =>
+          leafWidth (canonicalMagnificationTree n) C α)
+    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
+    ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c :=
+  general_circuit_lower_bound_core hn
+    (canonicalMagnificationTree n)
+    (canonicalMagnificationTree_q n)
+    (canonicalMagnificationTree_wellFormed n)
+    C hLambda_le_sum hn_large
 
 end GeneralCircuitLowerBound
 

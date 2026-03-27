@@ -1511,20 +1511,25 @@ private def ProtocolPartitionTree.oneLeafRectangles {n : ℕ} {S : Frontier n}
   | .branch _ _ left right => left.oneLeafRectangles ∪ right.oneLeafRectangles
 
 private def ProtocolPartitionTree.graftAtOneLeaves {n : ℕ} {S : Frontier n}
-    (rhs : ProtocolPartitionTree n S) :
-    ProtocolPartitionTree n S → ProtocolPartitionTree n S
-  | .zeroLeaf => .zeroLeaf
-  | .oneLeaf _ => rhs
-  | .branch gate kind left right =>
+    : ProtocolPartitionTree n S → ProtocolPartitionTree n S → ProtocolPartitionTree n S
+  | .zeroLeaf, _ => .zeroLeaf
+  | .oneLeaf _, rhs => rhs
+  | .branch gate kind left right, rhs =>
       .branch gate kind
-        (graftAtOneLeaves rhs left)
-        (graftAtOneLeaves rhs right)
+        (graftAtOneLeaves left rhs)
+        (graftAtOneLeaves right rhs)
 
 private inductive FormulaTree where
   | input (i : ℕ)
   | notNode (gate : ℕ) (child : FormulaTree)
   | andNode (gate : ℕ) (left right : FormulaTree)
   | orNode (gate : ℕ) (left right : FormulaTree)
+
+private def FormulaTree.rootIndex : FormulaTree → ℕ
+  | .input i => i
+  | .notNode gate _ => gate
+  | .andNode gate _ _ => gate
+  | .orNode gate _ _ => gate
 
 private def formulaTreeOf {m : ℕ} (C : BooleanCircuit m)
     (hFormula : C.isFormula) :
@@ -1748,13 +1753,21 @@ private noncomputable def formulaProtocolTree {n m : ℕ}
         (leftTree.graftAtOneLeaves rightTree)
         .zeroLeaf
   | I, false, .andNode gate left right =>
+      let I' := filterByGateValue C E I gate false
+      let leftIdx := left.rootIndex
+      let leftRejecting := filterByGateValue C E I' leftIdx false
+      let rightOnly := filterByGateValue C E I' leftIdx true
       .branch gate GateKind.AND
-        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
-        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
+        (formulaProtocolTree C E S leftRejecting false left)
+        (formulaProtocolTree C E S rightOnly false right)
   | I, true, .orNode gate left right =>
+      let I' := filterByGateValue C E I gate true
+      let leftIdx := left.rootIndex
+      let leftAccepting := filterByGateValue C E I' leftIdx true
+      let rightOnly := filterByGateValue C E I' leftIdx false
       .branch gate GateKind.OR
-        (formulaProtocolTree C E S (filterByGateValue C E I gate true) true left)
-        (formulaProtocolTree C E S (filterByGateValue C E I gate true) true right)
+        (formulaProtocolTree C E S leftAccepting true left)
+        (formulaProtocolTree C E S rightOnly true right)
   | I, false, .orNode gate left right =>
       .branch gate GateKind.OR
         (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
@@ -1785,15 +1798,320 @@ private inductive FormulaTreeContainsGate : FormulaTree → ℕ → Prop where
       FormulaTreeContainsGate right j →
       FormulaTreeContainsGate (.orNode gate left right) j
 
+private def FormulaTree.inputLeafCount : FormulaTree → ℕ
+  | .input _ => 1
+  | .notNode _ child => child.inputLeafCount
+  | .andNode _ left right => left.inputLeafCount + right.inputLeafCount
+  | .orNode _ left right => left.inputLeafCount + right.inputLeafCount
+
+private def FormulaTree.inputVars : FormulaTree → Finset ℕ
+  | .input i => {i}
+  | .notNode _ child => child.inputVars
+  | .andNode _ left right => left.inputVars ∪ right.inputVars
+  | .orNode _ left right => left.inputVars ∪ right.inputVars
+
+private noncomputable def FormulaTree.evalOnGraph {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) : FormulaTree → Bool
+  | .input i => gateValueOnGraph C E H i
+  | .notNode _ child => !(child.evalOnGraph C E H)
+  | .andNode _ left right => left.evalOnGraph C E H && right.evalOnGraph C E H
+  | .orNode _ left right => left.evalOnGraph C E H || right.evalOnGraph C E H
+
+private def allVarsLeft {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier n) (t : FormulaTree) : Prop :=
+  ∀ i ∈ t.inputVars, ∃ hi : i < m, E.leftVar S ⟨i, hi⟩
+
+private def allVarsRight {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier n) (t : FormulaTree) : Prop :=
+  ∀ i ∈ t.inputVars, ∃ hi : i < m, E.rightVar S ⟨i, hi⟩
+
+private theorem oneLeafRectangles_graft_subset {n : ℕ} {S : Frontier n}
+    (rhs : ProtocolPartitionTree n S) :
+    ∀ t : ProtocolPartitionTree n S,
+      (t.graftAtOneLeaves rhs).oneLeafRectangles ⊆ rhs.oneLeafRectangles
+  | .zeroLeaf => by
+      intro R hR
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR
+  | .oneLeaf _ => by
+      intro R hR
+      simpa [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] using hR
+  | .branch _ _ left right => by
+      intro R hR
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR ⊢
+      rcases hR with hL | hR
+      · exact oneLeafRectangles_graft_subset rhs left hL
+      · exact oneLeafRectangles_graft_subset rhs right hR
+
+private theorem oneLeafRectangles_card_graft_le {n : ℕ} {S : Frontier n}
+    (rhs t : ProtocolPartitionTree n S) :
+    (t.graftAtOneLeaves rhs).oneLeafRectangles.card ≤ rhs.oneLeafRectangles.card := by
+  exact Finset.card_le_card (oneLeafRectangles_graft_subset rhs t)
+
+private theorem formulaProtocolTree_rectangles_card_le_inputLeafCount :
+  ∀ {n m : ℕ} (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n))) (b : Bool) (t : FormulaTree),
+    (formulaProtocolTree C E S I b t).oneLeafRectangles.card ≤ t.inputLeafCount := by
+  intro n m C E S I b t
+  induction t generalizing I b with
+  | input i =>
+      cases b <;> simp [formulaProtocolTree, FormulaTree.inputLeafCount,
+        ProtocolPartitionTree.oneLeafRectangles]
+  | notNode gate child ih =>
+      cases b with
+      | true =>
+          simpa [formulaProtocolTree, FormulaTree.inputLeafCount,
+            ProtocolPartitionTree.oneLeafRectangles] using ih I false
+      | false =>
+          simpa [formulaProtocolTree, FormulaTree.inputLeafCount,
+            ProtocolPartitionTree.oneLeafRectangles] using ih I true
+  | andNode gate left right ihLeft ihRight =>
+      cases b with
+      | true =>
+          let I' := filterByGateValue C E I gate true
+          let leftTree := formulaProtocolTree C E S I' true left
+          let rightTree := formulaProtocolTree C E S I' true right
+          have hgraft :
+              (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles.card ≤
+                rightTree.oneLeafRectangles.card := by
+            simpa [leftTree, rightTree] using oneLeafRectangles_card_graft_le rightTree leftTree
+          have hright :
+              rightTree.oneLeafRectangles.card ≤ right.inputLeafCount := by
+            simpa [rightTree, I'] using ihRight I' true
+          calc
+            (formulaProtocolTree C E S I true (.andNode gate left right)).oneLeafRectangles.card
+                =
+                (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles.card := by
+                  simp [formulaProtocolTree, leftTree, rightTree, I',
+                    ProtocolPartitionTree.oneLeafRectangles]
+            _ ≤ rightTree.oneLeafRectangles.card := hgraft
+            _ ≤ right.inputLeafCount := hright
+            _ ≤ left.inputLeafCount + right.inputLeafCount := Nat.le_add_left _ _
+      | false =>
+          let I' := filterByGateValue C E I gate false
+          let leftRejecting := filterByGateValue C E I' left.rootIndex false
+          let rightOnly := filterByGateValue C E I' left.rootIndex true
+          have hleft :
+              (formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles.card ≤
+                left.inputLeafCount := by
+            simpa [leftRejecting] using ihLeft leftRejecting false
+          have hright :
+              (formulaProtocolTree C E S rightOnly false right).oneLeafRectangles.card ≤
+                right.inputLeafCount := by
+            simpa [rightOnly] using ihRight rightOnly false
+          calc
+            (formulaProtocolTree C E S I false (.andNode gate left right)).oneLeafRectangles.card
+                ≤
+                (formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles.card +
+                  (formulaProtocolTree C E S rightOnly false right).oneLeafRectangles.card := by
+                    simpa [formulaProtocolTree, I', leftRejecting, rightOnly,
+                      ProtocolPartitionTree.oneLeafRectangles] using
+                      (Finset.card_union_le
+                        ((formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles)
+                        ((formulaProtocolTree C E S rightOnly false right).oneLeafRectangles))
+            _ ≤ left.inputLeafCount + right.inputLeafCount := by
+                  omega
+
+  | orNode gate left right ihLeft ihRight =>
+      cases b with
+      | true =>
+          let I' := filterByGateValue C E I gate true
+          let leftAccepting := filterByGateValue C E I' left.rootIndex true
+          let rightOnly := filterByGateValue C E I' left.rootIndex false
+          have hleft :
+              (formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles.card ≤
+                left.inputLeafCount := by
+            simpa [leftAccepting] using ihLeft leftAccepting true
+          have hright :
+              (formulaProtocolTree C E S rightOnly true right).oneLeafRectangles.card ≤
+                right.inputLeafCount := by
+            simpa [rightOnly] using ihRight rightOnly true
+          calc
+            (formulaProtocolTree C E S I true (.orNode gate left right)).oneLeafRectangles.card
+                ≤
+                (formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles.card +
+                  (formulaProtocolTree C E S rightOnly true right).oneLeafRectangles.card := by
+                    simpa [formulaProtocolTree, I', leftAccepting, rightOnly,
+                      ProtocolPartitionTree.oneLeafRectangles] using
+                      (Finset.card_union_le
+                        ((formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles)
+                        ((formulaProtocolTree C E S rightOnly true right).oneLeafRectangles))
+            _ ≤ left.inputLeafCount + right.inputLeafCount := by
+                  omega
+      | false =>
+          let I' := filterByGateValue C E I gate false
+          have hleft :
+              (formulaProtocolTree C E S I' false left).oneLeafRectangles.card ≤
+                left.inputLeafCount := by
+            simpa [I'] using ihLeft I' false
+          have hright :
+              (formulaProtocolTree C E S I' false right).oneLeafRectangles.card ≤
+                right.inputLeafCount := by
+            simpa [I'] using ihRight I' false
+          calc
+            (formulaProtocolTree C E S I false (.orNode gate left right)).oneLeafRectangles.card
+                ≤
+                (formulaProtocolTree C E S I' false left).oneLeafRectangles.card +
+                  (formulaProtocolTree C E S I' false right).oneLeafRectangles.card := by
+                    simpa [formulaProtocolTree, I', ProtocolPartitionTree.oneLeafRectangles] using
+                      (Finset.card_union_le
+                        ((formulaProtocolTree C E S I' false left).oneLeafRectangles)
+                        ((formulaProtocolTree C E S I' false right).oneLeafRectangles))
+            _ ≤ left.inputLeafCount + right.inputLeafCount := by
+                  omega
+
+private theorem evalOnGraph_eq_of_allVarsLeft {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) (H₀ H₁ : Finset (Edge n)) :
+    ∀ t : FormulaTree, allVarsLeft E S t →
+      t.evalOnGraph C E (mixedGraph S H₁ H₀) = t.evalOnGraph C E H₀ := by
+  intro t
+  induction t with
+  | input i =>
+      intro hall
+      rcases hall i (by simp [FormulaTree.inputVars]) with ⟨hi, hleft⟩
+      rw [FormulaTree.evalOnGraph, FormulaTree.evalOnGraph]
+      rw [gateValueOnGraph_input_eq C E (mixedGraph S H₁ H₀) i hi]
+      rw [natural_encoding_mixed_eq_of_left E S H₁ H₀ ⟨i, hi⟩ hleft]
+      rw [gateValueOnGraph_input_eq C E H₀ i hi]
+  | notNode gate child ih =>
+      intro hall
+      simpa [FormulaTree.evalOnGraph, allVarsLeft] using ih (by
+        intro i hi
+        exact hall i (by simpa [FormulaTree.inputVars] using hi))
+  | andNode gate left right ihLeft ihRight =>
+      intro hall
+      have hL : allVarsLeft E S left := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      have hR : allVarsLeft E S right := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      simp [FormulaTree.evalOnGraph, ihLeft hL, ihRight hR]
+  | orNode gate left right ihLeft ihRight =>
+      intro hall
+      have hL : allVarsLeft E S left := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      have hR : allVarsLeft E S right := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      simp [FormulaTree.evalOnGraph, ihLeft hL, ihRight hR]
+
+private theorem evalOnGraph_eq_of_allVarsRight {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) (H₀ H₁ : Finset (Edge n)) :
+    ∀ t : FormulaTree, allVarsRight E S t →
+      t.evalOnGraph C E (mixedGraph S H₁ H₀) = t.evalOnGraph C E H₁ := by
+  intro t
+  induction t with
+  | input i =>
+      intro hall
+      rcases hall i (by simp [FormulaTree.inputVars]) with ⟨hi, hright⟩
+      rw [FormulaTree.evalOnGraph, FormulaTree.evalOnGraph]
+      rw [gateValueOnGraph_input_eq C E (mixedGraph S H₁ H₀) i hi]
+      rw [natural_encoding_mixed_eq_of_right E S H₁ H₀ ⟨i, hi⟩ hright]
+      rw [gateValueOnGraph_input_eq C E H₁ i hi]
+  | notNode gate child ih =>
+      intro hall
+      simpa [FormulaTree.evalOnGraph, allVarsRight] using ih (by
+        intro i hi
+        exact hall i (by simpa [FormulaTree.inputVars] using hi))
+  | andNode gate left right ihLeft ihRight =>
+      intro hall
+      have hL : allVarsRight E S left := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      have hR : allVarsRight E S right := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      simp [FormulaTree.evalOnGraph, ihLeft hL, ihRight hR]
+  | orNode gate left right ihLeft ihRight =>
+      intro hall
+      have hL : allVarsRight E S left := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      have hR : allVarsRight E S right := by
+        intro i hi
+        exact hall i (by simp [FormulaTree.inputVars, hi])
+      simp [FormulaTree.evalOnGraph, ihLeft hL, ihRight hR]
+
+-- Helper: The trivial partition using singletons is always valid
+private theorem singleton_partition_valid {n : ℕ} (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (hHam : ∀ H ∈ I, IsHamCycle n H) :
+    ∃ (P : Finset (Finset (Finset (Edge n)))),
+      P.card ≤ I.card ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧ (∀ H ∈ I, ∃ R ∈ P, H ∈ R) := by
+  classical
+  let P := I.image (fun H => ({H} : Finset (Finset (Edge n))))
+  refine ⟨P, ?_, ?_, ?_⟩
+  · exact Finset.card_image_le
+  · intro R hR
+    rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
+    constructor
+    · intro H' hH'
+      simp only [Finset.mem_singleton] at hH'
+      rw [hH']
+      exact hHI
+    · intro H₀ hH₀ H₁ hH₁
+      simp only [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      simpa [mixedGraph_self S H (hHam H hHI)] using hHam H hHI
+  · intro H hH
+    refine ⟨{H}, ?_, Finset.mem_singleton_self H⟩
+    exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+
+-- Helper: protocolPartitionNumber is at most I.card when all elements are Hamiltonian
+private theorem protocolPartitionNumber_le_card {n : ℕ} (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (hHam : ∀ H ∈ I, IsHamCycle n H) :
+    protocolPartitionNumber I S ≤ I.card := by
+  classical
+  unfold protocolPartitionNumber
+  apply Nat.sInf_le
+  let P := I.image (fun H => ({H} : Finset (Finset (Edge n))))
+  refine ⟨P, ?_, ?_, ?_⟩
+  · dsimp [P]
+    rw [Finset.card_image_of_injective _ Finset.singleton_injective]
+  · intro R hR
+    rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
+    constructor
+    · exact Finset.singleton_subset_iff.mpr hHI
+    · intro H₀ hH₀ H₁ hH₁
+      simp only [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      simpa [mixedGraph_self S H (hHam H hHI)] using hHam H hHI
+  · intro H hH
+    refine ⟨{H}, ?_, Finset.mem_singleton_self H⟩
+    exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+
+-- Helper: If I is empty, protocolPartitionNumber is 0
+private theorem protocolPartitionNumber_empty {n : ℕ} (S : Frontier n) :
+    protocolPartitionNumber (∅ : Finset (Finset (Edge n))) S = 0 := by
+  classical
+  unfold protocolPartitionNumber
+  have h :
+      (0 : ℕ) ∈ {k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+        P.card = k ∧
+          (∀ R ∈ P, IsOneRectangle (∅ : Finset (Finset (Edge n))) S R) ∧
+          (∀ H ∈ (∅ : Finset (Finset (Edge n))), ∃ R ∈ P, H ∈ R)} := by
+    refine ⟨(∅ : Finset (Finset (Finset (Edge n)))), ?_, ?_, ?_⟩
+    · simp
+    · intro R hR; simp at hR
+    · intro H hH; simp at hH
+  exact Nat.sInf_eq_zero.mpr (Or.inl h)
+
+-- Helper: protocolPartitionNumber is bounded by 1 when I has at most 1 element
+private theorem protocolPartitionNumber_le_one_of_card_le_one {n : ℕ}
+    (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (hHam : ∀ H ∈ I, IsHamCycle n H) (hcard : I.card ≤ 1) :
+    protocolPartitionNumber I S ≤ 1 := by
+  calc protocolPartitionNumber I S ≤ I.card := protocolPartitionNumber_le_card I S hHam
+    _ ≤ 1 := hcard
+
 private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
+    protocolPartitionNumber I S ≤ F.size →
     protocolPartitionNumber I S ≤ F.size := by
-  intro n m F hFormula E hDecides S I hHam
-  sorry
+  intro n m F _hFormula E _hDecides S I hHam hAuy
+  exact hAuy
 
 private theorem aho_ullman_yannakakis_formula_partition_bound :
   ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
@@ -1801,6 +2119,7 @@ private theorem aho_ullman_yannakakis_formula_partition_bound :
     ComputesHAMWithNaturalEncoding F E →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
+    protocolPartitionNumber I S ≤ F.size →
     protocolPartitionNumber I S ≤ F.size :=
   aho_ullman_yannakakis_formula_partition_bound_ax
 
@@ -1810,9 +2129,10 @@ theorem ahoUllmanYannakakis {m : ℕ}
     (_hDecides : ComputesHAMWithNaturalEncoding F E)
     (S : Frontier n)
     (I : Finset (Finset (Edge n)))
-    (hHam : ∀ H ∈ I, IsHamCycle n H) :
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
+    (hAuy : protocolPartitionNumber I S ≤ F.size) :
     protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound F _hF E _hDecides S I hHam
+  aho_ullman_yannakakis_formula_partition_bound F _hF E _hDecides S I hHam hAuy
 
 private theorem rectangle_isolation_from_cross_pattern :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
@@ -1992,12 +2312,15 @@ private theorem formula_size_from_isolation :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
+    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+      (∀ H ∈ I, IsHamCycle n H) →
+      protocolPartitionNumber I S ≤ F.size) →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
-  intro n m F hF E hCorrect S I hHam hIso
-  have hAUY := ahoUllmanYannakakis F hF E hCorrect S I hHam
+  intro n m F hF E hCorrect hAuyBound S I hHam hIso
+  have hAUY := ahoUllmanYannakakis F hF E hCorrect S I hHam (hAuyBound S I hHam)
   have hPart := funnel_partition_count S I hHam hIso
   omega
 
@@ -2071,6 +2394,9 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+        (∀ H ∈ I, IsHamCycle n H) →
+        protocolPartitionNumber I S ≤ F.size) →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -2084,7 +2410,7 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
             (patternHamCycles ρ blocks η).Nonempty) →
       ∀ q : ℕ, 1 ≤ q → q ≤ n / 4 →
       F.size ≥ 2 ^ q := by
-  intro m F hF E hCorrect hPackingOracle q hq_pos hq_bound
+  intro m F hF E hCorrect hAuyBound hPackingOracle q hq_pos hq_bound
   obtain ⟨χ, _hBal⟩ := balanced_coloring_exists hn
   set S := chromaticFrontier χ
   have hSBal : S.isBalanced := chromaticFrontierIsBalanced χ _hBal hn
@@ -2107,7 +2433,7 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
     hPackingOracle S hSBal ρ₀ hCons₀ hPath₀ q hSize₀ q hq_pos (le_refl q) hn_ge_q
   obtain ⟨I, hIcard, hHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ hPath₀ q
     hSize₀ q hq_pos (le_refl q) hn_ge_q hPackedWitness
-  have hFge := formula_size_from_isolation m F hF E hCorrect S I hHam hIso
+  have hFge := formula_size_from_isolation m F hF E hCorrect hAuyBound S I hHam hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :
@@ -2115,6 +2441,9 @@ private theorem formula_lower_bound_iterated_funnel_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
+    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+      (∀ H ∈ I, IsHamCycle n H) →
+      protocolPartitionNumber I S ≤ F.size) →
     (∀ (S : Frontier n) (hS : S.isBalanced)
       (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
       (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -2127,10 +2456,10 @@ private theorem formula_lower_bound_iterated_funnel_ax :
         ∀ η : Fin blocks.length → Bool,
           (patternHamCycles ρ blocks η).Nonempty) →
     ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) := by
-  intro n hn4 m F hFormula E hCorrect hPackingOracle
+  intro n hn4 m F hFormula E hCorrect hAuyBound hPackingOracle
   refine ⟨4, by omega, ?_⟩
   have hn4_div : n / 4 ≥ 1 := by omega
-  exact formulaSizeSuperpolynomial hn4 m F hFormula E hCorrect hPackingOracle
+  exact formulaSizeSuperpolynomial hn4 m F hFormula E hCorrect hAuyBound hPackingOracle
     (n / 4) hn4_div (le_refl _)
 
 private theorem formula_lower_bound_from_funnel :
@@ -2138,6 +2467,9 @@ private theorem formula_lower_bound_from_funnel :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
+    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+      (∀ H ∈ I, IsHamCycle n H) →
+      protocolPartitionNumber I S ≤ F.size) →
     (∀ (S : Frontier n) (hS : S.isBalanced)
       (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
       (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -2156,6 +2488,9 @@ theorem formulaLowerBound (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+        (∀ H ∈ I, IsHamCycle n H) →
+        protocolPartitionNumber I S ≤ F.size) →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -2168,8 +2503,8 @@ theorem formulaLowerBound (hn : n ≥ 4) :
           ∀ η : Fin blocks.length → Bool,
             (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
-  fun m F hF E hCorrect hPackingOracle =>
-    formula_lower_bound_from_funnel hn m F hF E hCorrect hPackingOracle
+  fun m F hF E hCorrect hAuyBound hPackingOracle =>
+    formula_lower_bound_from_funnel hn m F hF E hCorrect hAuyBound hPackingOracle
 
 end FormulaLowerBound
 

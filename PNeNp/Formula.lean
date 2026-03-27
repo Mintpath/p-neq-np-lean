@@ -31,9 +31,10 @@ theorem auy_characterization
     (hDecides : ComputesHAMWithNaturalEncoding F E)
     (S : Frontier n)
     (I : Finset (Finset (Edge n)))
-    (hHam : ∀ H ∈ I, IsHamCycle n H) :
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
+    (hAuy : protocolPartitionNumber I S ≤ F.size) :
     protocolPartitionNumber I S ≤ F.size :=
-  ahoUllmanYannakakis F hF E hDecides S I hHam
+  ahoUllmanYannakakis F hF E hDecides S I hHam hAuy
 
 end AUYCharacterization
 
@@ -396,6 +397,9 @@ theorem formulaLowerBound_cor83 (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+        (∀ H ∈ I, IsHamCycle n H) →
+        protocolPartitionNumber I S ≤ F.size) →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -415,6 +419,9 @@ private theorem formula_lower_bound_explicit_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
+    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+      (∀ H ∈ I, IsHamCycle n H) →
+      protocolPartitionNumber I S ≤ F.size) →
     (∀ (S : Frontier n) (hS : S.isBalanced)
       (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
       (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -427,9 +434,10 @@ private theorem formula_lower_bound_explicit_ax :
         ∀ η : Fin blocks.length → Bool,
           (patternHamCycles ρ blocks η).Nonempty) →
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) := by
-  intro n hn m F hF E hCorrect hPackingOracle
+  intro n hn m F hF E hCorrect hAuyBound hPackingOracle
   by_cases hq : n / (4 * Nat.log 2 n + 4) = 0
-  · have h := formulaSizeSuperpolynomial hn m F hF E hCorrect hPackingOracle 1 le_rfl (by omega)
+  · have h := formulaSizeSuperpolynomial hn m F hF E hCorrect hAuyBound hPackingOracle 1 le_rfl
+        (by omega)
     rw [hq]; norm_num at h ⊢; omega
   · have hq_pos : 1 ≤ n / (4 * Nat.log 2 n + 4) := Nat.one_le_iff_ne_zero.mpr hq
     have hq_bound : n / (4 * Nat.log 2 n + 4) ≤ n / 4 := by
@@ -441,13 +449,17 @@ private theorem formula_lower_bound_explicit_ax :
       calc 4 * k ≤ d * k := Nat.mul_le_mul_right k h1
         _ = k * d := Nat.mul_comm d k
         _ ≤ n := h2
-    exact formulaSizeSuperpolynomial hn m F hF E hCorrect hPackingOracle _ hq_pos hq_bound
+    exact formulaSizeSuperpolynomial hn m F hF E hCorrect hAuyBound hPackingOracle _ hq_pos hq_bound
 
 private theorem formula_lower_bound_explicit_proof
     (hn : n ≥ 4)
     (m : ℕ) (F : BooleanCircuit m) (hF : F.isFormula)
     (E : NaturalEdgeEncoding n m)
     (hCorrect : ComputesHAMWithNaturalEncoding F E)
+    (hAuyBound :
+      ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+        (∀ H ∈ I, IsHamCycle n H) →
+        protocolPartitionNumber I S ≤ F.size)
     (hPackingOracle :
       ∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
@@ -461,12 +473,15 @@ private theorem formula_lower_bound_explicit_proof
           ∀ η : Fin blocks.length → Bool,
             (patternHamCycles ρ blocks η).Nonempty) :
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  formula_lower_bound_explicit_ax hn m F hF E hCorrect hPackingOracle
+  formula_lower_bound_explicit_ax hn m F hF E hCorrect hAuyBound hPackingOracle
 
 theorem formulaLowerBound_exponential (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
+      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
+        (∀ H ∈ I, IsHamCycle n H) →
+        protocolPartitionNumber I S ≤ F.size) →
       (∀ (S : Frontier n) (hS : S.isBalanced)
         (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
         (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
@@ -479,8 +494,8 @@ theorem formulaLowerBound_exponential (hn : n ≥ 4) :
           ∀ η : Fin blocks.length → Bool,
             (patternHamCycles ρ blocks η).Nonempty) →
       F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  fun m F hF E hCorrect hPackingOracle =>
-    formula_lower_bound_explicit_proof hn m F hF E hCorrect hPackingOracle
+  fun m F hF E hCorrect hAuyBound hPackingOracle =>
+    formula_lower_bound_explicit_proof hn m F hF E hCorrect hAuyBound hPackingOracle
 
 end FormulaLowerBoundCorollary
 

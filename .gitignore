@@ -1,1 +1,6 @@
 /.lake
+.claude/
+.env
+AGENTS.md
+lean4-skills/
+hamiltonian_route.tex

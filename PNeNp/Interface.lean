@@ -2046,6 +2046,134 @@ private theorem every_component_has_boundary_vertex
           reachable_mono Finset.subset_union_right hw_reach_R
         exact ⟨w, hw_bdy, (SimpleGraph.ConnectedComponent.sound hw_reach).symm⟩
 
+open Classical in
+private theorem every_component_has_bmg_vertex
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S)
+    (c : (edgeSetToGraph n (L ∪ R)).ConnectedComponent)
+    (hc : c ∈ Set.range (edgeSetToGraph n (L ∪ R)).connectedComponentMk) :
+    ∃ v : Fin n, v ∈ (boundaryMultigraphOf S L R).vertices ∧
+      (edgeSetToGraph n (L ∪ R)).connectedComponentMk v = c := by
+  obtain ⟨v₀, rfl⟩ := hc
+  by_cases h1 : vertexDegreeIn n L v₀ = 1
+  · refine ⟨v₀, ?_, rfl⟩
+    unfold boundaryMultigraphOf
+    simp only [Finset.mem_filter]
+    exact ⟨hLEndpoints v₀ h1, Or.inl h1⟩
+  · by_cases h2 : vertexDegreeIn n R v₀ = 1
+    · refine ⟨v₀, ?_, rfl⟩
+      unfold boundaryMultigraphOf
+      simp only [Finset.mem_filter]
+      exact ⟨hREndpoints v₀ h2, Or.inr h2⟩
+    · have hv₀_deg : vertexDegreeIn n (L ∪ R) v₀ = 2 := hSpanning v₀
+      have hv₀_pos : 0 < vertexDegreeIn n (L ∪ R) v₀ := by omega
+      unfold vertexDegreeIn at hv₀_pos
+      rw [Finset.card_pos] at hv₀_pos
+      obtain ⟨e₀, he₀⟩ := hv₀_pos
+      simp only [Finset.mem_filter] at he₀
+      obtain ⟨he₀_mem, hv₀_in_e₀⟩ := he₀
+      rcases Finset.mem_union.mp he₀_mem with he₀L | he₀R
+      · have hv₀_L_pos : 0 < vertexDegreeIn n L v₀ := by
+          unfold vertexDegreeIn
+          rw [Finset.card_pos]
+          exact ⟨e₀, Finset.mem_filter.mpr ⟨he₀L, hv₀_in_e₀⟩⟩
+        have hv₀_L_le : vertexDegreeIn n L v₀ ≤ vertexDegreeIn n (L ∪ R) v₀ := by
+          unfold vertexDegreeIn
+          exact Finset.card_le_card (Finset.filter_subset_filter _ Finset.subset_union_left)
+        have hv₀_L_le2 : vertexDegreeIn n L v₀ ≤ 2 := by
+          simpa [hv₀_deg] using hv₀_L_le
+        have hv₀_L_eq2 : vertexDegreeIn n L v₀ = 2 := by
+          have hv₀_L_ne1 : vertexDegreeIn n L v₀ ≠ 1 := h1
+          omega
+        set comp := localEdgeComponentOf L v₀ with hcomp_def
+        have hcomp_sub : comp ⊆ L := localEdgeComponentOf_sub L v₀
+        have hcomp_ne : comp.Nonempty :=
+          localEdgeComponentOf_nonempty L v₀ ⟨e₀, he₀L, hv₀_in_e₀⟩
+        have hno_cycle := hLNoCycles comp hcomp_sub hcomp_ne
+        push_neg at hno_cycle
+        obtain ⟨w, hw⟩ := hno_cycle
+        have hw_deg_le : vertexDegreeIn n comp w ≤ vertexDegreeIn n L w := by
+          simpa [hcomp_def] using localEdgeComponentOf_degree_le L v₀ w
+        have hw_le2 : vertexDegreeIn n comp w ≤ 2 := by
+          calc
+            vertexDegreeIn n comp w ≤ vertexDegreeIn n L w := hw_deg_le
+            _ ≤ vertexDegreeIn n (L ∪ R) w := by
+                unfold vertexDegreeIn
+                exact Finset.card_le_card (Finset.filter_subset_filter _ Finset.subset_union_left)
+            _ = 2 := hSpanning w
+        have hw_eq1 : vertexDegreeIn n comp w = 1 := by omega
+        have hw_incident : ∃ e ∈ comp, w ∈ e := by
+          unfold vertexDegreeIn at hw_eq1
+          have hpos : 0 < (comp.filter fun e => w ∈ e).card := by omega
+          obtain ⟨e, he⟩ := Finset.card_pos.mp hpos
+          simp only [Finset.mem_filter] at he
+          exact ⟨e, he.1, he.2⟩
+        have hw_reach_L : (edgeSetToGraph n L).Reachable v₀ w :=
+          localEdgeComponentOf_reachable L v₀ w hw_incident
+        have hw_L_deg : vertexDegreeIn n L w = 1 := by
+          rw [← localEdgeComponentOf_degree_eq L v₀ w hw_reach_L]
+          simpa [hcomp_def] using hw_eq1
+        have hw_bdy : w ∈ boundaryVertices S := hLEndpoints w hw_L_deg
+        have hw_reach : (edgeSetToGraph n (L ∪ R)).Reachable v₀ w :=
+          reachable_mono Finset.subset_union_left hw_reach_L
+        refine ⟨w, ?_, (SimpleGraph.ConnectedComponent.sound hw_reach).symm⟩
+        unfold boundaryMultigraphOf
+        simp only [Finset.mem_filter]
+        exact ⟨hw_bdy, Or.inl hw_L_deg⟩
+      · have hv₀_R_pos : 0 < vertexDegreeIn n R v₀ := by
+          unfold vertexDegreeIn
+          rw [Finset.card_pos]
+          exact ⟨e₀, Finset.mem_filter.mpr ⟨he₀R, hv₀_in_e₀⟩⟩
+        have hv₀_R_le : vertexDegreeIn n R v₀ ≤ vertexDegreeIn n (L ∪ R) v₀ := by
+          unfold vertexDegreeIn
+          exact Finset.card_le_card (Finset.filter_subset_filter _ Finset.subset_union_right)
+        have hv₀_R_le2 : vertexDegreeIn n R v₀ ≤ 2 := by
+          simpa [hv₀_deg] using hv₀_R_le
+        have hv₀_R_eq2 : vertexDegreeIn n R v₀ = 2 := by
+          have hv₀_R_ne1 : vertexDegreeIn n R v₀ ≠ 1 := h2
+          omega
+        set comp := localEdgeComponentOf R v₀ with hcomp_def
+        have hcomp_sub : comp ⊆ R := localEdgeComponentOf_sub R v₀
+        have hcomp_ne : comp.Nonempty :=
+          localEdgeComponentOf_nonempty R v₀ ⟨e₀, he₀R, hv₀_in_e₀⟩
+        have hno_cycle := hRNoCycles comp hcomp_sub hcomp_ne
+        push_neg at hno_cycle
+        obtain ⟨w, hw⟩ := hno_cycle
+        have hw_deg_le : vertexDegreeIn n comp w ≤ vertexDegreeIn n R w := by
+          simpa [hcomp_def] using localEdgeComponentOf_degree_le R v₀ w
+        have hw_le2 : vertexDegreeIn n comp w ≤ 2 := by
+          calc
+            vertexDegreeIn n comp w ≤ vertexDegreeIn n R w := hw_deg_le
+            _ ≤ vertexDegreeIn n (L ∪ R) w := by
+                unfold vertexDegreeIn
+                exact Finset.card_le_card (Finset.filter_subset_filter _ Finset.subset_union_right)
+            _ = 2 := hSpanning w
+        have hw_eq1 : vertexDegreeIn n comp w = 1 := by omega
+        have hw_incident : ∃ e ∈ comp, w ∈ e := by
+          unfold vertexDegreeIn at hw_eq1
+          have hpos : 0 < (comp.filter fun e => w ∈ e).card := by omega
+          obtain ⟨e, he⟩ := Finset.card_pos.mp hpos
+          simp only [Finset.mem_filter] at he
+          exact ⟨e, he.1, he.2⟩
+        have hw_reach_R : (edgeSetToGraph n R).Reachable v₀ w :=
+          localEdgeComponentOf_reachable R v₀ w hw_incident
+        have hw_R_deg : vertexDegreeIn n R w = 1 := by
+          rw [← localEdgeComponentOf_degree_eq R v₀ w hw_reach_R]
+          simpa [hcomp_def] using hw_eq1
+        have hw_bdy : w ∈ boundaryVertices S := hREndpoints w hw_R_deg
+        have hw_reach : (edgeSetToGraph n (L ∪ R)).Reachable v₀ w :=
+          reachable_mono Finset.subset_union_right hw_reach_R
+        refine ⟨w, ?_, (SimpleGraph.ConnectedComponent.sound hw_reach).symm⟩
+        unfold boundaryMultigraphOf
+        simp only [Finset.mem_filter]
+        exact ⟨hw_bdy, Or.inr hw_R_deg⟩
+
 private lemma degree_add_of_disjoint {n : ℕ} (L R : Finset (Edge n))
     (hDisjoint : Disjoint L R) (v : Fin n) :
     vertexDegreeIn n L v + vertexDegreeIn n R v = vertexDegreeIn n (L ∪ R) v := by
@@ -2577,6 +2705,95 @@ private lemma danglingEndpoints_eq_degree_iff
   · intro h
     exact (fwd.mpr ⟨hv, h⟩).2
 
+private theorem leftSubgraph_no_cycle_of_nonempty_dangling
+    (S : Frontier n) (hS : S.isBalanced) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (hDang : (danglingEndpoints S H).Nonempty) :
+    ∀ comp : Finset (Edge n), comp ⊆ leftSubgraph S H → comp.Nonempty →
+      ¬ (∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+  have hc : ¬ hasPrematureCycle S H := no_prematureCycle_at_balanced_frontier S hS H hH
+  intro comp hcomp hne hall
+  have hneq : comp ≠ H := by
+    intro hEq
+    obtain ⟨u, hu⟩ := hDang
+    have hHsubL : H ⊆ leftSubgraph S H := by
+      intro e he
+      exact hcomp (hEq ▸ he)
+    have hHeqL : H = leftSubgraph S H := by
+      apply Finset.Subset.antisymm
+      · exact hHsubL
+      · exact Finset.inter_subset_left
+    have hu_degL : vertexDegreeIn n (leftSubgraph S H) u = 1 := by
+      simp only [danglingEndpoints, Finset.mem_filter, degreeProfile] at hu
+      simpa [leftDegreeAt] using hu.2
+    have hu_deg : vertexDegreeIn n H u = 1 := by
+      rw [← hHeqL] at hu_degL
+      exact hu_degL
+    rw [← hEq] at hu_deg
+    rcases hall u with h0 | h2 <;> omega
+  exact hc ⟨comp, hcomp, hne, hall, hneq⟩
+
+private theorem rightSubgraph_no_cycle_of_nonempty_dangling
+    (S : Frontier n) (hS : S.isBalanced) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (hDang : (danglingEndpoints S H).Nonempty) :
+    ∀ comp : Finset (Edge n), comp ⊆ rightSubgraph S H → comp.Nonempty →
+      ¬ (∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+  have hSswap : S.swap.isBalanced := ⟨hS.2, hS.1⟩
+  have hc : ¬ hasPrematureCycle S.swap H := no_prematureCycle_at_balanced_frontier S.swap hSswap H hH
+  intro comp hcomp hne hall
+  have hneq : comp ≠ H := by
+    intro hEq
+    obtain ⟨u, hu⟩ := (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ hDang)
+    have hHsubR : H ⊆ rightSubgraph S H := by
+      intro e he
+      exact hcomp (hEq ▸ he)
+    have hHeqR : H = rightSubgraph S H := by
+      apply Finset.Subset.antisymm
+      · exact hHsubR
+      · exact Finset.inter_subset_left
+    have hu_degR : vertexDegreeIn n (rightSubgraph S H) u = 1 := by
+      simp only [rightDanglingEndpoints, Finset.mem_filter] at hu
+      simpa [rightDegreeAt] using hu.2
+    have hu_deg : vertexDegreeIn n H u = 1 := by
+      rw [← hHeqR] at hu_degR
+      exact hu_degR
+    rw [← hEq] at hu_deg
+    rcases hall u with h0 | h2 <;> omega
+  exact hc ⟨comp, by simpa [leftSubgraph_swap] using hcomp, hne, hall, hneq⟩
+
+private theorem leftSubgraph_eq_empty_or_self_of_empty_dangling
+    (S : Frontier n) (hS : S.isBalanced) (H : Finset (Edge n))
+    (hH : IsHamCycle n H) (hEmpty : danglingEndpoints S H = ∅) :
+    leftSubgraph S H = ∅ ∨ leftSubgraph S H = H := by
+  by_cases hLempty : leftSubgraph S H = ∅
+  · exact Or.inl hLempty
+  · right
+    have hne : (leftSubgraph S H).Nonempty := Finset.nonempty_iff_ne_empty.mpr hLempty
+    have hall : ∀ v : Fin n, vertexDegreeIn n (leftSubgraph S H) v = 0 ∨
+        vertexDegreeIn n (leftSubgraph S H) v = 2 := by
+      intro v
+      have hle : vertexDegreeIn n (leftSubgraph S H) v ≤ 2 := by
+        unfold vertexDegreeIn
+        calc
+          (Finset.filter (fun e => v ∈ e) (leftSubgraph S H)).card
+              ≤ (Finset.filter (fun e => v ∈ e) H).card := by
+                exact Finset.card_le_card (Finset.filter_subset_filter _ Finset.inter_subset_left)
+          _ = 2 := hH.twoRegular v
+      by_cases h0 : vertexDegreeIn n (leftSubgraph S H) v = 0
+      · exact Or.inl h0
+      have hne1 : vertexDegreeIn n (leftSubgraph S H) v ≠ 1 := by
+        intro h1
+        have hv_bdy := left_degree_one_is_boundary S H hH v h1
+        have hv_dang : v ∈ danglingEndpoints S H := by
+          unfold danglingEndpoints
+          simp only [Finset.mem_filter, degreeProfile]
+          exact ⟨hv_bdy, by simpa [leftDegreeAt] using h1⟩
+        rw [hEmpty] at hv_dang
+        simp at hv_dang
+      omega
+    have hc : ¬ hasPrematureCycle S H := no_prematureCycle_at_balanced_frontier S hS H hH
+    by_contra hneq
+    exact hc ⟨leftSubgraph S H, subset_rfl, hne, hall, hneq⟩
+
 private lemma same_pairing_implies_left_reachability_iff
     (S : Frontier n) (_hS : S.isBalanced)
     (H H' : Finset (Edge n))
@@ -2748,31 +2965,6 @@ theorem boundary_multigraph_connected_of_ham :
   rw [hLR_eq_H]
   exact hreach
 
-private theorem same_pairing_transfers_reachability_ax :
-  ∀ (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
-    (hH : IsHamCycle n H) (hH' : IsHamCycle n H'),
-    S.isBalanced →
-    degreeProfile S H = degreeProfile S H' →
-    HEq (pathPairing S H hH) (pathPairing S H' hH') →
-    prematureCycleFlag S H = prematureCycleFlag S H' →
-    ∀ u v : Fin n,
-      (edgeSetToGraph n (leftSubgraph S H ∪ rightSubgraph S H)).Reachable u v →
-      (edgeSetToGraph n (leftSubgraph S H' ∪ rightSubgraph S H)).Reachable u v := by
-  intro n S H H' hH hH' _hS hd hπ _hc u v hreach; sorry
-
-theorem same_pairing_transfers_reachability :
-  ∀ (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
-    (hH : IsHamCycle n H) (hH' : IsHamCycle n H'),
-    S.isBalanced →
-    degreeProfile S H = degreeProfile S H' →
-    HEq (pathPairing S H hH) (pathPairing S H' hH') →
-    prematureCycleFlag S H = prematureCycleFlag S H' →
-    ∀ u v : Fin n,
-      (edgeSetToGraph n (leftSubgraph S H ∪ rightSubgraph S H)).Reachable u v →
-      (edgeSetToGraph n (leftSubgraph S H' ∪ rightSubgraph S H)).Reachable u v := by
-  intro n S H H' hH hH' hS hd hπ hc u v hreach
-  exact same_pairing_transfers_reachability_ax n S H H' hH hH' hS hd hπ hc u v hreach
-
 end StitchabilityHelpers
 
 theorem mixed_spanning (S : Frontier n) (H H' : Finset (Edge n))
@@ -2803,38 +2995,6 @@ theorem mixed_noLoops (S : Frontier n) (H H' : Finset (Edge n))
     exact hH'.noLoops e hleft.1
   · simp only [rightSubgraph, Finset.mem_inter] at hright
     exact hH.noLoops e hright.1
-
-theorem stitchability_connected
-    (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
-    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
-    (hS : S.isBalanced)
-    (hd : degreeProfile S H = degreeProfile S H')
-    (hπ : HEq (pathPairing S H hH) (pathPairing S H' hH'))
-    (hc : prematureCycleFlag S H = prematureCycleFlag S H') :
-    IsConnectedEdgeSet n (mixedGraph S H H') := by
-  unfold IsConnectedEdgeSet
-  have hno_premature : ¬ hasPrematureCycle S H :=
-    no_prematureCycle_at_balanced_frontier S hS H hH
-  rw [SimpleGraph.connected_iff]
-  refine ⟨fun u v => ?_, ?_⟩
-  · have hH_reach := boundary_multigraph_connected_of_ham n S H hH hS hno_premature u v
-    exact same_pairing_transfers_reachability n S H H' hH hH' hS hd hπ hc u v hH_reach
-  · exact hH.connected.nonempty
-
-theorem same_state_stitchability
-    (S : Frontier n) (hS : S.isBalanced)
-    (H H' : Finset (Edge n))
-    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
-    (hU : danglingEndpoints S H = danglingEndpoints S H')
-    (hσ : sameInterfaceState S H H' hH hH' hU) :
-    IsHamCycle n (mixedGraph S H H') := by
-  obtain ⟨hd, hπ, hc⟩ := hσ
-  exact {
-    twoRegular := mixed_degree_eq S H H' hH hH' hd
-    connected := stitchability_connected n S H H' hH hH' hS hd hπ hc
-    noLoops := mixed_noLoops S H H' hH hH'
-    spanning := mixed_spanning S H H' hH hH' hd
-  }
 
 end MixedGraph
 
@@ -3364,6 +3524,150 @@ private lemma reachable_endpoint_positive_degree
       rw [Finset.card_pos]
       exact ⟨_, Finset.mem_filter.mpr ⟨hx_mem, Sym2.mem_mk_left _ _⟩⟩
 
+private lemma boundary_vertex_degrees_one_of_pos
+    {n : ℕ} (L R : Finset (Edge n))
+    (hDisjoint : Disjoint L R)
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (v : Fin n)
+    (hLpos : 0 < vertexDegreeIn n L v)
+    (hRpos : 0 < vertexDegreeIn n R v) :
+    vertexDegreeIn n L v = 1 ∧ vertexDegreeIn n R v = 1 := by
+  have hadd := degree_add_of_disjoint L R hDisjoint v
+  have htot := hSpanning v
+  omega
+
+open Classical in
+private lemma walk_bmg_vertex_induction
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hDisjoint : Disjoint L R)
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S) :
+    ∀ {x v u : Fin n},
+      v ∈ (boundaryMultigraphOf S L R).vertices →
+      (edgeSetToGraph n (L ∪ R)).Walk x v →
+      u ∈ (boundaryMultigraphOf S L R).vertices →
+      ((edgeSetToGraph n L).Reachable u x ∧ vertexDegreeIn n L u = 1) ∨
+      ((edgeSetToGraph n R).Reachable u x ∧ vertexDegreeIn n R u = 1) →
+      (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u v
+:= by
+  intro x v u hv_bmg w hu_bmg hside
+  induction w generalizing u hu_bmg with
+  | @nil x =>
+      have hu_bdy : u ∈ boundaryVertices S := (Finset.mem_filter.mp hu_bmg).1
+      have hx_bdy : x ∈ boundaryVertices S := (Finset.mem_filter.mp hv_bmg).1
+      rcases hside with ⟨hLreach, hLdeg_u⟩ | ⟨hRreach, hRdeg_u⟩
+      · by_cases hux : u = x
+        · subst hux
+          exact SimpleGraph.Reachable.refl u
+        · have hLpos_x := reachable_endpoint_positive_degree L u x hLreach hLdeg_u
+          have hLdeg_x : vertexDegreeIn n L x = 1 := by
+            rcases (Finset.mem_filter.mp hv_bmg).2 with hLx | hRx
+            · exact hLx
+            · have hRpos_x : 0 < vertexDegreeIn n R x := by omega
+              exact (boundary_vertex_degrees_one_of_pos L R hDisjoint hSpanning x hLpos_x hRpos_x).1
+          exact
+            (bmg_adj_of_reachable_in_L S L R u x hux hu_bdy hx_bdy hLdeg_u hLdeg_x
+              hLreach).reachable
+      · by_cases hux : u = x
+        · subst hux
+          exact SimpleGraph.Reachable.refl u
+        · have hRpos_x := reachable_endpoint_positive_degree R u x hRreach hRdeg_u
+          have hRdeg_x : vertexDegreeIn n R x = 1 := by
+            rcases (Finset.mem_filter.mp hv_bmg).2 with hLx | hRx
+            · have hLpos_x : 0 < vertexDegreeIn n L x := by omega
+              exact (boundary_vertex_degrees_one_of_pos L R hDisjoint hSpanning x hLpos_x hRpos_x).2
+            · exact hRx
+          exact
+            (bmg_adj_of_reachable_in_R S L R u x hux hu_bdy hx_bdy hRdeg_u hRdeg_x
+              hRreach).reachable
+  | @cons x y z hadj_xy w' ih =>
+      have hu_bdy : u ∈ boundaryVertices S := (Finset.mem_filter.mp hu_bmg).1
+      rcases hside with ⟨hLreach_ux, hLdeg_u⟩ | ⟨hRreach_ux, hRdeg_u⟩
+      · rcases Finset.mem_union.mp hadj_xy.2 with hedge_L | hedge_R
+        · have hL_adj : (edgeSetToGraph n L).Adj x y := ⟨hadj_xy.1, hedge_L⟩
+          exact ih hv_bmg hu_bmg (Or.inl ⟨hLreach_ux.trans hL_adj.reachable, hLdeg_u⟩)
+        · have hLpos_x := reachable_endpoint_positive_degree L u x hLreach_ux hLdeg_u
+          have hRpos_x : 0 < vertexDegreeIn n R x := by
+            unfold vertexDegreeIn
+            rw [Finset.card_pos]
+            exact ⟨_, Finset.mem_filter.mpr ⟨hedge_R, Sym2.mem_mk_left x y⟩⟩
+          have hx_deg := boundary_vertex_degrees_one_of_pos L R hDisjoint hSpanning x hLpos_x hRpos_x
+          have hx_bdy : x ∈ boundaryVertices S := hLEndpoints x hx_deg.1
+          have hx_bmg : x ∈ (boundaryMultigraphOf S L R).vertices := by
+            unfold boundaryMultigraphOf
+            simp only [Finset.mem_filter]
+            exact ⟨hx_bdy, Or.inl hx_deg.1⟩
+          have hbmg_ux : (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u x := by
+            by_cases hux : u = x
+            · subst hux
+              exact SimpleGraph.Reachable.refl u
+            · exact
+                (bmg_adj_of_reachable_in_L S L R u x hux hu_bdy hx_bdy hLdeg_u hx_deg.1
+                  hLreach_ux).reachable
+          have hR_adj : (edgeSetToGraph n R).Adj x y := ⟨hadj_xy.1, hedge_R⟩
+          exact hbmg_ux.trans <| ih hv_bmg hx_bmg (Or.inr ⟨hR_adj.reachable, hx_deg.2⟩)
+      · rcases Finset.mem_union.mp hadj_xy.2 with hedge_L | hedge_R
+        · have hRpos_x := reachable_endpoint_positive_degree R u x hRreach_ux hRdeg_u
+          have hLpos_x : 0 < vertexDegreeIn n L x := by
+            unfold vertexDegreeIn
+            rw [Finset.card_pos]
+            exact ⟨_, Finset.mem_filter.mpr ⟨hedge_L, Sym2.mem_mk_left x y⟩⟩
+          have hx_deg := boundary_vertex_degrees_one_of_pos L R hDisjoint hSpanning x hLpos_x hRpos_x
+          have hx_bdy : x ∈ boundaryVertices S := hLEndpoints x hx_deg.1
+          have hx_bmg : x ∈ (boundaryMultigraphOf S L R).vertices := by
+            unfold boundaryMultigraphOf
+            simp only [Finset.mem_filter]
+            exact ⟨hx_bdy, Or.inl hx_deg.1⟩
+          have hbmg_ux : (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u x := by
+            by_cases hux : u = x
+            · subst hux
+              exact SimpleGraph.Reachable.refl u
+            · exact
+                (bmg_adj_of_reachable_in_R S L R u x hux hu_bdy hx_bdy hRdeg_u hx_deg.2
+                  hRreach_ux).reachable
+          have hL_adj : (edgeSetToGraph n L).Adj x y := ⟨hadj_xy.1, hedge_L⟩
+          exact hbmg_ux.trans <| ih hv_bmg hx_bmg (Or.inl ⟨hL_adj.reachable, hx_deg.1⟩)
+        · have hR_adj : (edgeSetToGraph n R).Adj x y := ⟨hadj_xy.1, hedge_R⟩
+          exact ih hv_bmg hu_bmg (Or.inr ⟨hRreach_ux.trans hR_adj.reachable, hRdeg_u⟩)
+
+private theorem reachable_in_union_gives_reachable_in_bmg_vertices
+    {n : ℕ} (S : Frontier n) (L R : Finset (Edge n))
+    (hDisjoint : Disjoint L R)
+    (hSpanning : ∀ v : Fin n, vertexDegreeIn n (L ∪ R) v = 2)
+    (hLNoCycles : ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hRNoCycles : ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+      ¬(∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2))
+    (hLEndpoints : ∀ v : Fin n, vertexDegreeIn n L v = 1 → v ∈ boundaryVertices S)
+    (hREndpoints : ∀ v : Fin n, vertexDegreeIn n R v = 1 → v ∈ boundaryVertices S)
+    (u v : Fin n)
+    (hu : u ∈ (boundaryMultigraphOf S L R).vertices)
+    (hv : v ∈ (boundaryMultigraphOf S L R).vertices)
+    (hreach : (edgeSetToGraph n (L ∪ R)).Reachable u v) :
+    (bmgToGraph (boundaryMultigraphOf S L R)).Reachable u v := by
+  obtain ⟨w⟩ := hreach
+  rcases (Finset.mem_filter.mp hu).2 with huL | huR
+  · exact walk_bmg_vertex_induction S L R hDisjoint hSpanning hLNoCycles hRNoCycles
+      hLEndpoints hREndpoints hv w hu (Or.inl ⟨SimpleGraph.Reachable.refl u, huL⟩)
+  · exact walk_bmg_vertex_induction S L R hDisjoint hSpanning hLNoCycles hRNoCycles
+      hLEndpoints hREndpoints hv w hu (Or.inr ⟨SimpleGraph.Reachable.refl u, huR⟩)
+
+private theorem numComponentsBMG_le_one_of_pairwise_reachable
+    {n : ℕ} (G : BoundaryMultigraph n)
+    (hpair : ∀ u ∈ G.vertices, ∀ v ∈ G.vertices, (bmgToGraph G).Reachable u v) :
+    numComponentsBMG G ≤ 1 := by
+  unfold numComponentsBMG
+  rw [Set.ncard_le_one_iff_subsingleton]
+  intro c hc d hd
+  rcases hc with ⟨u, hu, rfl⟩
+  rcases hd with ⟨v, hv, rfl⟩
+  exact SimpleGraph.ConnectedComponent.sound (hpair u hu v hv)
+
 private theorem disconnected_overlay_not_connected_ax :
   ∀ {n : ℕ} (S : Frontier n) (H H' : Finset (Edge n))
     (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
@@ -3374,7 +3678,93 @@ private theorem disconnected_overlay_not_connected_ax :
       (hU ▸ pathPairing S H' hH')
       (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH)),
     ¬ IsConnectedEdgeSet n (mixedGraph S H H') := by
-  intro n S H H' hH hH' hS hd hU hDisconnected; sorry
+  intro n S H H' hH hH' hS hd hU hDisconnected hConn
+  let L := leftSubgraph S H'
+  let R := rightSubgraph S H
+  let BMG := boundaryMultigraphOf S L R
+  have hc : ¬ hasPrematureCycle S H := no_prematureCycle_at_balanced_frontier S hS H hH
+  have hc' : ¬ hasPrematureCycle S H' := no_prematureCycle_at_balanced_frontier S hS H' hH'
+  have hU_nonempty : (danglingEndpoints S H).Nonempty := by
+    by_contra hEmpty
+    have hEmpty' : danglingEndpoints S H = ∅ := by
+      exact Finset.not_nonempty_iff_eq_empty.mp hEmpty
+    have hEmpty'' : danglingEndpoints S H' = ∅ := by
+      rw [← hU, hEmpty']
+    unfold overlayIsDisconnected overlayComponentCount at hDisconnected
+    simp [hEmpty'] at hDisconnected
+  have hLNoCycles :
+      ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+        ¬ (∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+    intro comp hcomp hne hall
+    have hneq : comp ≠ H' := by
+      intro hEq
+      obtain ⟨u, hu⟩ := (hU ▸ hU_nonempty : (danglingEndpoints S H').Nonempty)
+      have hH'subL : H' ⊆ L := by
+        intro e he
+        exact hcomp (hEq ▸ he)
+      have hHeqL : H' = leftSubgraph S H' := by
+        apply Finset.Subset.antisymm
+        · simpa [L] using hH'subL
+        · exact Finset.inter_subset_left
+      have hu_degL : vertexDegreeIn n (leftSubgraph S H') u = 1 := by
+        simp only [danglingEndpoints, Finset.mem_filter, degreeProfile] at hu
+        simpa [leftDegreeAt] using hu.2
+      have hu_deg : vertexDegreeIn n H' u = 1 := by
+        rw [← hHeqL] at hu_degL
+        exact hu_degL
+      rw [← hEq] at hu_deg
+      rcases hall u with h0 | h2 <;> omega
+    exact hc' ⟨comp, by simpa [L] using hcomp, hne, hall, hneq⟩
+  have hRNoCycles :
+      ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+        ¬ (∀ v : Fin n, vertexDegreeIn n comp v = 0 ∨ vertexDegreeIn n comp v = 2) := by
+    intro comp hcomp hne hall
+    have hSswap : S.swap.isBalanced := by
+      exact ⟨hS.2, hS.1⟩
+    have hcR : ¬ hasPrematureCycle S.swap H :=
+      no_prematureCycle_at_balanced_frontier S.swap hSswap H hH
+    have hneq : comp ≠ H := by
+      intro hEq
+      obtain ⟨u, hu⟩ := (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ hU_nonempty)
+      have hHsubR : H ⊆ R := by
+        intro e he
+        exact hcomp (hEq ▸ he)
+      have hHeqR : H = rightSubgraph S H := by
+        apply Finset.Subset.antisymm
+        · simpa [R] using hHsubR
+        · exact Finset.inter_subset_left
+      have hu_degR : vertexDegreeIn n (rightSubgraph S H) u = 1 := by
+        simp only [rightDanglingEndpoints, Finset.mem_filter] at hu
+        simpa [rightDegreeAt] using hu.2
+      have hu_deg : vertexDegreeIn n H u = 1 := by
+        rw [← hHeqR] at hu_degR
+        exact hu_degR
+      rw [← hEq] at hu_deg
+      rcases hall u with h0 | h2 <;> omega
+    exact hcR ⟨comp, by simpa [R, leftSubgraph_swap] using hcomp, hne, hall, hneq⟩
+  have hpair :
+      ∀ u ∈ BMG.vertices, ∀ v ∈ BMG.vertices, (bmgToGraph BMG).Reachable u v := by
+    intro u hu v hv
+    have hreach : (edgeSetToGraph n (L ∪ R)).Reachable u v := by
+      unfold IsConnectedEdgeSet at hConn
+      exact hConn.preconnected u v
+    exact reachable_in_union_gives_reachable_in_bmg_vertices S L R
+      (by simpa [L, R] using leftRight_mixed_disjoint S H H')
+      (by simpa [L, R, mixedGraph] using mixed_degree_eq S H H' hH hH' hd)
+      hLNoCycles hRNoCycles
+      (by simpa [L] using left_degree_one_is_boundary S H' hH')
+      (by simpa [R] using right_degree_one_is_boundary S H hH)
+      u v hu hv hreach
+  have hBMG_le : numComponentsBMG BMG ≤ 1 :=
+    numComponentsBMG_le_one_of_pairwise_reachable BMG hpair
+  have hEq := boundary_multigraph_equals_overlay_components S hS H H' hH hH' hd hc hc' hU
+  have hDiscCount :
+      overlayComponentCount
+          (hU ▸ pathPairing S H' hH')
+          (danglingEndpoints_eq_rightDanglingEndpoints S H hH ▸ rightPairing S H hH) > 1 := by
+    simpa [overlayIsDisconnected] using hDisconnected
+  rw [← hEq] at hDiscCount
+  exact (not_le_of_gt hDiscCount) hBMG_le
 
 theorem disconnected_overlay_not_connected :
   ∀ {n : ℕ} (S : Frontier n) (H H' : Finset (Edge n))
@@ -3388,6 +3778,214 @@ theorem disconnected_overlay_not_connected :
     ¬ IsConnectedEdgeSet n (mixedGraph S H H') := by
   intro n S H H' hH hH' hS hd hU hDisconnected
   exact disconnected_overlay_not_connected_ax S H H' hH hH' hS hd hU hDisconnected
+
+private theorem same_pairing_transfers_reachability_ax :
+  ∀ (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H'),
+    S.isBalanced →
+    degreeProfile S H = degreeProfile S H' →
+    HEq (pathPairing S H hH) (pathPairing S H' hH') →
+    prematureCycleFlag S H = prematureCycleFlag S H' →
+    ∀ u v : Fin n,
+      (edgeSetToGraph n (leftSubgraph S H ∪ rightSubgraph S H)).Reachable u v →
+      (edgeSetToGraph n (leftSubgraph S H' ∪ rightSubgraph S H)).Reachable u v := by
+  intro n S H H' hH hH' hS hd hπ hc u v hreach
+  let L := leftSubgraph S H'
+  let R := rightSubgraph S H
+  let BMG := boundaryMultigraphOf S L R
+  let LH := leftSubgraph S H
+  let RH := rightSubgraph S H
+  let BMGH := boundaryMultigraphOf S LH RH
+  have hU : danglingEndpoints S H = danglingEndpoints S H' :=
+    danglingEndpoints_eq_of_degreeProfile_eq S H H' hd
+  by_cases hDang : (danglingEndpoints S H).Nonempty
+  · have hLNoCycles :
+        ∀ comp : Finset (Edge n), comp ⊆ L → comp.Nonempty →
+          ¬ (∀ x : Fin n, vertexDegreeIn n comp x = 0 ∨ vertexDegreeIn n comp x = 2) := by
+      simpa [L] using leftSubgraph_no_cycle_of_nonempty_dangling S hS H' hH' (hU ▸ hDang)
+    have hRNoCycles :
+        ∀ comp : Finset (Edge n), comp ⊆ R → comp.Nonempty →
+          ¬ (∀ x : Fin n, vertexDegreeIn n comp x = 0 ∨ vertexDegreeIn n comp x = 2) := by
+      simpa [R] using rightSubgraph_no_cycle_of_nonempty_dangling S hS H hH hDang
+    have hLHNoCycles :
+        ∀ comp : Finset (Edge n), comp ⊆ LH → comp.Nonempty →
+          ¬ (∀ x : Fin n, vertexDegreeIn n comp x = 0 ∨ vertexDegreeIn n comp x = 2) := by
+      simpa [LH] using leftSubgraph_no_cycle_of_nonempty_dangling S hS H hH hDang
+    have hRHNoCycles :
+        ∀ comp : Finset (Edge n), comp ⊆ RH → comp.Nonempty →
+          ¬ (∀ x : Fin n, vertexDegreeIn n comp x = 0 ∨ vertexDegreeIn n comp x = 2) := by
+      simpa [RH] using rightSubgraph_no_cycle_of_nonempty_dangling S hS H hH hDang
+    have hpairH : ∀ a ∈ BMGH.vertices, ∀ b ∈ BMGH.vertices, (bmgToGraph BMGH).Reachable a b := by
+      intro a ha b hb
+      have hreachH : (edgeSetToGraph n (LH ∪ RH)).Reachable a b := by
+        have hno_premature : ¬ hasPrematureCycle S H :=
+          no_prematureCycle_at_balanced_frontier S hS H hH
+        simpa [LH, RH] using boundary_multigraph_connected_of_ham n S H hH hS hno_premature a b
+      exact reachable_in_union_gives_reachable_in_bmg_vertices S LH RH
+        (by simpa [LH, RH] using leftRight_mixed_disjoint S H H)
+        (by simpa [LH, RH, mixedGraph] using mixed_degree_eq S H H hH hH rfl)
+        hLHNoCycles hRHNoCycles
+        (by simpa [LH] using left_degree_one_is_boundary S H hH)
+        (by simpa [RH] using right_degree_one_is_boundary S H hH)
+        a b ha hb hreachH
+    have hEqBMG : BMG = BMGH := by
+      simpa [BMG, BMGH, L, R, LH, RH] using
+        matching_pairings_give_same_boundary_left_edges S hS H H' hH hH' hU hπ
+    have hpair : ∀ a ∈ BMG.vertices, ∀ b ∈ BMG.vertices, (bmgToGraph BMG).Reachable a b := by
+      intro a ha b hb
+      rw [hEqBMG] at ha hb ⊢
+      exact hpairH a ha b hb
+    have hpre : (edgeSetToGraph n (L ∪ R)).Reachable u v := by
+      have hu_rep := every_component_has_bmg_vertex S L R
+        (by simpa [L, R, mixedGraph] using mixed_degree_eq S H H' hH hH' hd)
+        hLNoCycles hRNoCycles
+        (by simpa [L] using left_degree_one_is_boundary S H' hH')
+        (by simpa [R] using right_degree_one_is_boundary S H hH)
+        ((edgeSetToGraph n (L ∪ R)).connectedComponentMk u) ⟨u, rfl⟩
+      have hv_rep := every_component_has_bmg_vertex S L R
+        (by simpa [L, R, mixedGraph] using mixed_degree_eq S H H' hH hH' hd)
+        hLNoCycles hRNoCycles
+        (by simpa [L] using left_degree_one_is_boundary S H' hH')
+        (by simpa [R] using right_degree_one_is_boundary S H hH)
+        ((edgeSetToGraph n (L ∪ R)).connectedComponentMk v) ⟨v, rfl⟩
+      rcases hu_rep with ⟨u₀, hu₀, hcu⟩
+      rcases hv_rep with ⟨v₀, hv₀, hcv⟩
+      have huu₀ : (edgeSetToGraph n (L ∪ R)).Reachable u u₀ :=
+        SimpleGraph.ConnectedComponent.exact hcu.symm
+      have hu₀v₀_bmg : (bmgToGraph BMG).Reachable u₀ v₀ := hpair u₀ hu₀ v₀ hv₀
+      have hu₀v₀ : (edgeSetToGraph n (L ∪ R)).Reachable u₀ v₀ :=
+        reachable_in_bmg_gives_reachable_in_union S L R u₀ v₀
+          (Finset.mem_filter.mp hu₀).1 (Finset.mem_filter.mp hv₀).1 hu₀v₀_bmg
+      have hv₀v : (edgeSetToGraph n (L ∪ R)).Reachable v₀ v :=
+        SimpleGraph.ConnectedComponent.exact hcv
+      exact huu₀.trans (hu₀v₀.trans hv₀v)
+    simpa [L, R] using hpre
+  · have hEmpty : danglingEndpoints S H = ∅ := Finset.not_nonempty_iff_eq_empty.mp hDang
+    have hLeftShape : LH = ∅ ∨ LH = H := leftSubgraph_eq_empty_or_self_of_empty_dangling S hS H hH hEmpty
+    rcases hLeftShape with hLHempty | hLHall
+    · have hLempty' : L = ∅ := by
+        apply Finset.not_nonempty_iff_eq_empty.mp
+        intro hLne
+        rcases hLne with ⟨e, he⟩
+        induction e using Sym2.ind with
+        | h a b =>
+            have hpos : 0 < vertexDegreeIn n L a := by
+              unfold L vertexDegreeIn
+              rw [Finset.card_pos]
+              exact ⟨_, Finset.mem_filter.mpr ⟨by simpa using he, Sym2.mem_mk_left a b⟩⟩
+            have hzero : vertexDegreeIn n L a = 0 := by
+              have hdeg := congrArg (fun f => f a) hd
+              simpa [degreeProfile, leftDegreeAt, LH, hLHempty, L] using hdeg.symm
+            omega
+      have hRHall : RH = H := by
+        apply Finset.Subset.antisymm
+        · exact Finset.inter_subset_left
+        · intro e he
+          have hedge : e ∈ allEdges n := by
+            simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
+            exact hH.noLoops e he
+          have hpart := S.partition ▸ hedge
+          rcases Finset.mem_union.mp hpart with hleft | hright
+          · exfalso
+            have : e ∈ LH := Finset.mem_inter.mpr ⟨he, hleft⟩
+            simpa [LH, hLHempty] using this
+          · have : e ∈ RH := Finset.mem_inter.mpr ⟨he, hright⟩
+            simpa [RH] using this
+      have hreachRH : (edgeSetToGraph n RH).Reachable u v := by
+        simpa [LH, hLHempty, RH] using hreach
+      simpa [mixedGraph, L, R, hLempty', RH, hRHall] using hreachRH
+    · have hRempty : RH = ∅ := by
+        apply Finset.not_nonempty_iff_eq_empty.mp
+        intro hRne
+        rcases hRne with ⟨e, he⟩
+        change e ∈ rightSubgraph S H at he
+        have heRH : e ∈ H ∩ S.rightEdges := by simpa [rightSubgraph] using he
+        have hmemH : e ∈ H := (Finset.mem_inter.mp heRH).1
+        have hmemLH : e ∈ LH := by simpa [LH, hLHall] using hmemH
+        have hleft : e ∈ S.leftEdges := Finset.mem_inter.mp hmemLH |>.2
+        have hright : e ∈ S.rightEdges := (Finset.mem_inter.mp heRH).2
+        exact Finset.disjoint_left.mp S.disjoint hleft hright
+      have hLHall' : L = H' := by
+        apply Finset.Subset.antisymm
+        · exact Finset.inter_subset_left
+        · intro e he
+          have hedge : e ∈ allEdges n := by
+            simp only [allEdges, Finset.mem_filter, Finset.mem_univ, true_and]
+            exact hH'.noLoops e he
+          have hpart := S.partition ▸ hedge
+          rcases Finset.mem_union.mp hpart with hleft | hright
+          · exact Finset.mem_inter.mpr ⟨he, hleft⟩
+          · exfalso
+            induction e using Sym2.ind with
+            | h a b =>
+                have hpos : 0 < vertexDegreeIn n (rightSubgraph S H') a := by
+                  unfold vertexDegreeIn
+                  rw [Finset.card_pos]
+                  exact ⟨_, Finset.mem_filter.mpr
+                    ⟨Finset.mem_inter.mpr ⟨he, hright⟩, Sym2.mem_mk_left a b⟩⟩
+                have hleft2 : vertexDegreeIn n L a = 2 := by
+                  have hdeg : degreeProfile S H a = degreeProfile S H' a :=
+                    congrArg (fun f => f a) hd
+                  have hdegH : degreeProfile S H a = 2 := by
+                    simpa [degreeProfile, leftDegreeAt, LH, hLHall] using hH.twoRegular a
+                  have hdegH' : degreeProfile S H' a = 2 := by
+                    exact hdeg.symm ▸ hdegH
+                  simpa [degreeProfile, leftDegreeAt, L] using hdegH'
+                have hsum' :
+                    vertexDegreeIn n (leftSubgraph S H') a +
+                      vertexDegreeIn n (rightSubgraph S H') a = 2 := by
+                  simpa [leftDegreeAt, rightDegreeAt] using leftDeg_add_rightDeg_eq_two S H' hH' a
+                have hleft2' : vertexDegreeIn n (leftSubgraph S H') a = 2 := by
+                  simpa [L] using hleft2
+                have hright0 : vertexDegreeIn n (rightSubgraph S H') a = 0 := by omega
+                omega
+      have hreachH' : (edgeSetToGraph n H').Reachable u v := hH'.connected.preconnected u v
+      simpa [mixedGraph, L, R, RH, hLHall', hRempty] using hreachH'
+
+theorem same_pairing_transfers_reachability :
+  ∀ (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H'),
+    S.isBalanced →
+    degreeProfile S H = degreeProfile S H' →
+    HEq (pathPairing S H hH) (pathPairing S H' hH') →
+    prematureCycleFlag S H = prematureCycleFlag S H' →
+    ∀ u v : Fin n,
+      (edgeSetToGraph n (leftSubgraph S H ∪ rightSubgraph S H)).Reachable u v →
+      (edgeSetToGraph n (leftSubgraph S H' ∪ rightSubgraph S H)).Reachable u v := by
+  intro n S H H' hH hH' hS hd hπ hc u v hreach
+  exact same_pairing_transfers_reachability_ax n S H H' hH hH' hS hd hπ hc u v hreach
+
+theorem stitchability_connected
+    (n : ℕ) (S : Frontier n) (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (hS : S.isBalanced)
+    (hd : degreeProfile S H = degreeProfile S H')
+    (hπ : HEq (pathPairing S H hH) (pathPairing S H' hH'))
+    (hc : prematureCycleFlag S H = prematureCycleFlag S H') :
+    IsConnectedEdgeSet n (mixedGraph S H H') := by
+  unfold IsConnectedEdgeSet
+  have hno_premature : ¬ hasPrematureCycle S H :=
+    no_prematureCycle_at_balanced_frontier S hS H hH
+  rw [SimpleGraph.connected_iff]
+  refine ⟨fun u v => ?_, ?_⟩
+  · have hH_reach := boundary_multigraph_connected_of_ham n S H hH hS hno_premature u v
+    exact same_pairing_transfers_reachability n S H H' hH hH' hS hd hπ hc u v hH_reach
+  · exact hH.connected.nonempty
+
+theorem same_state_stitchability
+    (S : Frontier n) (hS : S.isBalanced)
+    (H H' : Finset (Edge n))
+    (hH : IsHamCycle n H) (hH' : IsHamCycle n H')
+    (hU : danglingEndpoints S H = danglingEndpoints S H')
+    (hσ : sameInterfaceState S H H' hH hH' hU) :
+    IsHamCycle n (mixedGraph S H H') := by
+  obtain ⟨hd, hπ, hc⟩ := hσ
+  exact {
+    twoRegular := mixed_degree_eq S H H' hH hH' hd
+    connected := stitchability_connected n S H H' hH hH' hS hd hπ hc
+    noLoops := mixed_noLoops S H H' hH hH'
+    spanning := mixed_spanning S H H' hH hH' hd
+  }
 
 theorem pairing_mismatch_not_hamiltonian
     (S : Frontier n) (hS : S.isBalanced)

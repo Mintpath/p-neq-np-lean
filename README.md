@@ -1,5 +1,8 @@
 # p-neq-np-lean
 
+[![Lean 4 Build](https://github.com/Mintpath/p-neq-np-lean/actions/workflows/lean_action_ci.yml/badge.svg)](https://github.com/Mintpath/p-neq-np-lean/actions/workflows/lean_action_ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Machine-verified proof that P ≠ NP via exponential circuit lower bounds for Hamiltonian Cycle. Lean 4 formalization with Mathlib. Proves SIZE(HAM_n) ≥ 2^{Ω(n)} using frontier analysis, switch blocks, cross-pattern mixing, recursive funnel magnification, continuation packets, rooted descent, and signature rigidity.
 
 **Zero `sorry`. Two `axiom` (both classical results with published proofs). Every other theorem machine-checked.**

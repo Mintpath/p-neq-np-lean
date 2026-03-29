@@ -37,52 +37,18 @@ def Restriction.maxDegree (ρ : Restriction n) : ℕ :=
   Finset.univ.sup fun v : Fin n =>
     (ρ.forcedPresent.filter fun e => v ∈ e).card
 
+def incidentVertices (edges : Finset (Edge n)) : Finset (Fin n) :=
+  Finset.univ.filter fun v : Fin n => 0 < (edges.filter fun e => v ∈ e).card
+
 def Restriction.isPathCompatible (ρ : Restriction n) : Prop :=
   ρ.maxDegree ≤ 2 ∧
   (∀ e ∈ ρ.forcedPresent, ¬ e.IsDiag) ∧
-  ¬ (ρ.forcedPresent.card ≥ 3 ∧ IsConnectedEdgeSet n ρ.forcedPresent ∧
-     ρ.forcedPresent.card = (Finset.univ.filter
-       fun v : Fin n => (ρ.forcedPresent.filter fun e => v ∈ e).card ≥ 1).card)
+  ∀ comp : Finset (Edge n), comp ⊆ ρ.forcedPresent →
+    IsIncidentConnected n comp →
+    comp.Nonempty →
+    comp.card < (incidentVertices comp).card
 
 end Restriction
-
-section PackedFamily
-
-private theorem packed_family_robustness_ax :
-  ∀ (n : ℕ), n ≥ 4 →
-    ∀ (ρ : Restriction n), ρ.consistent → ρ.isPathCompatible →
-    ∀ (polylogBound : ℕ), ρ.size ≤ polylogBound →
-    2 * ρ.size + 4 ≤ n →
-    (restrictedHamCycles n ρ).Nonempty →
-    (restrictedHamCycles n ρ).Nonempty := by
-  intro _ _ _ _ _ _ _ _ hne; exact hne
-
-private theorem packed_family_robustness_core (n : ℕ) (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
-    (hSizeN : 2 * ρ.size + 4 ≤ n)
-    (hne : (restrictedHamCycles n ρ).Nonempty) :
-    (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_ax n hn ρ hcons hpath polylogBound hsize hSizeN hne
-
-theorem packedFamily (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
-    (hSizeN : 2 * ρ.size + 4 ≤ n)
-    (hne : (restrictedHamCycles n ρ).Nonempty) :
-    (restrictedHamCycles n ρ).Nonempty :=
-  packed_family_robustness_core n hn ρ hcons hpath polylogBound hsize hSizeN hne
-
-theorem packedFamily_superexp (hn : n ≥ 4)
-    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hsize : ρ.size ≤ polylogBound)
-    (hSizeN : 2 * ρ.size + 4 ≤ n)
-    (hne : (restrictedHamCycles n ρ).Nonempty) :
-    ∃ c : ℕ, c > 0 ∧ (restrictedHamCycles n ρ).card ≥ c := by
-  have hne' := packedFamily hn ρ hcons hpath polylogBound hsize hSizeN hne
-  exact ⟨1, Nat.one_pos, Finset.Nonempty.card_pos hne'⟩
-
-end PackedFamily
 
 section TwoOptRerouting
 
@@ -504,33 +470,6 @@ private lemma monochromaticToggleFraction_le_one {n : ℕ} (S : Frontier n)
   · rw [div_le_one (Nat.cast_pos.mpr h)]
     exact Nat.cast_le.mpr (Finset.card_le_card (Finset.filter_subset _ _))
   · norm_num
-
-private theorem degree_visibility_bias_bounds_ax :
-  ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
-    ∀ (H : Finset (Edge n)), IsHamCycle n H →
-    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H) →
-    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) →
-    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) := by
-  intro n S _hbal _hn H _hH hlo hhi
-  exact ⟨hlo, hhi⟩
-
-private theorem degree_visibility_bias_bounds :
-  ∀ {n : ℕ} (S : Frontier n), S.isDensityBalanced → n ≥ 4 →
-    ∀ (H : Finset (Edge n)), IsHamCycle n H →
-    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H) →
-    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) →
-    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
-  degree_visibility_bias_bounds_ax
-
-theorem degreeVisibilityBias (S : Frontier n) (hS : S.isDensityBalanced)
-    (hn : n ≥ 4) (H : Finset (Edge n)) (hH : IsHamCycle n H)
-    (hlo : 1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H)
-    (hhi : monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ)) :
-    1 / 8 - 1 / (n : ℝ) ≤ monochromaticToggleFraction S H ∧
-    monochromaticToggleFraction S H ≤ 1 / 2 + 1 / (n : ℝ) :=
-  degree_visibility_bias_bounds S hS hn H hH hlo hhi
 
 end DegreeVisibilityBias
 

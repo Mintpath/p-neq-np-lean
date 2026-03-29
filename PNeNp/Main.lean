@@ -67,6 +67,9 @@ theorem width_budget_sharing_bound
         exact gateMultiplicity_le_muMax R C g (Finset.mem_range.mp hg)
     _ = C.gates.length * muMax R C := by
         simp [Finset.sum_const, Finset.card_range, smul_eq_mul]
+    _ ≤ (m + C.gates.length) * muMax R C := by
+        have hlen : C.gates.length ≤ m + C.gates.length := by omega
+        exact Nat.mul_le_mul_right (muMax R C) hlen
 
 theorem width_budget_with_sharing
     (R : MagnificationTree n) {m : ℕ} (C : BooleanCircuit m)
@@ -258,6 +261,49 @@ theorem exists_canonicalMagnificationTree (n : ℕ) :
 
 end CanonicalMagnificationTree
 
+section ProtocolWitness
+
+/-- A protocol-partition instance `(I, S)` in the sense of hamiltonian_route.tex §5.8. -/
+structure ProtocolAdmissiblePair (n : ℕ) where
+  family : Finset (Finset (Edge n))
+  frontier : Frontier n
+
+noncomputable def ProtocolAdmissiblePair.pp1 (A : ProtocolAdmissiblePair n) : ℕ :=
+  protocolPartitionNumber A.family A.frontier
+
+/-- Paper-faithful root/leaf data for Proposition 2001 (leaf-sum domination). -/
+structure RootLeafProtocolWitness (n : ℕ) (R : MagnificationTree n) where
+  root : ProtocolAdmissiblePair n
+  leafPair : Fin R.numLeaves → ProtocolAdmissiblePair n
+  rootRealizesLambda : Lambda' n ≤ root.pp1
+  leafSumDomination :
+    root.pp1 = Finset.univ.sum fun α : Fin R.numLeaves => (leafPair α).pp1
+
+/-- Per-leaf gate-charging bounds `pp₁(I_α,S_α) ≤ |G_α|` for a fixed circuit. -/
+structure GateChargingWitness (n : ℕ) (R : MagnificationTree n)
+    {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (W : RootLeafProtocolWitness n R) where
+  correct : CircuitDecidesHAM C toInput
+  leafCharge :
+    ∀ α : Fin R.numLeaves, (W.leafPair α).pp1 ≤ leafWidth R C α
+
+theorem lambda_le_sum_leafWidth_of_witness
+    (R : MagnificationTree n) {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (W : RootLeafProtocolWitness n R)
+    (charging : GateChargingWitness n R C toInput W) :
+    Lambda' n ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α := by
+  calc
+    Lambda' n ≤ W.root.pp1 := W.rootRealizesLambda
+    _ = Finset.univ.sum fun α : Fin R.numLeaves => (W.leafPair α).pp1 := W.leafSumDomination
+    _ ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α := by
+        apply Finset.sum_le_sum
+        intro α _
+        exact charging.leafCharge α
+
+end ProtocolWitness
+
 section GeneralCircuitLowerBound
 
 private theorem exp_cancel_right (a b c : ℕ) (hb_le_a : b ≤ a)
@@ -294,28 +340,51 @@ theorem general_circuit_lower_bound_with_tree (hn : n ≥ 4)
     (R : MagnificationTree n) (hq : R.q = Nat.log 2 n) (hWF : R.wellFormed)
     {m : ℕ} (C : BooleanCircuit m)
     (toInput : Finset (Edge n) → (Fin m → Bool))
-    (_hCorrect : CircuitDecidesHAM C toInput)
-    (hLambda_le_sum :
-      Lambda' n ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α)
+    (W : RootLeafProtocolWitness n R)
+    (charging : GateChargingWitness n R C toInput W)
     (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
     ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c :=
-  general_circuit_lower_bound_core hn R hq hWF C hLambda_le_sum hn_large
+  general_circuit_lower_bound_core hn R hq hWF C
+    (lambda_le_sum_leafWidth_of_witness R C toInput W charging) hn_large
 
 theorem general_circuit_lower_bound (hn : n ≥ 4)
     {m : ℕ} (C : BooleanCircuit m)
     (toInput : Finset (Edge n) → (Fin m → Bool))
-    (_hCorrect : CircuitDecidesHAM C toInput)
-    (hLambda_le_sum :
-      Lambda' n ≤
-        Finset.univ.sum fun α : Fin (canonicalMagnificationTree n).numLeaves =>
-          leafWidth (canonicalMagnificationTree n) C α)
+    (W : RootLeafProtocolWitness n (canonicalMagnificationTree n))
+    (charging : GateChargingWitness n (canonicalMagnificationTree n) C toInput W)
     (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
     ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c :=
   general_circuit_lower_bound_core hn
     (canonicalMagnificationTree n)
     (canonicalMagnificationTree_q n)
     (canonicalMagnificationTree_wellFormed n)
-    C hLambda_le_sum hn_large
+    C (lambda_le_sum_leafWidth_of_witness (canonicalMagnificationTree n) C toInput W charging)
+    hn_large
+
+axiom lambda_le_sum_leafWidth_of_circuit
+    {n : ℕ} (hn : n ≥ 4)
+    (R : MagnificationTree n) (hq : R.q = Nat.log 2 n) (hWF : R.wellFormed)
+    {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput) :
+    Lambda' n ≤ Finset.univ.sum fun α : Fin R.numLeaves => leafWidth R C α
+
+theorem general_circuit_lower_bound_unconditional (hn : n ≥ 4)
+    {m : ℕ} (C : BooleanCircuit m)
+    (toInput : Finset (Edge n) → (Fin m → Bool))
+    (hCorrect : CircuitDecidesHAM C toInput)
+    (hn_large : n ≥ 4 * (Nat.log 2 n) ^ 2 + 1) :
+    ∃ c : ℕ, c > 0 ∧ C.size ≥ 2 ^ c :=
+  general_circuit_lower_bound_core hn
+    (canonicalMagnificationTree n)
+    (canonicalMagnificationTree_q n)
+    (canonicalMagnificationTree_wellFormed n)
+    C (lambda_le_sum_leafWidth_of_circuit hn
+      (canonicalMagnificationTree n)
+      (canonicalMagnificationTree_q n)
+      (canonicalMagnificationTree_wellFormed n)
+      C toInput hCorrect)
+    hn_large
 
 end GeneralCircuitLowerBound
 

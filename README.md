@@ -62,4 +62,4 @@ grep -rn "^axiom \|^private axiom " PNeNp/*.lean
 
 ## Paper
 
-The mathematical proof is detailed in `hamiltonian_route.tex` (also available on [[Zenodo](https://zenodo.org/records/19103649)]).
+The mathematical proof is detailed in `hamiltonian_route.tex` (also available on [Zenodo](https://zenodo.org/records/19103649)).

@@ -23,21 +23,6 @@ noncomputable def optimalOneLeaves (I : Finset (Finset (Edge n)))
 
 end ProtocolPartitionTree
 
-section AUYCharacterization
-
-theorem auy_characterization
-    {m : ℕ} (F : BooleanCircuit m) (hF : F.isFormula)
-    (E : NaturalEdgeEncoding n m)
-    (hDecides : ComputesHAMWithNaturalEncoding F E)
-    (S : Frontier n)
-    (I : Finset (Finset (Edge n)))
-    (hHam : ∀ H ∈ I, IsHamCycle n H)
-    (hAuy : protocolPartitionNumber I S ≤ F.size) :
-    protocolPartitionNumber I S ≤ F.size :=
-  ahoUllmanYannakakis F hF E hDecides S I hHam hAuy
-
-end AUYCharacterization
-
 section CrossPatternRectangleIsolation
 
 theorem crossPatternRectIsolation
@@ -92,45 +77,52 @@ private theorem cross_pattern_rect_isolation_pp_bound_ax :
     fun η => patternHamCycles_isHamCycle_local ρ blocks η _ (hRepMem η)
   have hRepNoShare :
       ∀ (η₀ η₁ : Fin blocks.length → Bool), η₀ ≠ η₁ →
-      ∀ (R : Finset (Finset (Edge n))),
-        (∀ H₀ ∈ R, ∀ H₁ ∈ R, IsHamCycle n (mixedGraph S H₁ H₀)) →
-        ¬(rep η₀ ∈ R ∧ rep η₁ ∈ R) := by
+      ∀ (R : OneRectangle n),
+        (∀ H₀ ∈ R.leftFam, ∀ H₁ ∈ R.rightFam, IsHamCycle n (mixedGraph S H₁ H₀)) →
+        ¬(rep η₀ ∈ R.leftFam ∧ rep η₁ ∈ R.rightFam) := by
     intro η₀ η₁ hne R hRrect ⟨h₀, h₁⟩
     have hNo := rectangleIsolation S ρ blocks hDisjoint hVisible η₀ η₁ hne
       (rep η₀) (rep η₁) (hRepMem η₀) (hRepMem η₁)
     exact hNo (hRrect _ h₀ _ h₁)
   unfold protocolPartitionNumber
   apply le_csInf
-  · refine ⟨I.card, I.image (fun H => ({H} : Finset (Finset (Edge n)))), ?_, ?_, ?_⟩
-    · exact Finset.card_image_of_injective _ Finset.singleton_injective
+  · refine ⟨I.card, I.image (fun H : Finset (Edge n) =>
+        ({ leftFam := ({H} : Finset (Finset (Edge n)))
+           rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n)), ?_, ?_, ?_⟩
+    · refine Finset.card_image_of_injective _ ?_
+      intro H₀ H₁ hEq
+      simpa using congrArg OneRectangle.leftFam hEq
     · intro R hR
       simp only [Finset.mem_image] at hR
       obtain ⟨H, hH, rfl⟩ := hR
-      refine ⟨Finset.singleton_subset_iff.mpr hH, ?_⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hH, Finset.singleton_subset_iff.mpr hH, ?_⟩
       intro H₀ hH₀ H₁ hH₁
       rw [Finset.mem_singleton] at hH₀ hH₁
       rw [hH₀, hH₁, mixedGraph_self_local S H (hIHam H hH)]
       exact hIHam H hH
     · intro H hH
-      exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
+      exact ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))),
+        Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H, Finset.mem_singleton_self H⟩
   · intro k hk
     rcases hk with ⟨P, hPcard, hRect, hCover⟩
     rw [← hPcard]
-    have hAssign : ∀ η : Fin blocks.length → Bool, ∃ R ∈ P, rep η ∈ R := by
+    have hAssign : ∀ η : Fin blocks.length → Bool, ∃ R ∈ P, rep η ∈ R.leftFam ∧ rep η ∈ R.rightFam := by
       intro η
       exact hCover (rep η) (hRepInI η)
-    let assign : (Fin blocks.length → Bool) → Finset (Finset (Edge n)) :=
+    let assign : (Fin blocks.length → Bool) → OneRectangle n :=
       fun η => (hAssign η).choose
     have hAssignMem : ∀ η, assign η ∈ P := fun η => (hAssign η).choose_spec.1
-    have hAssignIn : ∀ η, rep η ∈ assign η := fun η => (hAssign η).choose_spec.2
+    have hAssignInLeft : ∀ η, rep η ∈ (assign η).leftFam := fun η => (hAssign η).choose_spec.2.1
+    have hAssignInRight : ∀ η, rep η ∈ (assign η).rightFam := fun η => (hAssign η).choose_spec.2.2
     have hAssignInj : Function.Injective assign := by
       intro η₀ η₁ hEq
       by_contra hne
-      have hRectMono : ∀ H₀ ∈ assign η₀, ∀ H₁ ∈ assign η₀, IsHamCycle n (mixedGraph S H₁ H₀) := by
-        exact (hRect (assign η₀) (hAssignMem η₀)).2
-      have hBoth : rep η₀ ∈ assign η₀ ∧ rep η₁ ∈ assign η₀ := by
-        refine ⟨hAssignIn η₀, ?_⟩
-        simpa [assign, hEq] using hAssignIn η₁
+      have hRectMono : ∀ H₀ ∈ (assign η₀).leftFam, ∀ H₁ ∈ (assign η₀).rightFam,
+          IsHamCycle n (mixedGraph S H₁ H₀) := by
+        exact (hRect (assign η₀) (hAssignMem η₀)).monochromatic
+      have hBoth : rep η₀ ∈ (assign η₀).leftFam ∧ rep η₁ ∈ (assign η₀).rightFam := by
+        refine ⟨hAssignInLeft η₀, ?_⟩
+        simpa [assign, hEq] using hAssignInRight η₁
       exact hRepNoShare η₀ η₁ hne (assign η₀) hRectMono hBoth
     have hImageSub : (Finset.univ.image assign) ⊆ P := by
       intro R hR
@@ -141,21 +133,6 @@ private theorem cross_pattern_rect_isolation_pp_bound_ax :
       (Finset.univ : Finset (Fin blocks.length → Bool)).card = (Finset.univ.image assign).card := by
         rw [Finset.card_image_of_injective _ hAssignInj]
       _ ≤ P.card := Finset.card_le_card hImageSub
-
-private theorem cross_pattern_rect_isolation_pp_bound_proof
-    (S : Frontier n) (ρ : Restriction n)
-    (blocks : List (SwitchBlock n))
-    (hDisjoint : blocksVertexDisjoint blocks)
-    (hVisible : ∀ i : Fin blocks.length, blocks[i].isDegreeVisible S)
-    (hOpen : ∀ η : Fin blocks.length → Bool,
-      (patternHamCycles ρ blocks η).Nonempty)
-    (I : Finset (Finset (Edge n)))
-    (hIHam : ∀ H ∈ I, IsHamCycle n H)
-    (hI : ∀ η : Fin blocks.length → Bool,
-      ∀ H ∈ patternHamCycles ρ blocks η, H ∈ I) :
-    protocolPartitionNumber I S ≥
-      (Finset.univ : Finset (Fin blocks.length → Bool)).card :=
-  cross_pattern_rect_isolation_pp_bound_ax S ρ blocks hDisjoint hVisible hOpen I hIHam hI
 
 theorem crossPatternRectIsolation_pp
     (S : Frontier n) (ρ : Restriction n)
@@ -170,7 +147,7 @@ theorem crossPatternRectIsolation_pp
       ∀ H ∈ patternHamCycles ρ blocks η, H ∈ I) :
     protocolPartitionNumber I S ≥
       (Finset.univ : Finset (Fin blocks.length → Bool)).card :=
-  cross_pattern_rect_isolation_pp_bound_proof S ρ blocks hDisjoint hVisible hOpen I hIHam hI
+  cross_pattern_rect_isolation_pp_bound_ax S ρ blocks hDisjoint hVisible hOpen I hIHam hI
 
 end CrossPatternRectangleIsolation
 
@@ -383,34 +360,15 @@ private theorem funnel_iteration_bound_ax :
     rw [show n / (4 * q) ≤ q * steps ↔ n / (4 * q) < q * steps + 1 from by omega]
     rwa [Nat.div_lt_iff_lt_mul h4q_pos]
 
-private theorem funnel_iteration_bound_proof
-    (n q : ℕ) (hq : q = Nat.log 2 n) (hn : n ≥ 4 * q ^ 2 + 1) :
-    Gamma q (n - 2 * q) ≥ 2 ^ (n / (4 * q)) :=
-  funnel_iteration_bound_ax n q hq hn
-
 theorem funnelIteration (n q : ℕ) (hq : q = Nat.log 2 n)
     (hn : n ≥ 4 * q ^ 2 + 1) :
     Gamma q (n - 2 * q) ≥ 2 ^ (n / (4 * q)) :=
-  funnel_iteration_bound_proof n q hq hn
+  funnel_iteration_bound_ax n q hq hn
 
 theorem formulaLowerBound_cor83 (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
-      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-        (∀ H ∈ I, IsHamCycle n H) →
-        protocolPartitionNumber I S ≤ F.size) →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
   formulaLowerBound hn
 
@@ -419,24 +377,10 @@ private theorem formula_lower_bound_explicit_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
-    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-      (∀ H ∈ I, IsHamCycle n H) →
-      protocolPartitionNumber I S ≤ F.size) →
-    (∀ (S : Frontier n) (hS : S.isBalanced)
-      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-      ∃ (blocks : List (SwitchBlock n)),
-        blocks.length = q ∧
-        blocksVertexDisjoint blocks ∧
-        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-        ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ blocks η).Nonempty) →
     F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) := by
-  intro n hn m F hF E hCorrect hAuyBound hPackingOracle
+  intro n hn m F hF E hCorrect
   by_cases hq : n / (4 * Nat.log 2 n + 4) = 0
-  · have h := formulaSizeSuperpolynomial hn m F hF E hCorrect hAuyBound hPackingOracle 1 le_rfl
+  · have h := formulaSizeSuperpolynomial hn m F hF E hCorrect 1 le_rfl
         (by omega)
     rw [hq]; norm_num at h ⊢; omega
   · have hq_pos : 1 ≤ n / (4 * Nat.log 2 n + 4) := Nat.one_le_iff_ne_zero.mpr hq
@@ -449,53 +393,15 @@ private theorem formula_lower_bound_explicit_ax :
       calc 4 * k ≤ d * k := Nat.mul_le_mul_right k h1
         _ = k * d := Nat.mul_comm d k
         _ ≤ n := h2
-    exact formulaSizeSuperpolynomial hn m F hF E hCorrect hAuyBound hPackingOracle _ hq_pos hq_bound
-
-private theorem formula_lower_bound_explicit_proof
-    (hn : n ≥ 4)
-    (m : ℕ) (F : BooleanCircuit m) (hF : F.isFormula)
-    (E : NaturalEdgeEncoding n m)
-    (hCorrect : ComputesHAMWithNaturalEncoding F E)
-    (hAuyBound :
-      ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-        (∀ H ∈ I, IsHamCycle n H) →
-        protocolPartitionNumber I S ≤ F.size)
-    (hPackingOracle :
-      ∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) :
-    F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  formula_lower_bound_explicit_ax hn m F hF E hCorrect hAuyBound hPackingOracle
+    exact formulaSizeSuperpolynomial hn m F hF E hCorrect _ hq_pos hq_bound
 
 theorem formulaLowerBound_exponential (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
-      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-        (∀ H ∈ I, IsHamCycle n H) →
-        protocolPartitionNumber I S ≤ F.size) →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       F.size ≥ 2 ^ (n / (4 * Nat.log 2 n + 4)) :=
-  fun m F hF E hCorrect hAuyBound hPackingOracle =>
-    formula_lower_bound_explicit_proof hn m F hF E hCorrect hAuyBound hPackingOracle
+  fun m F hF E hCorrect =>
+    formula_lower_bound_explicit_ax hn m F hF E hCorrect
 
 end FormulaLowerBoundCorollary
 

@@ -1,6 +1,7 @@
 import PNeNp.Basic
 import PNeNp.Interface
 import PNeNp.Switch
+import PNeNp.Robustness
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Card
 import Mathlib.Data.Finset.Sort
@@ -196,98 +197,31 @@ noncomputable def cleanDegreeVisibleCount (S : Frontier n)
     ¬(Sym2.mk (p, a) ∉ S.leftEdges ∧ Sym2.mk (p, b) ∉ S.leftEdges ∧
       Sym2.mk (a, q) ∉ S.leftEdges ∧ Sym2.mk (b, q) ∉ S.leftEdges)).card
 
-private theorem degree_visible_supply_exists_ax :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
-    (polylogBound : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    (restrictedHamCycles n ρ).Nonempty →
-    (∃ H ∈ restrictedHamCycles n ρ,
-      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n) →
-    ∃ H ∈ restrictedHamCycles n ρ,
-      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n := by
-  intro _n _S _ρ _polylogBound _hBal _hcons _hm _hn4 _hne hSupplyWitness
-  exact hSupplyWitness
-
-private theorem degree_visible_supply_exists :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
-    (polylogBound : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    (restrictedHamCycles n ρ).Nonempty →
-    (∃ H ∈ restrictedHamCycles n ρ,
-      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n) →
-    ∃ H ∈ restrictedHamCycles n ρ,
-      (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n :=
-  degree_visible_supply_exists_ax
-
 theorem degreeVisibleBlockSupply
-    (S : Frontier n) (hS : S.isBalanced)
-    (ρ : Restriction n) (hcons : ρ.consistent)
-    (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-    (hNonempty : (restrictedHamCycles n ρ).Nonempty)
+    (S : Frontier n) (_hS : S.isBalanced)
+    (ρ : Restriction n) (_hcons : ρ.consistent)
+    (polylogBound : ℕ) (_hm : ρ.size ≤ polylogBound)
+    (_hNonempty : (restrictedHamCycles n ρ).Nonempty)
     (hSupplyWitness : ∃ H ∈ restrictedHamCycles n ρ,
       (cleanDegreeVisibleCount S ρ H : ℝ) ≥ 1 / 8 * ↑n)
-    (hn : n ≥ 4) :
+    (_hn : n ≥ 4) :
     ∃ c₀ : ℝ, c₀ > 0 ∧
       ∃ H ∈ restrictedHamCycles n ρ,
         ↑(cleanDegreeVisibleCount S ρ H) ≥ c₀ * ↑n := by
-  obtain ⟨H, hH, hSupply⟩ :=
-    degree_visible_supply_exists S ρ polylogBound hS hcons hm hn hNonempty hSupplyWitness
+  obtain ⟨H, hH, hSupply⟩ := hSupplyWitness
   exact ⟨1 / 8, by positivity, H, hH, hSupply⟩
 
 end DegreeVisibleSupply
 
 section DisjointSwitchPacking
 
-private theorem greedy_packing_from_supply_ax :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
-    (polylogBound q : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    1 ≤ q → q ≤ polylogBound → n ≥ q →
-    (∃ (blocks : List (SwitchBlock n)),
-      blocks.length = q ∧
-      blocksVertexDisjoint blocks ∧
-      (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-      (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-      ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty) →
-    ∃ (blocks : List (SwitchBlock n)),
-      blocks.length = q ∧
-      blocksVertexDisjoint blocks ∧
-      (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-      (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-      ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty := by
-  intro _n _S _ρ _polylogBound _q _hBal _hCons _hSize _hn4 _hq_pos _hq_bound _hn_ge_q hPackedWitness
-  exact hPackedWitness
-
-private theorem greedy_packing_from_supply :
-  ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
-    (polylogBound q : ℕ),
-    S.isBalanced → ρ.consistent → ρ.size ≤ polylogBound → n ≥ 4 →
-    1 ≤ q → q ≤ polylogBound → n ≥ q →
-    (∃ (blocks : List (SwitchBlock n)),
-      blocks.length = q ∧
-      blocksVertexDisjoint blocks ∧
-      (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-      (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-      ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty) →
-    ∃ (blocks : List (SwitchBlock n)),
-      blocks.length = q ∧
-      blocksVertexDisjoint blocks ∧
-      (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-      (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-      ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty :=
-  greedy_packing_from_supply_ax
-
 theorem disjointOpenSwitchPacking
-    (S : Frontier n) (hS : S.isBalanced)
-    (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-    (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-    (hn : n ≥ 4)
-    (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound)
-    (hn_ge_q : n ≥ q)
+    (S : Frontier n) (_hS : S.isBalanced)
+    (ρ : Restriction n) (_hcons : ρ.consistent) (_hpath : ρ.isPathCompatible)
+    (polylogBound : ℕ) (_hm : ρ.size ≤ polylogBound)
+    (_hn : n ≥ 4)
+    (q : ℕ) (_hq_pos : 1 ≤ q) (_hq_bound : q ≤ polylogBound)
+    (_hn_ge_q : n ≥ q)
     (hPackedWitness : ∃ (blocks : List (SwitchBlock n)),
       blocks.length = q ∧
       blocksVertexDisjoint blocks ∧
@@ -301,9 +235,8 @@ theorem disjointOpenSwitchPacking
       (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
       (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
       ∀ η : Fin blocks.length → Bool,
-        (patternHamCycles ρ blocks η).Nonempty := by
-  exact greedy_packing_from_supply S ρ polylogBound q
-    hS hcons hm hn hq_pos hq_bound hn_ge_q hPackedWitness
+        (patternHamCycles ρ blocks η).Nonempty :=
+  hPackedWitness
 
 end DisjointSwitchPacking
 
@@ -490,17 +423,33 @@ noncomputable def backgroundRestriction {q : ℕ}
 
 /-! ### Protocol-partition number (hamiltonian_route.tex Definition, lines 1725-1732) -/
 
+structure OneRectangle (n : ℕ) where
+  leftFam : Finset (Finset (Edge n))
+  rightFam : Finset (Finset (Edge n))
+deriving DecidableEq
+
 structure IsOneRectangle (I : Finset (Finset (Edge n))) (S : Frontier n)
-    (R : Finset (Finset (Edge n))) : Prop where
-  subset : R ⊆ I
-  monochromatic : ∀ H₀ ∈ R, ∀ H₁ ∈ R, IsHamCycle n (mixedGraph S H₁ H₀)
+    (R : OneRectangle n) : Prop where
+  left_subset : R.leftFam ⊆ I
+  right_subset : R.rightFam ⊆ I
+  monochromatic :
+    ∀ H₀ ∈ R.leftFam, ∀ H₁ ∈ R.rightFam, IsHamCycle n (mixedGraph S H₁ H₀)
+
+structure IsOneRectangleFor
+    (L R : Finset (Finset (Edge n)))
+    (pred : Finset (Edge n) → Finset (Edge n) → Prop)
+    (rect : OneRectangle n) : Prop where
+  left_subset : rect.leftFam ⊆ L
+  right_subset : rect.rightFam ⊆ R
+  monochromatic :
+    ∀ H₀ ∈ rect.leftFam, ∀ H₁ ∈ rect.rightFam, pred H₀ H₁
 
 open Classical in
 noncomputable def protocolPartitionNumber
     (I : Finset (Finset (Edge n))) (S : Frontier n) : ℕ :=
-  sInf {k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+  sInf {k : ℕ | ∃ (P : Finset (OneRectangle n)),
       P.card = k ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧
-      (∀ H ∈ I, ∃ R ∈ P, H ∈ R)}
+      (∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam)}
 
 noncomputable def Gamma (q N : ℕ) : ℕ :=
   if q = 0 then 1
@@ -998,33 +947,221 @@ private noncomputable def suppressedBackgroundRestriction {q : ℕ}
   ⟨child.ρ.forcedPresent \ (Finset.univ.image fun i => (child.carriers i).toEdge),
    child.ρ.forcedAbsent⟩
 
-private theorem multi_carrier_suppression_child :
-  ∀ {n q : ℕ} (ext : MultiCarrierExtension n q)
-    (η : Fin q → Bool), n ≥ 2 * q →
-    (∃ (child : SuppressedChild (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
-      (suppressedBackgroundRestriction child).size = (backgroundRestriction ext.mca).size) →
-    ∃ (child : SuppressedChild (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
-      (suppressedBackgroundRestriction child).size = (backgroundRestriction ext.mca).size := by
-  intro _n _q _ext _η _hn hSupp
-  exact hSupp
+private noncomputable def parentCarrierEdges {n q : ℕ}
+    (ext : MultiCarrierExtension n q) : Finset (Edge n) :=
+  Finset.univ.image fun i : Fin q => (ext.mca.carriers i).toEdge
 
-theorem multiCarrierSuppression {q : ℕ}
-    (ext : MultiCarrierExtension n q)
-    (η : Fin q → Bool)
-    (hn : n ≥ 2 * q)
-    (hSupp : ∃ (child : SuppressedChild (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
-      (suppressedBackgroundRestriction child).size = (backgroundRestriction ext.mca).size) :
-    ∃ (child : SuppressedChild (n - 2 * q) q),
-      (∀ i, (child.carriers i).endpt1.val = (ext.blocks i).p.val ∧
-            (child.carriers i).endpt2.val = (ext.blocks i).q.val) ∧
-      (suppressedBackgroundRestriction child).size = (backgroundRestriction ext.mca).size :=
-  multi_carrier_suppression_child ext η hn hSupp
+private theorem parentCarrierEdge_injective {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    Function.Injective (fun i : Fin q => (ext.mca.carriers i).toEdge) := by
+  intro i j hij
+  by_contra hne
+  obtain ⟨h11, h12, _, _⟩ := ext.mca.hCarrierDisjoint i j hne
+  have hij' := Sym2.eq_iff.mp hij
+  rcases hij' with h | h
+  · exact h11 h.1
+  · exact h12 h.1
+
+private theorem parentCarrierEdges_card {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (parentCarrierEdges ext).card = q := by
+  unfold parentCarrierEdges
+  rw [Finset.card_image_of_injective _ (parentCarrierEdge_injective ext), Finset.card_fin]
+
+private theorem parentCarrierEdges_subset_forcedPresent {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    parentCarrierEdges ext ⊆ ext.mca.ρ.forcedPresent := by
+  intro e he
+  simp only [parentCarrierEdges, Finset.mem_image, Finset.mem_univ, true_and] at he
+  obtain ⟨i, rfl⟩ := he
+  exact ext.mca.hForced i
+
+private theorem parent_forcedPresent_eq_carriers {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    ext.mca.ρ.forcedPresent = parentCarrierEdges ext := by
+  symm
+  apply Finset.eq_of_subset_of_card_le
+  · exact parentCarrierEdges_subset_forcedPresent ext
+  · have hcard_le : ext.mca.ρ.forcedPresent.card ≤ q := by
+      have hsize := ext.mca.hSizeBound
+      unfold Restriction.size at hsize
+      omega
+    simpa [parentCarrierEdges_card ext] using hcard_le
+
+private theorem parent_forcedAbsent_eq_empty {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    ext.mca.ρ.forcedAbsent = ∅ := by
+  have hFp_card : ext.mca.ρ.forcedPresent.card = q := by
+    rw [parent_forcedPresent_eq_carriers ext, parentCarrierEdges_card ext]
+  have hsize := ext.mca.hSizeBound
+  unfold Restriction.size at hsize
+  have hFa_card : ext.mca.ρ.forcedAbsent.card = 0 := by omega
+  exact Finset.card_eq_zero.mp hFa_card
+
+private theorem backgroundRestriction_eq_empty {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    backgroundRestriction ext.mca = ⟨∅, ∅⟩ := by
+  unfold backgroundRestriction
+  rw [parent_forcedPresent_eq_carriers ext, parent_forcedAbsent_eq_empty ext]
+  simp [parentCarrierEdges]
+
+private def suppressedCarrierEdge {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) : CarrierEdge n where
+  endpt1 := (ext.blocks i).p
+  endpt2 := (ext.blocks i).q
+  ne := by
+    exact (ext.blocks i).all_distinct.2.2.1
+
+private noncomputable def suppressedCarrierEdges {n q : ℕ}
+    (ext : MultiCarrierExtension n q) : Finset (Edge n) :=
+  Finset.univ.image fun i : Fin q => (suppressedCarrierEdge ext i).toEdge
+
+private noncomputable def suppressedChildRestriction {n q : ℕ}
+    (ext : MultiCarrierExtension n q) : Restriction n :=
+  let bg := backgroundRestriction ext.mca
+  ⟨bg.forcedPresent ∪ suppressedCarrierEdges ext,
+    bg.forcedAbsent \ suppressedCarrierEdges ext⟩
+
+private theorem suppressedChildRestriction_eq_carriers {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    suppressedChildRestriction ext = ⟨suppressedCarrierEdges ext, ∅⟩ := by
+  unfold suppressedChildRestriction
+  rw [backgroundRestriction_eq_empty ext]
+  simp
+
+private theorem suppressedChildRestriction_consistent {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (suppressedChildRestriction ext).consistent := by
+  unfold suppressedChildRestriction Restriction.consistent
+  dsimp
+  rw [Finset.disjoint_left]
+  intro e heP heA
+  rcases Finset.mem_union.mp heP with hbg | hcar
+  · have hparent : e ∈ ext.mca.ρ.forcedPresent := by
+      exact Finset.mem_sdiff.mp hbg |>.1
+    have habs : e ∈ ext.mca.ρ.forcedAbsent := by
+      exact Finset.mem_sdiff.mp heA |>.1
+    exact Finset.disjoint_left.mp ext.mca.hConsistent hparent habs
+  · exact (Finset.mem_sdiff.mp heA).2 hcar
+
+private theorem suppressedCarrier_forced {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (suppressedCarrierEdge ext i).toEdge ∈ (suppressedChildRestriction ext).forcedPresent := by
+  unfold suppressedChildRestriction
+  simp [suppressedCarrierEdges]
+
+private theorem suppressedCarrier_bichromatic {n q : ℕ}
+    (ext : MultiCarrierExtension n q) (i : Fin q) :
+    (suppressedCarrierEdge ext i).isBichromatic ext.mca.χ := by
+  exact ext.hPortsBichromatic i
+
+private theorem suppressedCarrier_disjoint {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    ∀ i j, i ≠ j →
+      (suppressedCarrierEdge ext i).endpt1 ≠ (suppressedCarrierEdge ext j).endpt1 ∧
+      (suppressedCarrierEdge ext i).endpt1 ≠ (suppressedCarrierEdge ext j).endpt2 ∧
+      (suppressedCarrierEdge ext i).endpt2 ≠ (suppressedCarrierEdge ext j).endpt1 ∧
+      (suppressedCarrierEdge ext i).endpt2 ≠ (suppressedCarrierEdge ext j).endpt2 := by
+  intro i j hij
+  have hdisj := ext.hAllDistinct i j hij
+  constructor
+  · intro h
+    have hpi : (ext.blocks i).p ∈ (ext.blocks i).vertices := by simp [SwitchBlock.vertices]
+    have hp_eq : (ext.blocks i).p = (ext.blocks j).p := by
+      simpa [suppressedCarrierEdge] using h
+    have hpj : (ext.blocks i).p ∈ (ext.blocks j).vertices := by
+      have : (ext.blocks j).p ∈ (ext.blocks j).vertices := by simp [SwitchBlock.vertices]
+      simpa [SwitchBlock.vertices, hp_eq] using this
+    exact (Finset.disjoint_left.mp hdisj) hpi hpj
+  constructor
+  · intro h
+    have hpi : (ext.blocks i).p ∈ (ext.blocks i).vertices := by simp [SwitchBlock.vertices]
+    have hq_eq : (ext.blocks i).p = (ext.blocks j).q := by
+      simpa [suppressedCarrierEdge] using h
+    have hqj : (ext.blocks i).p ∈ (ext.blocks j).vertices := by
+      have : (ext.blocks j).q ∈ (ext.blocks j).vertices := by simp [SwitchBlock.vertices]
+      simpa [SwitchBlock.vertices, hq_eq] using this
+    exact (Finset.disjoint_left.mp hdisj) hpi hqj
+  constructor
+  · intro h
+    have hqi : (ext.blocks i).q ∈ (ext.blocks i).vertices := by simp [SwitchBlock.vertices]
+    have hp_eq : (ext.blocks i).q = (ext.blocks j).p := by
+      simpa [suppressedCarrierEdge] using h
+    have hpj : (ext.blocks i).q ∈ (ext.blocks j).vertices := by
+      have : (ext.blocks j).p ∈ (ext.blocks j).vertices := by simp [SwitchBlock.vertices]
+      simpa [SwitchBlock.vertices, hp_eq] using this
+    exact (Finset.disjoint_left.mp hdisj) hqi hpj
+  · intro h
+    have hqi : (ext.blocks i).q ∈ (ext.blocks i).vertices := by simp [SwitchBlock.vertices]
+    have hq_eq : (ext.blocks i).q = (ext.blocks j).q := by
+      simpa [suppressedCarrierEdge] using h
+    have hqj : (ext.blocks i).q ∈ (ext.blocks j).vertices := by
+      have : (ext.blocks j).q ∈ (ext.blocks j).vertices := by simp [SwitchBlock.vertices]
+      simpa [SwitchBlock.vertices, hq_eq] using this
+    exact (Finset.disjoint_left.mp hdisj) hqi hqj
+
+private theorem suppressedCarrierEdge_injective {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    Function.Injective (fun i : Fin q => (suppressedCarrierEdge ext i).toEdge) := by
+  intro i j hij
+  by_contra hne
+  obtain ⟨h11, h12, _, _⟩ := suppressedCarrier_disjoint ext i j hne
+  have hij' := Sym2.eq_iff.mp hij
+  rcases hij' with h | h
+  · exact h11 h.1
+  · exact h12 h.1
+
+private theorem suppressedCarrierEdges_card {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (suppressedCarrierEdges ext).card = q := by
+  unfold suppressedCarrierEdges
+  rw [Finset.card_image_of_injective _ (suppressedCarrierEdge_injective ext), Finset.card_fin]
+
+private noncomputable def multi_carrier_suppression_child {n q : ℕ}
+    (ext : MultiCarrierExtension n q) : SuppressedChild n q where
+  ρ := suppressedChildRestriction ext
+  χ := ext.mca.χ
+  carriers := suppressedCarrierEdge ext
+  hConsistent := suppressedChildRestriction_consistent ext
+  hBalanced := ext.mca.hBalanced
+  hBichromatic := suppressedCarrier_bichromatic ext
+  hForced := suppressedCarrier_forced ext
+  hCarrierDisjoint := suppressedCarrier_disjoint ext
+
+private theorem suppressedBackgroundRestriction_eq_empty {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    suppressedBackgroundRestriction (multi_carrier_suppression_child ext) = ⟨∅, ∅⟩ := by
+  change
+    ((⟨(suppressedChildRestriction ext).forcedPresent \
+        (Finset.univ.image fun i => (suppressedCarrierEdge ext i).toEdge),
+      (suppressedChildRestriction ext).forcedAbsent⟩ : Restriction n) =
+      (⟨∅, ∅⟩ : Restriction n))
+  rw [suppressedChildRestriction_eq_carriers ext]
+  simp [suppressedCarrierEdges]
+
+private theorem suppressed_background_mass_preserved {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (suppressedBackgroundRestriction (multi_carrier_suppression_child ext)).size =
+      (backgroundRestriction ext.mca).size := by
+  rw [suppressedBackgroundRestriction_eq_empty ext, backgroundRestriction_eq_empty ext]
+
+private theorem suppressedChildRestriction_size_eq {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    (suppressedChildRestriction ext).size = q := by
+  rw [suppressedChildRestriction_eq_carriers ext, Restriction.size, suppressedCarrierEdges_card ext]
+  simp
+
+private theorem multi_carrier_suppression_child_spec {n q : ℕ}
+    (ext : MultiCarrierExtension n q) :
+    let child := multi_carrier_suppression_child ext
+    child.ρ = suppressedChildRestriction ext ∧
+    child.χ = ext.mca.χ ∧
+    child.carriers = suppressedCarrierEdge ext ∧
+    suppressedBackgroundRestriction child = backgroundRestriction ext.mca ∧
+    child.ρ.size = q := by
+  refine ⟨rfl, rfl, rfl, ?_, ?_⟩
+  · rw [suppressedBackgroundRestriction_eq_empty ext, backgroundRestriction_eq_empty ext]
+  · simpa [multi_carrier_suppression_child] using suppressedChildRestriction_size_eq ext
 
 end MultiCarrierSuppression
 
@@ -1334,6 +1471,42 @@ theorem iteratedRecurrence (q N : ℕ)
     ∃ c : ℕ, c > 0 ∧ Gamma q N ≥ 2 ^ c :=
   iterated_recurrence_exponential_bound q N hq2 hN
 
+theorem iteratedRecurrenceStrong (q N : ℕ)
+    (hq7 : q ≥ 7) (hN : N ≥ 4 * q ^ 2 + 1) :
+    ∃ c : ℕ, c > N / q ∧ Gamma q N ≥ 2 ^ c := by
+  have hq1 : q ≥ 1 := by omega
+  have hq_pos : 0 < q := by omega
+  have h2q_pos : 0 < 2 * q := by omega
+  have hN_ge_base : N ≥ 4 * q + 1 := by nlinarith [sq_nonneg q]
+  set steps := (N - (4 * q + 1)) / (2 * q) with hsteps_def
+  have hM_ge : N - (4 * q + 1) ≥ 4 * q * (q - 1) := by
+    zify [hN_ge_base, hq1] at *; nlinarith [sq_nonneg (q : ℤ)]
+  have hsteps_ge : steps ≥ 2 * (q - 1) := by
+    show 2 * (q - 1) ≤ steps
+    rw [hsteps_def, Nat.le_div_iff_mul_le h2q_pos]
+    calc 2 * (q - 1) * (2 * q) = 4 * q * (q - 1) := by ring
+      _ ≤ N - (4 * q + 1) := hM_ge
+  have hiterate : N ≥ 4 * q + 1 + 2 * q * steps := by
+    have h := hsteps_def ▸ Nat.div_mul_le_self (N - (4 * q + 1)) (2 * q)
+    have hcomm : 2 * q * steps = steps * (2 * q) := by ring
+    omega
+  have hsteps_pos : steps > 0 := by omega
+  have hN_upper : N ≤ 6 * q + 2 * q * steps := by
+    have h1 : (2 * q) * ((N - (4 * q + 1)) / (2 * q)) +
+      (N - (4 * q + 1)) % (2 * q) = N - (4 * q + 1) :=
+      Nat.div_add_mod (N - (4 * q + 1)) (2 * q)
+    have h2 : (N - (4 * q + 1)) % (2 * q) < 2 * q := Nat.mod_lt _ h2q_pos
+    rw [← hsteps_def] at h1
+    have hN_eq : N = 4 * q + 1 + (2 * q * steps + (N - (4 * q + 1)) % (2 * q)) := by omega
+    omega
+  have hqs_sq_gt : q ^ 2 * steps > N := by
+    zify [hN_ge_base, hq1] at *; nlinarith [sq_nonneg (q : ℤ), sq_nonneg (steps : ℤ)]
+  have hqs_gt : q * steps > N / q := by
+    have hlt : N < q * (q * steps) := by nlinarith [sq q]
+    rw [show q * (q * steps) = q * steps * q from by ring] at hlt
+    exact (Nat.div_lt_iff_lt_mul hq_pos).mpr hlt
+  exact ⟨q * steps, hqs_gt, gamma_iterate q steps hq1 N hiterate⟩
+
 end IteratedRecurrence
 
 section FormulaLowerBound
@@ -1449,8 +1622,32 @@ private theorem formula_unique_parent_index {m : ℕ} (C : BooleanCircuit m)
       (by simpa [p] using hjParent)
       (by simpa [p] using hkParent)
   have hcount_le : C.gates.countP p ≤ 1 := by
-    simpa [BooleanCircuit.isFormula, BooleanCircuit.fanOut, p, List.countP_eq_length_filter] using
-      hFormula.1 i hi
+    have hcount_le_fanOut_aux :
+        ∀ (gates : List Gate) (acc : ℕ),
+          acc + List.countP p gates ≤
+            gates.foldl (init := acc) fun acc g =>
+              acc + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0) := by
+      intro gates
+      induction gates with
+      | nil =>
+          intro acc
+          simp [p]
+      | cons g gates ih =>
+          intro acc
+          by_cases h1 : g.input1 = i
+          · by_cases h2 : g.input2 = i
+            · have h := ih (acc + 2)
+              simp [List.countP_cons, p, h1, h2] at h ⊢
+              exact le_trans (by omega) h
+            · simpa [List.countP_cons, p, h1, h2, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+                using ih (acc + 1)
+          · by_cases h2 : g.input2 = i
+            · simpa [List.countP_cons, p, h1, h2, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm]
+                using ih (acc + 1)
+            · simpa [List.countP_cons, p, h1, h2] using ih acc
+    have hcount_le_fanOut : C.gates.countP p ≤ C.fanOut i := by
+      simpa [BooleanCircuit.fanOut] using hcount_le_fanOut_aux C.gates 0
+    exact le_trans hcount_le_fanOut (hFormula.1 i hi)
   omega
 
 private theorem formula_gate_inputs_lt {m : ℕ} (C : BooleanCircuit m)
@@ -1491,12 +1688,18 @@ private theorem subformulaGateCount_le_size {m : ℕ} (C : BooleanCircuit m)
     (subformulaGateSet C root).card ≤ (Finset.range C.gates.length).card :=
       Finset.card_le_card (subformulaGateSet_subset_range C root)
     _ = C.gates.length := Finset.card_range _
+    _ ≤ m + C.gates.length := by omega
 
 private inductive ProtocolPartitionTree (n : ℕ) (S : Frontier n) where
   | zeroLeaf
-  | oneLeaf (R : Finset (Finset (Edge n)))
+  | oneLeaf (R : OneRectangle n)
   | branch (gate : ℕ) (kind : GateKind)
       (left right : ProtocolPartitionTree n S)
+
+private inductive ProtocolBranchDir where
+  | left
+  | right
+  deriving DecidableEq
 
 private def ProtocolPartitionTree.oneLeafCount {n : ℕ} {S : Frontier n}
     : ProtocolPartitionTree n S → ℕ
@@ -1504,20 +1707,80 @@ private def ProtocolPartitionTree.oneLeafCount {n : ℕ} {S : Frontier n}
   | .oneLeaf _ => 1
   | .branch _ _ left right => left.oneLeafCount + right.oneLeafCount
 
+private def ProtocolPartitionTree.oneLeafTraces {n : ℕ} {S : Frontier n}
+    : ProtocolPartitionTree n S → List (List ProtocolBranchDir)
+  | .zeroLeaf => []
+  | .oneLeaf _ => [[]]
+  | .branch _ _ left right =>
+      left.oneLeafTraces.map (ProtocolBranchDir.left :: ·) ++
+      right.oneLeafTraces.map (ProtocolBranchDir.right :: ·)
+
+private def ProtocolPartitionTree.oneLeaves {n : ℕ} {S : Frontier n}
+    : ProtocolPartitionTree n S → List (OneRectangle n)
+  | .zeroLeaf => []
+  | .oneLeaf R => [R]
+  | .branch _ _ left right => left.oneLeaves ++ right.oneLeaves
+
+private def ProtocolPartitionTree.numOneLeaves {n : ℕ} {S : Frontier n}
+    (t : ProtocolPartitionTree n S) : ℕ :=
+  t.oneLeaves.length
+
+@[simp] private theorem ProtocolPartitionTree.oneLeafTraces_length
+    {n : ℕ} {S : Frontier n} :
+    ∀ t : ProtocolPartitionTree n S, t.oneLeafTraces.length = t.oneLeafCount
+  | .zeroLeaf => by
+      simp [ProtocolPartitionTree.oneLeafTraces, ProtocolPartitionTree.oneLeafCount]
+  | .oneLeaf _ => by
+      simp [ProtocolPartitionTree.oneLeafTraces, ProtocolPartitionTree.oneLeafCount]
+  | .branch _ _ left right => by
+      simp [ProtocolPartitionTree.oneLeafTraces, ProtocolPartitionTree.oneLeafCount,
+        ProtocolPartitionTree.oneLeafTraces_length left,
+        ProtocolPartitionTree.oneLeafTraces_length right, List.length_append]
+
 private def ProtocolPartitionTree.oneLeafRectangles {n : ℕ} {S : Frontier n}
-    : ProtocolPartitionTree n S → Finset (Finset (Finset (Edge n)))
+    : ProtocolPartitionTree n S → Finset (OneRectangle n)
   | .zeroLeaf => ∅
   | .oneLeaf R => {R}
   | .branch _ _ left right => left.oneLeafRectangles ∪ right.oneLeafRectangles
 
+private def ProtocolPartitionTree.restrictTree {n : ℕ} {S : Frontier n}
+    (R : OneRectangle n) : ProtocolPartitionTree n S → ProtocolPartitionTree n S
+  | .zeroLeaf => .zeroLeaf
+  | .oneLeaf R' =>
+      .oneLeaf
+        { leftFam := R.leftFam ∩ R'.leftFam
+          rightFam := R.rightFam ∩ R'.rightFam }
+  | .branch gate kind left right =>
+      .branch gate kind (restrictTree R left) (restrictTree R right)
+
 private def ProtocolPartitionTree.graftAtOneLeaves {n : ℕ} {S : Frontier n}
     : ProtocolPartitionTree n S → ProtocolPartitionTree n S → ProtocolPartitionTree n S
   | .zeroLeaf, _ => .zeroLeaf
-  | .oneLeaf _, rhs => rhs
+  | .oneLeaf R, rhs => rhs.restrictTree R
   | .branch gate kind left right, rhs =>
       .branch gate kind
         (graftAtOneLeaves left rhs)
         (graftAtOneLeaves right rhs)
+
+@[simp] private theorem ProtocolPartitionTree.numOneLeaves_eq_oneLeafCount
+    {n : ℕ} {S : Frontier n} :
+    ∀ t : ProtocolPartitionTree n S, t.numOneLeaves = t.oneLeafCount
+  | .zeroLeaf => by simp [ProtocolPartitionTree.numOneLeaves, ProtocolPartitionTree.oneLeaves,
+      ProtocolPartitionTree.oneLeafCount]
+  | .oneLeaf _ => by simp [ProtocolPartitionTree.numOneLeaves, ProtocolPartitionTree.oneLeaves,
+      ProtocolPartitionTree.oneLeafCount]
+  | .branch _ _ left right => by
+      simpa [ProtocolPartitionTree.numOneLeaves, ProtocolPartitionTree.oneLeaves,
+        List.length_append, ProtocolPartitionTree.oneLeafCount] using
+        congrArg₂ Nat.add
+          (ProtocolPartitionTree.numOneLeaves_eq_oneLeafCount left)
+          (ProtocolPartitionTree.numOneLeaves_eq_oneLeafCount right)
+
+@[simp] private theorem ProtocolPartitionTree.numOneLeaves_eq_oneLeafTraces_length
+    {n : ℕ} {S : Frontier n} (t : ProtocolPartitionTree n S) :
+    t.numOneLeaves = t.oneLeafTraces.length := by
+  rw [ProtocolPartitionTree.numOneLeaves_eq_oneLeafCount,
+    ProtocolPartitionTree.oneLeafTraces_length]
 
 private inductive FormulaTree where
   | input (i : ℕ)
@@ -1571,6 +1834,15 @@ private def formulaTreeOf {m : ℕ} (C : BooleanCircuit m)
 termination_by root hroot => root
 decreasing_by
   all_goals assumption
+
+private theorem formulaTreeOf_rootIndex {m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula) (root : ℕ) (hroot : root < m + C.gates.length) :
+    (formulaTreeOf C hFormula root hroot).rootIndex = root := by
+  unfold formulaTreeOf
+  split
+  · simp [FormulaTree.rootIndex]
+  · have hj : root - m < C.gates.length := by omega
+    cases hk : (C.gates[root - m]'hj).kind <;> simp [FormulaTree.rootIndex, hk]
 
 private noncomputable def gateValueOnGraph {n m : ℕ} (C : BooleanCircuit m)
     (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) (idx : ℕ) : Bool :=
@@ -1737,10 +2009,13 @@ private noncomputable def formulaProtocolTree {n m : ℕ}
     (S : Frontier n) :
     (I : Finset (Finset (Edge n))) → Bool → FormulaTree → ProtocolPartitionTree n S
   | I, true, .input i =>
-      .oneLeaf (filterByGateValue C E I i true)
-  | I, false, .input _ =>
-      let _ := I
-      .zeroLeaf
+      .oneLeaf
+        { leftFam := filterByGateValue C E I i true
+          rightFam := filterByGateValue C E I i true }
+  | I, false, .input i =>
+      .oneLeaf
+        { leftFam := filterByGateValue C E I i false
+          rightFam := filterByGateValue C E I i false }
   | I, b, .notNode gate child =>
       .branch gate GateKind.NOT
         (formulaProtocolTree C E S I (!b) child)
@@ -1769,9 +2044,12 @@ private noncomputable def formulaProtocolTree {n m : ℕ}
         (formulaProtocolTree C E S leftAccepting true left)
         (formulaProtocolTree C E S rightOnly true right)
   | I, false, .orNode gate left right =>
+      let I' := filterByGateValue C E I gate false
+      let leftTree := formulaProtocolTree C E S I' false left
+      let rightTree := formulaProtocolTree C E S I' false right
       .branch gate GateKind.OR
-        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false left)
-        (formulaProtocolTree C E S (filterByGateValue C E I gate false) false right)
+        (leftTree.graftAtOneLeaves rightTree)
+        .zeroLeaf
 
 private inductive FormulaTreeContainsGate : FormulaTree → ℕ → Prop where
   | root_input {i} :
@@ -1804,11 +2082,224 @@ private def FormulaTree.inputLeafCount : FormulaTree → ℕ
   | .andNode _ left right => left.inputLeafCount + right.inputLeafCount
   | .orNode _ left right => left.inputLeafCount + right.inputLeafCount
 
+private def FormulaTree.inputLeafPaths : FormulaTree → List (List Bool)
+  | .input _ => [[]]
+  | .notNode _ child => child.inputLeafPaths.map (fun p => false :: p)
+  | .andNode _ left right =>
+      left.inputLeafPaths.map (fun p => false :: p) ++
+      right.inputLeafPaths.map (fun p => true :: p)
+  | .orNode _ left right =>
+      left.inputLeafPaths.map (fun p => false :: p) ++
+      right.inputLeafPaths.map (fun p => true :: p)
+
+private def FormulaTree.inputLeafGateAt : FormulaTree → List Bool → ℕ
+  | .input i, _ => i
+  | .notNode gate child, false :: path => child.inputLeafGateAt path
+  | .notNode gate _, _ => gate
+  | .andNode gate left right, false :: path => left.inputLeafGateAt path
+  | .andNode gate left right, true :: path => right.inputLeafGateAt path
+  | .andNode gate _ _, _ => gate
+  | .orNode gate left right, false :: path => left.inputLeafGateAt path
+  | .orNode gate left right, true :: path => right.inputLeafGateAt path
+  | .orNode gate _ _, _ => gate
+
+private def FormulaTree.inputLeafPolarityAt : FormulaTree → List Bool → Bool
+  | .input _, _ => true
+  | .notNode _ child, false :: path => !(child.inputLeafPolarityAt path)
+  | .notNode _ _, _ => false
+  | .andNode _ left right, false :: path => left.inputLeafPolarityAt path
+  | .andNode _ left right, true :: path => right.inputLeafPolarityAt path
+  | .andNode _ _ _, _ => false
+  | .orNode _ left right, false :: path => left.inputLeafPolarityAt path
+  | .orNode _ left right, true :: path => right.inputLeafPolarityAt path
+  | .orNode _ _ _, _ => false
+
+private structure FormulaPacket where
+  inputPath : List Bool
+  andObligations : List FormulaTree
+
+private def FormulaTree.acceptingPackets : FormulaTree → List FormulaPacket
+  | .input _ =>
+      [{ inputPath := []
+         andObligations := [] }]
+  | .notNode _ child =>
+      child.acceptingPackets.map (fun p : FormulaPacket =>
+        { p with inputPath := false :: p.inputPath }
+      )
+  | .andNode _ left right =>
+      (left.acceptingPackets.map (fun p : FormulaPacket =>
+        { inputPath := false :: p.inputPath
+          andObligations := right :: p.andObligations })) ++
+      (right.acceptingPackets.map (fun p : FormulaPacket =>
+        { inputPath := true :: p.inputPath
+          andObligations := left :: p.andObligations }))
+  | .orNode _ left right =>
+      (left.acceptingPackets.map (fun p : FormulaPacket =>
+        { p with inputPath := false :: p.inputPath })) ++
+      (right.acceptingPackets.map (fun p : FormulaPacket =>
+        { p with inputPath := true :: p.inputPath }))
+
+@[simp] private theorem FormulaTree.inputLeafPaths_length :
+    ∀ t : FormulaTree, t.inputLeafPaths.length = t.inputLeafCount
+  | .input _ => by simp [FormulaTree.inputLeafPaths, FormulaTree.inputLeafCount]
+  | .notNode _ child => by
+      simp [FormulaTree.inputLeafPaths, FormulaTree.inputLeafCount,
+        FormulaTree.inputLeafPaths_length child]
+  | .andNode _ left right => by
+      simp [FormulaTree.inputLeafPaths, FormulaTree.inputLeafCount,
+        FormulaTree.inputLeafPaths_length left, FormulaTree.inputLeafPaths_length right,
+        List.length_append]
+  | .orNode _ left right => by
+      simp [FormulaTree.inputLeafPaths, FormulaTree.inputLeafCount,
+        FormulaTree.inputLeafPaths_length left, FormulaTree.inputLeafPaths_length right,
+        List.length_append]
+
+@[simp] private theorem FormulaTree.acceptingPackets_length :
+    ∀ t : FormulaTree, t.acceptingPackets.length = t.inputLeafCount
+  | .input _ => by
+      simp [FormulaTree.acceptingPackets, FormulaTree.inputLeafCount]
+  | .notNode _ child => by
+      simp [FormulaTree.acceptingPackets, FormulaTree.inputLeafCount,
+        FormulaTree.acceptingPackets_length child]
+  | .andNode _ left right => by
+      simp [FormulaTree.acceptingPackets, FormulaTree.inputLeafCount,
+        FormulaTree.acceptingPackets_length left, FormulaTree.acceptingPackets_length right,
+        List.length_append]
+  | .orNode _ left right => by
+      simp [FormulaTree.acceptingPackets, FormulaTree.inputLeafCount,
+        FormulaTree.acceptingPackets_length left, FormulaTree.acceptingPackets_length right,
+        List.length_append]
+
+@[simp] private theorem FormulaTree.acceptingPackets_map_inputPath :
+    ∀ t : FormulaTree, t.acceptingPackets.map FormulaPacket.inputPath = t.inputLeafPaths
+  | .input _ => by
+      simp [FormulaTree.acceptingPackets, FormulaTree.inputLeafPaths]
+  | .notNode _ child => by
+      simpa [FormulaTree.acceptingPackets, FormulaTree.inputLeafPaths, List.map_map] using
+        congrArg (List.map (fun p => false :: p))
+          (FormulaTree.acceptingPackets_map_inputPath child)
+  | .andNode _ left right => by
+      have hLeft := congrArg (List.map (fun p => false :: p))
+        (FormulaTree.acceptingPackets_map_inputPath left)
+      have hRight := congrArg (List.map (fun p => true :: p))
+        (FormulaTree.acceptingPackets_map_inputPath right)
+      simpa [FormulaTree.acceptingPackets, FormulaTree.inputLeafPaths, List.map_append, List.map_map]
+        using congrArg₂ List.append hLeft hRight
+  | .orNode _ left right => by
+      have hLeft := congrArg (List.map (fun p => false :: p))
+        (FormulaTree.acceptingPackets_map_inputPath left)
+      have hRight := congrArg (List.map (fun p => true :: p))
+        (FormulaTree.acceptingPackets_map_inputPath right)
+      simpa [FormulaTree.acceptingPackets, FormulaTree.inputLeafPaths, List.map_append, List.map_map]
+        using congrArg₂ List.append hLeft hRight
+
 private def FormulaTree.inputVars : FormulaTree → Finset ℕ
   | .input i => {i}
   | .notNode _ child => child.inputVars
   | .andNode _ left right => left.inputVars ∪ right.inputVars
   | .orNode _ left right => left.inputVars ∪ right.inputVars
+
+  private theorem FormulaTree.inputLeafGateAt_mem_inputVars :
+    ∀ t : FormulaTree, ∀ path ∈ t.inputLeafPaths,
+      t.inputLeafGateAt path ∈ t.inputVars
+  | .input i, path, hpath => by
+      simpa [FormulaTree.inputLeafPaths, FormulaTree.inputLeafGateAt, FormulaTree.inputVars] using hpath
+  | .notNode _ child, path, hpath => by
+      simp [FormulaTree.inputLeafPaths] at hpath
+      rcases hpath with ⟨p, hp, rfl⟩
+      simpa [FormulaTree.inputLeafGateAt, FormulaTree.inputVars] using
+        FormulaTree.inputLeafGateAt_mem_inputVars child p hp
+  | .andNode _ left right, path, hpath => by
+      simp [FormulaTree.inputLeafPaths] at hpath
+      rcases hpath with hpath | hpath
+      · rcases hpath with ⟨p, hp, rfl⟩
+        exact Finset.mem_union.mpr <| Or.inl <|
+          FormulaTree.inputLeafGateAt_mem_inputVars left p hp
+      · rcases hpath with ⟨p, hp, rfl⟩
+        exact Finset.mem_union.mpr <| Or.inr <|
+          FormulaTree.inputLeafGateAt_mem_inputVars right p hp
+  | .orNode _ left right, path, hpath => by
+      simp [FormulaTree.inputLeafPaths] at hpath
+      rcases hpath with hpath | hpath
+      · rcases hpath with ⟨p, hp, rfl⟩
+        exact Finset.mem_union.mpr <| Or.inl <|
+          FormulaTree.inputLeafGateAt_mem_inputVars left p hp
+      · rcases hpath with ⟨p, hp, rfl⟩
+        exact Finset.mem_union.mpr <| Or.inr <|
+          FormulaTree.inputLeafGateAt_mem_inputVars right p hp
+
+private theorem FormulaTree.acceptingPacket_inputGate_mem_inputVars :
+    ∀ t : FormulaTree, ∀ pkt ∈ t.acceptingPackets,
+      t.inputLeafGateAt pkt.inputPath ∈ t.inputVars
+  | t, pkt, hpkt => by
+      have hmap := FormulaTree.acceptingPackets_map_inputPath t
+      have hpath : pkt.inputPath ∈ t.inputLeafPaths := by
+        rw [← hmap]
+        exact List.mem_map.mpr ⟨pkt, hpkt, rfl⟩
+      exact FormulaTree.inputLeafGateAt_mem_inputVars t pkt.inputPath hpath
+
+private theorem FormulaTree.acceptingPackets_obligation_vars_subset :
+    ∀ t : FormulaTree, ∀ pkt ∈ t.acceptingPackets,
+      ∀ sib ∈ pkt.andObligations, sib.inputVars ⊆ t.inputVars
+  | .input _, pkt, hpkt, sib, hsib => by
+      simp [FormulaTree.acceptingPackets] at hpkt
+      subst hpkt
+      simp at hsib
+  | .notNode _ child, pkt, hpkt, sib, hsib => by
+      simp [FormulaTree.acceptingPackets] at hpkt
+      rcases hpkt with ⟨p, hp, rfl⟩
+      exact Set.Subset.trans
+        (FormulaTree.acceptingPackets_obligation_vars_subset child p hp sib hsib)
+        (by
+          intro i hi
+          simp [FormulaTree.inputVars, hi])
+  | .andNode _ left right, pkt, hpkt, sib, hsib => by
+      simp [FormulaTree.acceptingPackets] at hpkt
+      rcases hpkt with hpkt | hpkt
+      · rcases hpkt with ⟨p, hp, rfl⟩
+        simp at hsib
+        rcases hsib with rfl | hsib
+        · intro i hi
+          simp [FormulaTree.inputVars, hi]
+        · exact Set.Subset.trans
+            (FormulaTree.acceptingPackets_obligation_vars_subset left p hp sib hsib)
+            (by
+              intro i hi
+              exact Finset.mem_union.mpr (Or.inl hi))
+      · rcases hpkt with ⟨p, hp, rfl⟩
+        simp at hsib
+        rcases hsib with rfl | hsib
+        · intro i hi
+          simp [FormulaTree.inputVars, hi]
+        · exact Set.Subset.trans
+            (FormulaTree.acceptingPackets_obligation_vars_subset right p hp sib hsib)
+            (by
+              intro i hi
+              exact Finset.mem_union.mpr (Or.inr hi))
+  | .orNode _ left right, pkt, hpkt, sib, hsib => by
+      simp [FormulaTree.acceptingPackets] at hpkt
+      rcases hpkt with hpkt | hpkt
+      · rcases hpkt with ⟨p, hp, rfl⟩
+        exact Set.Subset.trans
+          (FormulaTree.acceptingPackets_obligation_vars_subset left p hp sib hsib)
+          (by
+            intro i hi
+            exact Finset.mem_union.mpr (Or.inl hi))
+      · rcases hpkt with ⟨p, hp, rfl⟩
+        exact Set.Subset.trans
+          (FormulaTree.acceptingPackets_obligation_vars_subset right p hp sib hsib)
+          (by
+            intro i hi
+            exact Finset.mem_union.mpr (Or.inr hi))
+
+private def sampleMixedObligationTree : FormulaTree :=
+  .andNode 3 (.input 0) (.orNode 2 (.input 1) (.input 2))
+
+private theorem sampleMixedObligationTree_has_compound_obligation :
+    { inputPath := [false]
+      andObligations := [FormulaTree.orNode 2 (.input 1) (.input 2)] } ∈
+      sampleMixedObligationTree.acceptingPackets := by
+  simp [sampleMixedObligationTree, FormulaTree.acceptingPackets]
 
 private noncomputable def FormulaTree.evalOnGraph {n m : ℕ} (C : BooleanCircuit m)
     (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) : FormulaTree → Bool
@@ -1823,139 +2314,251 @@ private def allVarsLeft {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier 
 private def allVarsRight {n m : ℕ} (E : NaturalEdgeEncoding n m) (S : Frontier n) (t : FormulaTree) : Prop :=
   ∀ i ∈ t.inputVars, ∃ hi : i < m, E.rightVar S ⟨i, hi⟩
 
-private theorem oneLeafRectangles_graft_subset {n : ℕ} {S : Frontier n}
-    (rhs : ProtocolPartitionTree n S) :
+private theorem restrictTree_rectangles_subset {n : ℕ} {S : Frontier n}
+    (ambient : OneRectangle n) :
     ∀ t : ProtocolPartitionTree n S,
-      (t.graftAtOneLeaves rhs).oneLeafRectangles ⊆ rhs.oneLeafRectangles
-  | .zeroLeaf => by
-      intro R hR
-      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR
-  | .oneLeaf _ => by
-      intro R hR
+      ∀ R ∈ (t.restrictTree ambient).oneLeafRectangles,
+        R.leftFam ⊆ ambient.leftFam ∧ R.rightFam ⊆ ambient.rightFam
+  | .zeroLeaf, R, hR => by
+      simpa [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] using hR
+  | .oneLeaf R0, R, hR => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+      subst hR
+      constructor <;> intro H hH
+      · exact (Finset.mem_inter.mp hH).1
+      · exact (Finset.mem_inter.mp hH).1
+  | .branch gate kind left right, R, hR => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR ⊢
+      rcases hR with hR | hR
+      · exact restrictTree_rectangles_subset ambient left R hR
+      · exact restrictTree_rectangles_subset ambient right R hR
+
+private theorem graft_rectangles_subset_of {n : ℕ} {S : Frontier n}
+    (rhs : ProtocolPartitionTree n S) (I : Finset (Finset (Edge n))) :
+    ∀ t : ProtocolPartitionTree n S,
+      (∀ A ∈ t.oneLeafRectangles, A.leftFam ⊆ I ∧ A.rightFam ⊆ I) →
+      ∀ R ∈ (t.graftAtOneLeaves rhs).oneLeafRectangles,
+        R.leftFam ⊆ I ∧ R.rightFam ⊆ I
+  | .zeroLeaf, _, R, hR => by
       simpa [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] using hR
-  | .branch _ _ left right => by
-      intro R hR
+  | .oneLeaf A, hsub, R, hR => by
+      have hA := hsub A (by simp [ProtocolPartitionTree.oneLeafRectangles])
+      have hrestrict := restrictTree_rectangles_subset A rhs R hR
+      exact ⟨Set.Subset.trans hrestrict.1 hA.1, Set.Subset.trans hrestrict.2 hA.2⟩
+  | .branch gate kind left right, hsub, R, hR => by
       simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR ⊢
-      rcases hR with hL | hR
-      · exact oneLeafRectangles_graft_subset rhs left hL
-      · exact oneLeafRectangles_graft_subset rhs right hR
+      rcases hR with hR | hR
+      · exact graft_rectangles_subset_of rhs I left
+          (fun A hA => hsub A (by simp [ProtocolPartitionTree.oneLeafRectangles, hA])) R hR
+      · exact graft_rectangles_subset_of rhs I right
+          (fun A hA => hsub A (by simp [ProtocolPartitionTree.oneLeafRectangles, hA])) R hR
 
-private theorem oneLeafRectangles_card_graft_le {n : ℕ} {S : Frontier n}
-    (rhs t : ProtocolPartitionTree n S) :
-    (t.graftAtOneLeaves rhs).oneLeafRectangles.card ≤ rhs.oneLeafRectangles.card := by
-  exact Finset.card_le_card (oneLeafRectangles_graft_subset rhs t)
+private theorem filterByGateValue_subset {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (I : Finset (Finset (Edge n)))
+    (idx : ℕ) (b : Bool) :
+    filterByGateValue C E I idx b ⊆ I := by
+  intro H hH
+  exact (Finset.mem_filter.mp hH).1
 
-private theorem formulaProtocolTree_rectangles_card_le_inputLeafCount :
+private theorem mem_filterByGateValue_iff {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (I : Finset (Finset (Edge n)))
+    (idx : ℕ) (b : Bool) (H : Finset (Edge n)) :
+    H ∈ filterByGateValue C E I idx b ↔ H ∈ I ∧ gateValueOnGraph C E H idx = b := by
+  unfold filterByGateValue
+  constructor
+  · intro h
+    rcases Finset.mem_filter.mp h with ⟨hI, hEq⟩
+    refine ⟨hI, ?_⟩
+    simpa using hEq
+  · intro h
+    rcases h with ⟨hI, hEq⟩
+    exact Finset.mem_filter.mpr ⟨hI, by simpa using hEq⟩
+
+private theorem oneLeafRectangles_mem_graft_of_mem {n : ℕ} {S : Frontier n}
+    (rhs t : ProtocolPartitionTree n S) (A R : OneRectangle n)
+    (hA : A ∈ t.oneLeafRectangles)
+    (hR : R ∈ rhs.oneLeafRectangles) :
+    { leftFam := A.leftFam ∩ R.leftFam
+      rightFam := A.rightFam ∩ R.rightFam } ∈
+      (t.graftAtOneLeaves rhs).oneLeafRectangles := by
+  have hrestrict :
+      OneRectangle.mk (A.leftFam ∩ R.leftFam) (A.rightFam ∩ R.rightFam) ∈
+        (rhs.restrictTree A).oneLeafRectangles := by
+    clear hA
+    induction rhs with
+    | zeroLeaf =>
+        simp [ProtocolPartitionTree.oneLeafRectangles] at hR
+    | oneLeaf R' =>
+        simp [ProtocolPartitionTree.oneLeafRectangles] at hR
+        subst hR
+        simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles]
+    | branch gate kind left right ihLeft ihRight =>
+        simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR ⊢
+        rcases hR with hR | hR
+        · exact Or.inl (ihLeft hR)
+        · exact Or.inr (ihRight hR)
+  revert A hA
+  induction t with
+  | zeroLeaf =>
+      intro A hA
+      simp [ProtocolPartitionTree.oneLeafRectangles] at hA
+  | oneLeaf A' =>
+      intro A hA
+      simp [ProtocolPartitionTree.oneLeafRectangles] at hA
+      subst hA
+      simpa [ProtocolPartitionTree.graftAtOneLeaves] using hrestrict
+  | branch gate kind left right ihLeft ihRight =>
+      intro A hA
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hA ⊢
+      rcases hA with hA | hA
+      · intro hrestrict
+        exact Or.inl (ihLeft _ hA hrestrict)
+      · intro hrestrict
+        exact Or.inr (ihRight _ hA hrestrict)
+
+private theorem oneLeafRectangles_mem_restrictTree_exists {n : ℕ} {S : Frontier n}
+    (ambient : OneRectangle n) :
+    ∀ (t : ProtocolPartitionTree n S) (R : OneRectangle n),
+      R ∈ (t.restrictTree ambient).oneLeafRectangles →
+      ∃ R' ∈ t.oneLeafRectangles,
+        R = OneRectangle.mk (ambient.leftFam ∩ R'.leftFam) (ambient.rightFam ∩ R'.rightFam)
+  | .zeroLeaf, R, hR => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+  | .oneLeaf R', R, hR => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+      subst hR
+      refine ⟨R', by simp [ProtocolPartitionTree.oneLeafRectangles], rfl⟩
+  | .branch gate kind left right, R, hR => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+      rcases hR with hR | hR
+      · rcases oneLeafRectangles_mem_restrictTree_exists ambient left R hR with ⟨R', hR', rfl⟩
+        exact ⟨R', by simp [ProtocolPartitionTree.oneLeafRectangles, hR'], rfl⟩
+      · rcases oneLeafRectangles_mem_restrictTree_exists ambient right R hR with ⟨R', hR', rfl⟩
+        exact ⟨R', by simp [ProtocolPartitionTree.oneLeafRectangles, hR'], rfl⟩
+
+private theorem oneLeafRectangles_mem_graft_exists {n : ℕ} {S : Frontier n}
+    (lhs rhs : ProtocolPartitionTree n S) (R : OneRectangle n) :
+    R ∈ (lhs.graftAtOneLeaves rhs).oneLeafRectangles →
+    ∃ A ∈ lhs.oneLeafRectangles, ∃ B ∈ rhs.oneLeafRectangles,
+      R = OneRectangle.mk (A.leftFam ∩ B.leftFam) (A.rightFam ∩ B.rightFam) := by
+  intro hR
+  induction lhs generalizing R with
+  | zeroLeaf =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR
+  | oneLeaf A =>
+      rcases oneLeafRectangles_mem_restrictTree_exists A rhs R
+        (by simpa [ProtocolPartitionTree.graftAtOneLeaves] using hR) with ⟨B, hB, hEq⟩
+      exact ⟨A, by simp [ProtocolPartitionTree.oneLeafRectangles], B, hB, hEq⟩
+  | branch gate kind left right ihLeft ihRight =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafRectangles] at hR
+      rcases hR with hR | hR
+      · rcases ihLeft _ hR with ⟨A, hA, B, hB, hEq⟩
+        exact ⟨A, by simp [ProtocolPartitionTree.oneLeafRectangles, hA], B, hB, hEq⟩
+      · rcases ihRight _ hR with ⟨A, hA, B, hB, hEq⟩
+        exact ⟨A, by simp [ProtocolPartitionTree.oneLeafRectangles, hA], B, hB, hEq⟩
+
+private theorem formulaProtocolTree_rectangles_subset :
   ∀ {n m : ℕ} (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m) (S : Frontier n)
-    (I : Finset (Finset (Edge n))) (b : Bool) (t : FormulaTree),
-    (formulaProtocolTree C E S I b t).oneLeafRectangles.card ≤ t.inputLeafCount := by
+    (I : Finset (Finset (Edge n))) (b : Bool) (t : FormulaTree)
+    (R : OneRectangle n),
+    R ∈ (formulaProtocolTree C E S I b t).oneLeafRectangles →
+      R.leftFam ⊆ I ∧ R.rightFam ⊆ I := by
   intro n m C E S I b t
   induction t generalizing I b with
   | input i =>
-      cases b <;> simp [formulaProtocolTree, FormulaTree.inputLeafCount,
-        ProtocolPartitionTree.oneLeafRectangles]
+      intro R hR
+      cases b with
+      | false =>
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          subst hR
+          exact ⟨filterByGateValue_subset C E I i false, filterByGateValue_subset C E I i false⟩
+      | true =>
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          subst hR
+          exact ⟨filterByGateValue_subset C E I i true, filterByGateValue_subset C E I i true⟩
   | notNode gate child ih =>
+      intro R hR
       cases b with
-      | true =>
-          simpa [formulaProtocolTree, FormulaTree.inputLeafCount,
-            ProtocolPartitionTree.oneLeafRectangles] using ih I false
       | false =>
-          simpa [formulaProtocolTree, FormulaTree.inputLeafCount,
-            ProtocolPartitionTree.oneLeafRectangles] using ih I true
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          exact ih (I := I) (b := true) (R := R) hR
+      | true =>
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          exact ih (I := I) (b := false) (R := R) hR
   | andNode gate left right ihLeft ihRight =>
+      intro R hR
       cases b with
       | true =>
           let I' := filterByGateValue C E I gate true
-          let leftTree := formulaProtocolTree C E S I' true left
-          let rightTree := formulaProtocolTree C E S I' true right
-          have hgraft :
-              (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles.card ≤
-                rightTree.oneLeafRectangles.card := by
-            simpa [leftTree, rightTree] using oneLeafRectangles_card_graft_le rightTree leftTree
-          have hright :
-              rightTree.oneLeafRectangles.card ≤ right.inputLeafCount := by
-            simpa [rightTree, I'] using ihRight I' true
-          calc
-            (formulaProtocolTree C E S I true (.andNode gate left right)).oneLeafRectangles.card
-                =
-                (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles.card := by
-                  simp [formulaProtocolTree, leftTree, rightTree, I',
-                    ProtocolPartitionTree.oneLeafRectangles]
-            _ ≤ rightTree.oneLeafRectangles.card := hgraft
-            _ ≤ right.inputLeafCount := hright
-            _ ≤ left.inputLeafCount + right.inputLeafCount := Nat.le_add_left _ _
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          have hI' : ∀ A ∈ (formulaProtocolTree C E S I' true left).oneLeafRectangles,
+              A.leftFam ⊆ I' ∧ A.rightFam ⊆ I' := by
+            intro A hA
+            exact ihLeft (I := I') (b := true) (R := A) hA
+          have hsubI' := graft_rectangles_subset_of (formulaProtocolTree C E S I' true right) I'
+            (formulaProtocolTree C E S I' true left) hI' R hR
+          exact ⟨Set.Subset.trans hsubI'.1 (filterByGateValue_subset C E I gate true),
+            Set.Subset.trans hsubI'.2 (filterByGateValue_subset C E I gate true)⟩
       | false =>
-          let I' := filterByGateValue C E I gate false
-          let leftRejecting := filterByGateValue C E I' left.rootIndex false
-          let rightOnly := filterByGateValue C E I' left.rootIndex true
-          have hleft :
-              (formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles.card ≤
-                left.inputLeafCount := by
-            simpa [leftRejecting] using ihLeft leftRejecting false
-          have hright :
-              (formulaProtocolTree C E S rightOnly false right).oneLeafRectangles.card ≤
-                right.inputLeafCount := by
-            simpa [rightOnly] using ihRight rightOnly false
-          calc
-            (formulaProtocolTree C E S I false (.andNode gate left right)).oneLeafRectangles.card
-                ≤
-                (formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles.card +
-                  (formulaProtocolTree C E S rightOnly false right).oneLeafRectangles.card := by
-                    simpa [formulaProtocolTree, I', leftRejecting, rightOnly,
-                      ProtocolPartitionTree.oneLeafRectangles] using
-                      (Finset.card_union_le
-                        ((formulaProtocolTree C E S leftRejecting false left).oneLeafRectangles)
-                        ((formulaProtocolTree C E S rightOnly false right).oneLeafRectangles))
-            _ ≤ left.inputLeafCount + right.inputLeafCount := by
-                  omega
-
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          rcases hR with hR | hR
+          · have hsub := ihLeft (I := filterByGateValue C E (filterByGateValue C E I gate false)
+                left.rootIndex false) (b := false) (R := R) hR
+            exact ⟨Set.Subset.trans hsub.1
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate false) left.rootIndex false)
+                  (filterByGateValue_subset C E I gate false)),
+              Set.Subset.trans hsub.2
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate false) left.rootIndex false)
+                  (filterByGateValue_subset C E I gate false))⟩
+          · have hsub := ihRight (I := filterByGateValue C E (filterByGateValue C E I gate false)
+                left.rootIndex true) (b := false) (R := R) hR
+            exact ⟨Set.Subset.trans hsub.1
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate false) left.rootIndex true)
+                  (filterByGateValue_subset C E I gate false)),
+              Set.Subset.trans hsub.2
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate false) left.rootIndex true)
+                  (filterByGateValue_subset C E I gate false))⟩
   | orNode gate left right ihLeft ihRight =>
+      intro R hR
       cases b with
       | true =>
-          let I' := filterByGateValue C E I gate true
-          let leftAccepting := filterByGateValue C E I' left.rootIndex true
-          let rightOnly := filterByGateValue C E I' left.rootIndex false
-          have hleft :
-              (formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles.card ≤
-                left.inputLeafCount := by
-            simpa [leftAccepting] using ihLeft leftAccepting true
-          have hright :
-              (formulaProtocolTree C E S rightOnly true right).oneLeafRectangles.card ≤
-                right.inputLeafCount := by
-            simpa [rightOnly] using ihRight rightOnly true
-          calc
-            (formulaProtocolTree C E S I true (.orNode gate left right)).oneLeafRectangles.card
-                ≤
-                (formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles.card +
-                  (formulaProtocolTree C E S rightOnly true right).oneLeafRectangles.card := by
-                    simpa [formulaProtocolTree, I', leftAccepting, rightOnly,
-                      ProtocolPartitionTree.oneLeafRectangles] using
-                      (Finset.card_union_le
-                        ((formulaProtocolTree C E S leftAccepting true left).oneLeafRectangles)
-                        ((formulaProtocolTree C E S rightOnly true right).oneLeafRectangles))
-            _ ≤ left.inputLeafCount + right.inputLeafCount := by
-                  omega
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          rcases hR with hR | hR
+          · have hsub := ihLeft (I := filterByGateValue C E (filterByGateValue C E I gate true)
+                left.rootIndex true) (b := true) (R := R) hR
+            exact ⟨Set.Subset.trans hsub.1
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate true) left.rootIndex true)
+                  (filterByGateValue_subset C E I gate true)),
+              Set.Subset.trans hsub.2
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate true) left.rootIndex true)
+                  (filterByGateValue_subset C E I gate true))⟩
+          · have hsub := ihRight (I := filterByGateValue C E (filterByGateValue C E I gate true)
+                left.rootIndex false) (b := true) (R := R) hR
+            exact ⟨Set.Subset.trans hsub.1
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate true) left.rootIndex false)
+                  (filterByGateValue_subset C E I gate true)),
+              Set.Subset.trans hsub.2
+                (Set.Subset.trans
+                  (filterByGateValue_subset C E (filterByGateValue C E I gate true) left.rootIndex false)
+                  (filterByGateValue_subset C E I gate true))⟩
       | false =>
           let I' := filterByGateValue C E I gate false
-          have hleft :
-              (formulaProtocolTree C E S I' false left).oneLeafRectangles.card ≤
-                left.inputLeafCount := by
-            simpa [I'] using ihLeft I' false
-          have hright :
-              (formulaProtocolTree C E S I' false right).oneLeafRectangles.card ≤
-                right.inputLeafCount := by
-            simpa [I'] using ihRight I' false
-          calc
-            (formulaProtocolTree C E S I false (.orNode gate left right)).oneLeafRectangles.card
-                ≤
-                (formulaProtocolTree C E S I' false left).oneLeafRectangles.card +
-                  (formulaProtocolTree C E S I' false right).oneLeafRectangles.card := by
-                    simpa [formulaProtocolTree, I', ProtocolPartitionTree.oneLeafRectangles] using
-                      (Finset.card_union_le
-                        ((formulaProtocolTree C E S I' false left).oneLeafRectangles)
-                        ((formulaProtocolTree C E S I' false right).oneLeafRectangles))
-            _ ≤ left.inputLeafCount + right.inputLeafCount := by
-                  omega
+          simp [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] at hR
+          have hI' : ∀ A ∈ (formulaProtocolTree C E S I' false left).oneLeafRectangles,
+              A.leftFam ⊆ I' ∧ A.rightFam ⊆ I' := by
+            intro A hA
+            exact ihLeft (I := I') (b := false) (R := A) hA
+          have hsubI' := graft_rectangles_subset_of (formulaProtocolTree C E S I' false right) I'
+            (formulaProtocolTree C E S I' false left) hI' R hR
+          exact ⟨Set.Subset.trans hsubI'.1 (filterByGateValue_subset C E I gate false),
+            Set.Subset.trans hsubI'.2 (filterByGateValue_subset C E I gate false)⟩
 
 private theorem evalOnGraph_eq_of_allVarsLeft {n m : ℕ} (C : BooleanCircuit m)
     (E : NaturalEdgeEncoding n m) (S : Frontier n) (H₀ H₁ : Finset (Edge n)) :
@@ -2031,18 +2634,1684 @@ private theorem evalOnGraph_eq_of_allVarsRight {n m : ℕ} (C : BooleanCircuit m
         exact hall i (by simp [FormulaTree.inputVars, hi])
       simp [FormulaTree.evalOnGraph, ihLeft hL, ihRight hR]
 
+private theorem gateValueOnGraph_output_eq_eval {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) :
+    gateValueOnGraph C E H C.outputGate = C.eval (E.encode H) := by
+  unfold gateValueOnGraph BooleanCircuit.eval evalAllGates
+  rfl
+
+private theorem eval_true_implies_outputGate_lt {m : ℕ} (C : BooleanCircuit m)
+    (input : Fin m → Bool) (hEval : C.eval input = true) :
+    C.outputGate < m + C.gates.length := by
+  by_contra hlt
+  have hlen :
+      (C.gates.foldl (init := List.ofFn input) fun acc g =>
+        let v1 := acc.getD g.input1 false
+        let v2 := acc.getD g.input2 false
+        let result := match g.kind with
+          | GateKind.AND => v1 && v2
+          | GateKind.OR => v1 || v2
+          | GateKind.NOT => !v1
+        acc ++ [result]).length = m + C.gates.length := by
+    simpa [evalStep] using evalFold_length C.gates (List.ofFn input)
+  have hfalse :
+      (C.gates.foldl (init := List.ofFn input) fun acc g =>
+        let v1 := acc.getD g.input1 false
+        let v2 := acc.getD g.input2 false
+        let result := match g.kind with
+          | GateKind.AND => v1 && v2
+          | GateKind.OR => v1 || v2
+          | GateKind.NOT => !v1
+        acc ++ [result]).getD C.outputGate false = false := by
+    apply List.getD_eq_default
+    rw [hlen]
+    exact Nat.le_of_not_lt hlt
+  unfold BooleanCircuit.eval at hEval
+  have hcontra : false = true := hfalse.symm.trans hEval
+  exact Bool.false_ne_true hcontra
+
+private theorem formulaTreeOf_eval_eq_gateValue {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (H : Finset (Edge n)) :
+    ∀ root : ℕ, ∀ hroot : root < m + C.gates.length,
+      (formulaTreeOf C hFormula root hroot).evalOnGraph C E H =
+        gateValueOnGraph C E H root
+  | root, hroot => by
+      unfold formulaTreeOf
+      by_cases hInput : root < m
+      · simp [hInput, FormulaTree.evalOnGraph, gateValueOnGraph_input_eq]
+      · simp [hInput]
+        set j : ℕ := root - m
+        have hj : j < C.gates.length := by
+          dsimp [j]
+          omega
+        set g : Gate := C.gates[j]'hj
+        have hinputs : g.input1 < m + j ∧ g.input2 < m + j := by
+          subst g
+          simpa [j] using formula_gate_inputs_lt C hFormula j hj
+        have hgj : m + j = root := by
+          dsimp [j]
+          omega
+        have hinput1 : g.input1 < m + C.gates.length := by omega
+        have hinput2 : g.input2 < m + C.gates.length := by omega
+        have hlt1 : g.input1 < root := by omega
+        have hlt2 : g.input2 < root := by omega
+        have hchild1 :
+            (formulaTreeOf C hFormula g.input1 hinput1).evalOnGraph C E H =
+              gateValueOnGraph C E H g.input1 := by
+          exact formulaTreeOf_eval_eq_gateValue C hFormula E H g.input1 hinput1
+        have hchild2 :
+            (formulaTreeOf C hFormula g.input2 hinput2).evalOnGraph C E H =
+              gateValueOnGraph C E H g.input2 := by
+          exact formulaTreeOf_eval_eq_gateValue C hFormula E H g.input2 hinput2
+        have hgate :
+            gateValueOnGraph C E H root = gateEvalFromInputs C E H j hj := by
+          have hbase := gateValueOnGraph_gate_eq C hFormula E H j hj
+          simpa [hgj, j] using hbase
+        cases hk : g.kind <;>
+          simp [FormulaTree.evalOnGraph, hchild1, hchild2, hgate, gateEvalFromInputs, hk, g, j]
+termination_by root _ => root
+decreasing_by
+  all_goals omega
+
+private theorem formulaTreeOf_output_eval_true {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m)
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (H : Finset (Edge n)) (hH : IsHamCycle n H)
+    (hout : C.outputGate < m + C.gates.length) :
+    (formulaTreeOf C hFormula C.outputGate hout).evalOnGraph C E H = true := by
+  have hEval : C.eval (E.encode H) = true := (hCorrect H).2 hH
+  rw [formulaTreeOf_eval_eq_gateValue C hFormula E H C.outputGate hout,
+    gateValueOnGraph_output_eq_eval, hEval]
+
+private theorem formulaProtocolTree_cover_of_gateValue {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ root : ℕ, ∀ hroot : root < m + C.gates.length,
+      ∀ (I : Finset (Finset (Edge n))) (b : Bool) (H : Finset (Edge n)),
+      H ∈ I →
+      gateValueOnGraph C E H root = b →
+      ∃ R ∈ (formulaProtocolTree C E S I b (formulaTreeOf C hFormula root hroot)).oneLeafRectangles,
+        H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+  intro root
+  induction root using Nat.strong_induction_on with
+  | h root ih =>
+      intro hroot I b H hHI hRoot
+      unfold formulaTreeOf
+      by_cases hInput : root < m
+      · refine ⟨OneRectangle.mk (filterByGateValue C E I root b) (filterByGateValue C E I root b), ?_, ?_⟩
+        · cases b <;> simp [formulaProtocolTree, hInput, ProtocolPartitionTree.oneLeafRectangles]
+        · exact ⟨(mem_filterByGateValue_iff C E I root b H).2 ⟨hHI, hRoot⟩,
+            (mem_filterByGateValue_iff C E I root b H).2 ⟨hHI, hRoot⟩⟩
+      · simp [hInput]
+        set j : ℕ := root - m
+        have hj : j < C.gates.length := by
+          dsimp [j]
+          omega
+        set g : Gate := C.gates[j]'hj
+        have hinputs : g.input1 < m + j ∧ g.input2 < m + j := by
+          subst g
+          simpa [j] using formula_gate_inputs_lt C hFormula j hj
+        have hinput1 : g.input1 < m + C.gates.length := by omega
+        have hinput2 : g.input2 < m + C.gates.length := by omega
+        have hlt1 : g.input1 < root := by
+          dsimp [j] at hinputs
+          omega
+        have hlt2 : g.input2 < root := by
+          dsimp [j] at hinputs
+          omega
+        have hroot_eq : m + j = root := by
+          dsimp [j]
+          omega
+        have hgate :
+            gateValueOnGraph C E H root = gateEvalFromInputs C E H j hj := by
+          have hbase := gateValueOnGraph_gate_eq C hFormula E H j hj
+          simpa [hroot_eq, j] using hbase
+        have hEval : gateEvalFromInputs C E H j hj = b := by
+          simpa [hgate] using hRoot
+        cases hk : g.kind with
+        | NOT =>
+            have hChild :
+                gateValueOnGraph C E H g.input1 = !b := by
+              simpa [gateEvalFromInputs, g, hk] using hEval
+            rcases ih g.input1 hlt1 hinput1 I (!b) H hHI hChild with ⟨R, hR, hHR⟩
+            refine ⟨R, ?_, hHR⟩
+            simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk] using hR
+        | AND =>
+            cases hb : b with
+            | true =>
+                have hChildren :
+                    gateValueOnGraph C E H g.input1 = true ∧
+                    gateValueOnGraph C E H g.input2 = true := by
+                  cases h1 : gateValueOnGraph C E H g.input1 <;>
+                    cases h2 : gateValueOnGraph C E H g.input2 <;>
+                    simp [gateEvalFromInputs, g, hk, h1, h2, hb] at hEval ⊢
+                let I' := filterByGateValue C E I root true
+                have hHI' : H ∈ I' := by
+                  exact (mem_filterByGateValue_iff C E I root true H).2 ⟨hHI, by simpa [hb] using hRoot⟩
+                rcases ih g.input2 hlt2 hinput2 I' true H hHI' hChildren.2 with ⟨R, hR, hHR⟩
+                let leftTree :=
+                  formulaProtocolTree C E S I' true (formulaTreeOf C hFormula g.input1 hinput1)
+                let rightTree :=
+                  formulaProtocolTree C E S I' true (formulaTreeOf C hFormula g.input2 hinput2)
+                rcases ih g.input1 hlt1 hinput1 I' true H hHI' hChildren.1 with ⟨A, hA, hHA⟩
+                have hR' : R ∈ rightTree.oneLeafRectangles := by
+                  simpa [rightTree] using hR
+                have hInGraft :
+                    OneRectangle.mk (A.leftFam ∩ R.leftFam) (A.rightFam ∩ R.rightFam) ∈
+                      (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles := by
+                  exact oneLeafRectangles_mem_graft_of_mem rightTree leftTree A R
+                    (by simpa [leftTree] using hA) hR'
+                refine ⟨OneRectangle.mk (A.leftFam ∩ R.leftFam) (A.rightFam ∩ R.rightFam), ?_, ?_⟩
+                simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk,
+                  I', leftTree, rightTree] using hInGraft
+                · exact ⟨by exact Finset.mem_inter.mpr ⟨hHA.1, hHR.1⟩,
+                    by exact Finset.mem_inter.mpr ⟨hHA.2, hHR.2⟩⟩
+            | false =>
+                let I' := filterByGateValue C E I root false
+                have hHI' : H ∈ I' := by
+                  exact (mem_filterByGateValue_iff C E I root false H).2 ⟨hHI, by simpa [hb] using hRoot⟩
+                by_cases hLeft : gateValueOnGraph C E H g.input1 = true
+                · have hRightFalse :
+                      gateValueOnGraph C E H g.input2 = false := by
+                    cases h2 : gateValueOnGraph C E H g.input2 with
+                    | false =>
+                        simpa [h2]
+                    | true =>
+                        have hEvalFalse : gateEvalFromInputs C E H j hj = false := by
+                          simpa [hb] using hEval
+                        have hEvalTrue : gateEvalFromInputs C E H j hj = true := by
+                          simpa [gateEvalFromInputs, g, hk, hLeft, h2]
+                        exfalso
+                        exact Bool.false_ne_true (hEvalFalse.symm.trans hEvalTrue)
+                  let rightOnly := filterByGateValue C E I' g.input1 true
+                  have hHRightOnly : H ∈ rightOnly := by
+                    exact (mem_filterByGateValue_iff C E I' g.input1 true H).2 ⟨hHI', hLeft⟩
+                  rcases ih g.input2 hlt2 hinput2 rightOnly false H hHRightOnly hRightFalse with ⟨R, hR, hHR⟩
+                  have hR' :
+                      R ∈ (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root false)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                        false (formulaTreeOf C hFormula g.input2 hinput2)).oneLeafRectangles := by
+                    simpa [rightOnly, I', formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR
+                  refine ⟨R, ?_, hHR⟩
+                  simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk] using
+                    (Or.inr hR')
+                · have hLeftFalse : gateValueOnGraph C E H g.input1 = false := by
+                    cases hleftv : gateValueOnGraph C E H g.input1 <;> simp_all
+                  let leftRejecting := filterByGateValue C E I' g.input1 false
+                  have hHLeftRejecting : H ∈ leftRejecting := by
+                    exact (mem_filterByGateValue_iff C E I' g.input1 false H).2 ⟨hHI', hLeftFalse⟩
+                  rcases ih g.input1 hlt1 hinput1 leftRejecting false H hHLeftRejecting hLeftFalse with ⟨R, hR, hHR⟩
+                  have hR' :
+                      R ∈ (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root false)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                        false (formulaTreeOf C hFormula g.input1 hinput1)).oneLeafRectangles := by
+                    simpa [leftRejecting, I', formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR
+                  refine ⟨R, ?_, hHR⟩
+                  simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk] using
+                    (Or.inl hR')
+        | OR =>
+            cases hb : b with
+            | true =>
+                let I' := filterByGateValue C E I root true
+                have hHI' : H ∈ I' := by
+                  exact (mem_filterByGateValue_iff C E I root true H).2 ⟨hHI, by simpa [hb] using hRoot⟩
+                by_cases hLeft : gateValueOnGraph C E H g.input1 = true
+                · let leftAccepting := filterByGateValue C E I' g.input1 true
+                  have hHLeftAccepting : H ∈ leftAccepting := by
+                    exact (mem_filterByGateValue_iff C E I' g.input1 true H).2 ⟨hHI', hLeft⟩
+                  rcases ih g.input1 hlt1 hinput1 leftAccepting true H hHLeftAccepting hLeft with ⟨R, hR, hHR⟩
+                  have hR' :
+                      R ∈ (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root true)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                        true (formulaTreeOf C hFormula g.input1 hinput1)).oneLeafRectangles := by
+                    simpa [leftAccepting, I', formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR
+                  refine ⟨R, ?_, hHR⟩
+                  simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk] using
+                    (Or.inl hR')
+                · have hLeftFalse : gateValueOnGraph C E H g.input1 = false := by
+                    cases hleftv : gateValueOnGraph C E H g.input1 <;> simp_all
+                  have hRightTrue :
+                      gateValueOnGraph C E H g.input2 = true := by
+                    cases h2 : gateValueOnGraph C E H g.input2 with
+                    | false =>
+                        have hEvalTrue : gateEvalFromInputs C E H j hj = true := by
+                          simpa [hb] using hEval
+                        have hEvalFalse : gateEvalFromInputs C E H j hj = false := by
+                          simpa [gateEvalFromInputs, g, hk, hLeftFalse, h2]
+                        exfalso
+                        exact Bool.false_ne_true (hEvalFalse.symm.trans hEvalTrue)
+                    | true =>
+                        simpa [h2]
+                  let rightOnly := filterByGateValue C E I' g.input1 false
+                  have hHRightOnly : H ∈ rightOnly := by
+                    exact (mem_filterByGateValue_iff C E I' g.input1 false H).2 ⟨hHI', hLeftFalse⟩
+                  rcases ih g.input2 hlt2 hinput2 rightOnly true H hHRightOnly hRightTrue with ⟨R, hR, hHR⟩
+                  have hR' :
+                      R ∈ (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root true)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                        true (formulaTreeOf C hFormula g.input2 hinput2)).oneLeafRectangles := by
+                    simpa [rightOnly, I', formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR
+                  refine ⟨R, ?_, hHR⟩
+                  simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk] using
+                    (Or.inr hR')
+            | false =>
+                let I' := filterByGateValue C E I root false
+                have hHI' : H ∈ I' := by
+                  exact (mem_filterByGateValue_iff C E I root false H).2 ⟨hHI, by simpa [hb] using hRoot⟩
+                have hChildren :
+                    gateValueOnGraph C E H g.input1 = false ∧
+                    gateValueOnGraph C E H g.input2 = false := by
+                  cases h1 : gateValueOnGraph C E H g.input1 <;>
+                    cases h2 : gateValueOnGraph C E H g.input2 <;>
+                    simp [gateEvalFromInputs, g, hk, h1, h2, hb] at hEval ⊢
+                rcases ih g.input2 hlt2 hinput2 I' false H hHI' hChildren.2 with ⟨R, hR, hHR⟩
+                let leftTree :=
+                  formulaProtocolTree C E S I' false (formulaTreeOf C hFormula g.input1 hinput1)
+                let rightTree :=
+                  formulaProtocolTree C E S I' false (formulaTreeOf C hFormula g.input2 hinput2)
+                rcases ih g.input1 hlt1 hinput1 I' false H hHI' hChildren.1 with ⟨A, hA, hHA⟩
+                have hR' : R ∈ rightTree.oneLeafRectangles := by
+                  simpa [rightTree] using hR
+                have hInGraft :
+                    OneRectangle.mk (A.leftFam ∩ R.leftFam) (A.rightFam ∩ R.rightFam) ∈
+                      (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles := by
+                  exact oneLeafRectangles_mem_graft_of_mem rightTree leftTree A R
+                    (by simpa [leftTree] using hA) hR'
+                refine ⟨OneRectangle.mk (A.leftFam ∩ R.leftFam) (A.rightFam ∩ R.rightFam), ?_, ?_⟩
+                simpa [formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles, hInput, j, g, hk,
+                  I', leftTree, rightTree] using hInGraft
+                · exact ⟨by exact Finset.mem_inter.mpr ⟨hHA.1, hHR.1⟩,
+                    by exact Finset.mem_inter.mpr ⟨hHA.2, hHR.2⟩⟩
+
+private theorem formulaProtocolTree_cover_output {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (H : Finset (Edge n)) (hHI : H ∈ I) (hHam : IsHamCycle n H)
+    (hout : C.outputGate < m + C.gates.length) :
+    ∃ R ∈ (formulaProtocolTree C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout)).oneLeafRectangles,
+      H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+  have hOutTrue : gateValueOnGraph C E H C.outputGate = true := by
+    have hEval : C.eval (E.encode H) = true := (hCorrect H).2 hHam
+    rw [gateValueOnGraph_output_eq_eval, hEval]
+  exact formulaProtocolTree_cover_of_gateValue C hFormula E S C.outputGate hout I true H hHI hOutTrue
+
+private theorem formulaProtocolTree_covering_output {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
+    (hout : C.outputGate < m + C.gates.length) :
+    ∀ H ∈ I, ∃ R ∈ (formulaProtocolTree C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout)).oneLeafRectangles,
+      H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+  intro H hHI
+  exact formulaProtocolTree_cover_output C hFormula E S I hCorrect H hHI (hHam H hHI) hout
+
+private theorem protocolPartitionNumber_le_oneLeafRectangles_card_of_valid {n : ℕ}
+    (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (rects : Finset (OneRectangle n))
+    (hRect : ∀ R ∈ rects, IsOneRectangle I S R)
+    (hCover : ∀ H ∈ I, ∃ R ∈ rects, H ∈ R.leftFam ∧ H ∈ R.rightFam) :
+    protocolPartitionNumber I S ≤ rects.card := by
+  classical
+  unfold protocolPartitionNumber
+  apply Nat.sInf_le
+  refine ⟨rects, rfl, hRect, hCover⟩
+
+private theorem ProtocolPartitionTree.oneLeafRectangles_eq_toFinset_oneLeaves
+    {n : ℕ} {S : Frontier n} :
+    ∀ t : ProtocolPartitionTree n S, t.oneLeafRectangles = t.oneLeaves.toFinset
+  | .zeroLeaf => by simp [ProtocolPartitionTree.oneLeafRectangles, ProtocolPartitionTree.oneLeaves]
+  | .oneLeaf R => by simp [ProtocolPartitionTree.oneLeafRectangles, ProtocolPartitionTree.oneLeaves]
+  | .branch _ _ left right => by
+      simp [ProtocolPartitionTree.oneLeafRectangles, ProtocolPartitionTree.oneLeaves,
+        ProtocolPartitionTree.oneLeafRectangles_eq_toFinset_oneLeaves left,
+        ProtocolPartitionTree.oneLeafRectangles_eq_toFinset_oneLeaves right,
+        List.toFinset_append, Finset.union_comm, Finset.union_left_comm, Finset.union_assoc]
+
+@[simp] private theorem ProtocolPartitionTree.oneLeaves_restrictTree {n : ℕ} {S : Frontier n}
+    (ambient : OneRectangle n) :
+    ∀ t : ProtocolPartitionTree n S,
+      (t.restrictTree ambient).oneLeaves =
+        t.oneLeaves.map (fun R =>
+          OneRectangle.mk (ambient.leftFam ∩ R.leftFam) (ambient.rightFam ∩ R.rightFam))
+  | .zeroLeaf => by simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeaves]
+  | .oneLeaf R => by simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeaves]
+  | .branch _ _ left right => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeaves,
+        ProtocolPartitionTree.oneLeaves_restrictTree ambient left,
+        ProtocolPartitionTree.oneLeaves_restrictTree ambient right, List.map_append]
+
+@[simp] private theorem ProtocolPartitionTree.numOneLeaves_restrictTree {n : ℕ} {S : Frontier n}
+    (ambient : OneRectangle n) (t : ProtocolPartitionTree n S) :
+    (t.restrictTree ambient).numOneLeaves = t.numOneLeaves := by
+  simp [ProtocolPartitionTree.numOneLeaves, ProtocolPartitionTree.oneLeaves_restrictTree]
+
+@[simp] private theorem ProtocolPartitionTree.oneLeafCount_restrictTree {n : ℕ} {S : Frontier n}
+    (ambient : OneRectangle n) :
+    ∀ t : ProtocolPartitionTree n S,
+      (t.restrictTree ambient).oneLeafCount = t.oneLeafCount
+  | .zeroLeaf => by simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafCount]
+  | .oneLeaf _ => by simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafCount]
+  | .branch _ _ left right => by
+      simp [ProtocolPartitionTree.restrictTree, ProtocolPartitionTree.oneLeafCount,
+        ProtocolPartitionTree.oneLeafCount_restrictTree ambient left,
+        ProtocolPartitionTree.oneLeafCount_restrictTree ambient right]
+
+@[simp] private theorem ProtocolPartitionTree.oneLeaves_graftAtOneLeaves {n : ℕ} {S : Frontier n}
+    (lhs rhs : ProtocolPartitionTree n S) :
+    (lhs.graftAtOneLeaves rhs).oneLeaves =
+      lhs.oneLeaves.flatMap (fun ambient =>
+        (rhs.oneLeaves.map (fun R =>
+          OneRectangle.mk (ambient.leftFam ∩ R.leftFam) (ambient.rightFam ∩ R.rightFam)))) := by
+  induction lhs with
+  | zeroLeaf =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeaves]
+  | oneLeaf ambient =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeaves,
+        ProtocolPartitionTree.oneLeaves_restrictTree ambient]
+  | branch gate kind left right ihLeft ihRight =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeaves, ihLeft, ihRight,
+        List.flatMap_append]
+
+@[simp] private theorem ProtocolPartitionTree.numOneLeaves_graftAtOneLeaves {n : ℕ} {S : Frontier n}
+    (lhs rhs : ProtocolPartitionTree n S) :
+    (lhs.graftAtOneLeaves rhs).numOneLeaves = lhs.numOneLeaves * rhs.numOneLeaves := by
+  have hcount :
+      (lhs.graftAtOneLeaves rhs).oneLeafCount = lhs.oneLeafCount * rhs.oneLeafCount := by
+    induction lhs with
+    | zeroLeaf =>
+        simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafCount]
+    | oneLeaf ambient =>
+        simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafCount,
+          ProtocolPartitionTree.oneLeafCount_restrictTree ambient]
+    | branch gate kind left right ihLeft ihRight =>
+        simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.oneLeafCount,
+          ihLeft, ihRight, Nat.add_mul]
+  induction lhs with
+  | zeroLeaf =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.numOneLeaves,
+        ProtocolPartitionTree.oneLeaves]
+  | oneLeaf ambient =>
+      simp [ProtocolPartitionTree.graftAtOneLeaves, ProtocolPartitionTree.numOneLeaves,
+        ProtocolPartitionTree.oneLeaves, ProtocolPartitionTree.oneLeaves_restrictTree]
+  | branch gate kind left right ihLeft ihRight =>
+      simpa [ProtocolPartitionTree.numOneLeaves_eq_oneLeafCount] using hcount
+
+private theorem ProtocolPartitionTree.oneLeafRectangles_card_le_numOneLeaves
+    {n : ℕ} {S : Frontier n} (t : ProtocolPartitionTree n S) :
+    t.oneLeafRectangles.card ≤ t.numOneLeaves := by
+  classical
+  rw [ProtocolPartitionTree.oneLeafRectangles_eq_toFinset_oneLeaves]
+  exact List.toFinset_card_le _
+
+private theorem protocolPartitionNumber_le_numOneLeaves_of_valid {n : ℕ}
+    (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (t : ProtocolPartitionTree n S)
+    (hRect : ∀ R ∈ t.oneLeafRectangles, IsOneRectangle I S R)
+    (hCover : ∀ H ∈ I, ∃ R ∈ t.oneLeafRectangles, H ∈ R.leftFam ∧ H ∈ R.rightFam) :
+    protocolPartitionNumber I S ≤ t.numOneLeaves := by
+  have hpp :
+      protocolPartitionNumber I S ≤ t.oneLeafRectangles.card := by
+    exact protocolPartitionNumber_le_oneLeafRectangles_card_of_valid I S t.oneLeafRectangles hRect hCover
+  exact le_trans hpp t.oneLeafRectangles_card_le_numOneLeaves
+
+private def restrictRectangleToFamily {n : ℕ}
+    (I : Finset (Finset (Edge n))) (R : OneRectangle n) : OneRectangle n :=
+  { leftFam := I ∩ R.leftFam
+    rightFam := I ∩ R.rightFam }
+
+private theorem restrictRectangleToFamily_valid_of_valid {n : ℕ}
+    (I I' : Finset (Finset (Edge n))) (S : Frontier n)
+    (R : OneRectangle n) (hR : IsOneRectangle I S R) :
+    IsOneRectangle I' S (restrictRectangleToFamily I' R) := by
+  refine ⟨?_, ?_, ?_⟩
+  · intro H hH
+    exact (Finset.mem_inter.mp hH).1
+  · intro H hH
+    exact (Finset.mem_inter.mp hH).1
+  · intro H₀ hH₀ H₁ hH₁
+    exact hR.monochromatic H₀ (Finset.mem_inter.mp hH₀).2
+      H₁ (Finset.mem_inter.mp hH₁).2
+
+private theorem protocolPartitionNumber_mono {n : ℕ}
+    (I I' : Finset (Finset (Edge n))) (S : Frontier n)
+    (hHam : ∀ H ∈ I, IsHamCycle n H) (hI' : I' ⊆ I) :
+    protocolPartitionNumber I' S ≤ protocolPartitionNumber I S := by
+  classical
+  unfold protocolPartitionNumber
+  have hnonempty :
+      {k : ℕ | ∃ P : Finset (OneRectangle n),
+        P.card = k ∧
+          (∀ R ∈ P, IsOneRectangle I S R) ∧
+            ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam}.Nonempty := by
+    let P := I.image (fun H : Finset (Edge n) =>
+      ({ leftFam := ({H} : Finset (Finset (Edge n)))
+         rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n))
+    have hRect : ∀ R ∈ P, IsOneRectangle I S R := by
+      intro R hR
+      rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hHI, Finset.singleton_subset_iff.mpr hHI, ?_⟩
+      intro H₀ hH₀ H₁ hH₁
+      simp only [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      simpa [mixedGraph_self S H (hHam H hHI)] using hHam H hHI
+    have hCover : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+      intro H hH
+      refine ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))), ?_, ?_, ?_⟩
+      · exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+      · exact Finset.mem_singleton_self H
+      · exact Finset.mem_singleton_self H
+    exact ⟨P.card, ⟨P, rfl, hRect, hCover⟩⟩
+  rcases Nat.sInf_mem hnonempty with ⟨P, hPk, hRect, hCover⟩
+  let P' : Finset (OneRectangle n) := P.image (restrictRectangleToFamily I')
+  have hP'valid : ∀ R ∈ P', IsOneRectangle I' S R := by
+    intro R hR
+    rcases Finset.mem_image.mp hR with ⟨R', hR', rfl⟩
+    exact restrictRectangleToFamily_valid_of_valid I I' S R' (hRect R' hR')
+  have hP'cover : ∀ H ∈ I', ∃ R ∈ P', H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+    intro H hH
+    rcases hCover H (hI' hH) with ⟨R, hR, hHL, hHR⟩
+    refine ⟨restrictRectangleToFamily I' R, Finset.mem_image.mpr ⟨R, hR, rfl⟩, ?_, ?_⟩
+    · exact Finset.mem_inter.mpr ⟨hH, hHL⟩
+    · exact Finset.mem_inter.mpr ⟨hH, hHR⟩
+  have hcard : P'.card ≤ P.card := Finset.card_image_le
+  have hsInf :
+      sInf
+          {k : ℕ | ∃ P : Finset (OneRectangle n),
+            P.card = k ∧
+              (∀ R ∈ P, IsOneRectangle I' S R) ∧
+                ∀ H ∈ I', ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam}
+        ≤ P'.card := by
+    apply Nat.sInf_le
+    exact ⟨P', rfl, hP'valid, hP'cover⟩
+  exact le_trans hsInf (le_trans hcard (by simpa [hPk]))
+
+private theorem protocolPartitionNumber_le_card_of_witness {n : ℕ}
+    (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (P : Finset (OneRectangle n))
+    (hRect : ∀ R ∈ P, IsOneRectangle I S R)
+    (hCover : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam) :
+    protocolPartitionNumber I S ≤ P.card := by
+  unfold protocolPartitionNumber
+  apply Nat.sInf_le
+  exact ⟨P, rfl, hRect, hCover⟩
+
+private theorem protocolPartitionNumber_le_card_of_generalized_witness {n : ℕ}
+    (I : Finset (Finset (Edge n))) (S : Frontier n)
+    (pred : Finset (Edge n) → Finset (Edge n) → Prop)
+    (P : Finset (OneRectangle n))
+    (hRect : ∀ R ∈ P, IsOneRectangleFor I I pred R)
+    (hCover : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam)
+    (hPredToHam : ∀ H₀ H₁, pred H₀ H₁ → IsHamCycle n (mixedGraph S H₁ H₀)) :
+    protocolPartitionNumber I S ≤ P.card := by
+  apply protocolPartitionNumber_le_card_of_witness I S P
+  · intro R hR
+    refine ⟨(hRect R hR).left_subset, (hRect R hR).right_subset, ?_⟩
+    intro H₀ hH₀ H₁ hH₁
+    exact hPredToHam H₀ H₁ ((hRect R hR).monochromatic H₀ hH₀ H₁ hH₁)
+  · exact hCover
+
+private theorem protocolPartitionNumber_union_le {n : ℕ}
+    (I₁ I₂ : Finset (Finset (Edge n))) (S : Frontier n)
+    (hHam₁ : ∀ H ∈ I₁, IsHamCycle n H)
+    (hHam₂ : ∀ H ∈ I₂, IsHamCycle n H) :
+    protocolPartitionNumber (I₁ ∪ I₂) S ≤
+      protocolPartitionNumber I₁ S + protocolPartitionNumber I₂ S := by
+  classical
+  let witnessSet := fun I : Finset (Finset (Edge n)) =>
+    {k : ℕ | ∃ P : Finset (OneRectangle n),
+      P.card = k ∧
+        (∀ R ∈ P, IsOneRectangle I S R) ∧
+          ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam}
+  have hnonempty₁ : (witnessSet I₁).Nonempty := by
+    let P := I₁.image (fun H : Finset (Edge n) =>
+      ({ leftFam := ({H} : Finset (Finset (Edge n)))
+         rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n))
+    have hRect : ∀ R ∈ P, IsOneRectangle I₁ S R := by
+      intro R hR
+      rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hHI, Finset.singleton_subset_iff.mpr hHI, ?_⟩
+      intro H₀ hH₀ H₁ hH₁
+      simp only [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      simpa [mixedGraph_self S H (hHam₁ H hHI)] using hHam₁ H hHI
+    have hCover : ∀ H ∈ I₁, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+      intro H hH
+      refine ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))), ?_, ?_, ?_⟩
+      · exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+      · exact Finset.mem_singleton_self H
+      · exact Finset.mem_singleton_self H
+    exact ⟨P.card, ⟨P, rfl, hRect, hCover⟩⟩
+  have hnonempty₂ : (witnessSet I₂).Nonempty := by
+    let P := I₂.image (fun H : Finset (Edge n) =>
+      ({ leftFam := ({H} : Finset (Finset (Edge n)))
+         rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n))
+    have hRect : ∀ R ∈ P, IsOneRectangle I₂ S R := by
+      intro R hR
+      rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hHI, Finset.singleton_subset_iff.mpr hHI, ?_⟩
+      intro H₀ hH₀ H₁ hH₁
+      simp only [Finset.mem_singleton] at hH₀ hH₁
+      rw [hH₀, hH₁]
+      simpa [mixedGraph_self S H (hHam₂ H hHI)] using hHam₂ H hHI
+    have hCover : ∀ H ∈ I₂, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+      intro H hH
+      refine ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))), ?_, ?_, ?_⟩
+      · exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+      · exact Finset.mem_singleton_self H
+      · exact Finset.mem_singleton_self H
+    exact ⟨P.card, ⟨P, rfl, hRect, hCover⟩⟩
+  rcases Nat.sInf_mem hnonempty₁ with ⟨P₁, hP₁card, hRect₁, hCover₁⟩
+  rcases Nat.sInf_mem hnonempty₂ with ⟨P₂, hP₂card, hRect₂, hCover₂⟩
+  have hRectUnion : ∀ R ∈ P₁ ∪ P₂, IsOneRectangle (I₁ ∪ I₂) S R := by
+    intro R hR
+    rcases Finset.mem_union.mp hR with hR | hR
+    · refine ⟨?_, ?_, ?_⟩
+      · exact Set.Subset.trans (hRect₁ R hR).left_subset (Finset.subset_union_left)
+      · exact Set.Subset.trans (hRect₁ R hR).right_subset (Finset.subset_union_left)
+      · exact (hRect₁ R hR).monochromatic
+    · refine ⟨?_, ?_, ?_⟩
+      · exact Set.Subset.trans (hRect₂ R hR).left_subset (Finset.subset_union_right)
+      · exact Set.Subset.trans (hRect₂ R hR).right_subset (Finset.subset_union_right)
+      · exact (hRect₂ R hR).monochromatic
+  have hCoverUnion :
+      ∀ H ∈ I₁ ∪ I₂, ∃ R ∈ P₁ ∪ P₂, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+    intro H hH
+    rcases Finset.mem_union.mp hH with hH | hH
+    · rcases hCover₁ H hH with ⟨R, hR, hHL, hHR⟩
+      exact ⟨R, Finset.mem_union.mpr (Or.inl hR), hHL, hHR⟩
+    · rcases hCover₂ H hH with ⟨R, hR, hHL, hHR⟩
+      exact ⟨R, Finset.mem_union.mpr (Or.inr hR), hHL, hHR⟩
+  calc
+    protocolPartitionNumber (I₁ ∪ I₂) S ≤ (P₁ ∪ P₂).card := by
+      exact protocolPartitionNumber_le_card_of_witness (I₁ ∪ I₂) S (P₁ ∪ P₂) hRectUnion hCoverUnion
+    _ ≤ P₁.card + P₂.card := Finset.card_union_le _ _
+    _ = protocolPartitionNumber I₁ S + protocolPartitionNumber I₂ S := by
+      unfold protocolPartitionNumber
+      simpa [hP₁card, hP₂card, witnessSet]
+
+private lemma SubformulaNodeOf.trans'
+    {m : ℕ} {C : BooleanCircuit m} {a b c : ℕ}
+    (hab : SubformulaNodeOf C a b) (hbc : SubformulaNodeOf C b c) :
+    SubformulaNodeOf C a c := by
+  induction hbc generalizing a with
+  | root => exact hab
+  | input1 hj hget ih => exact SubformulaNodeOf.input1 (ih hab) hget
+  | input2 hj hget ih => exact SubformulaNodeOf.input2 (ih hab) hget
+
+@[simp] private lemma mem_subformulaGateSet_iff
+    {m : ℕ} (C : BooleanCircuit m) (root j : ℕ) :
+    j ∈ subformulaGateSet C root ↔
+      j < C.gates.length ∧ SubformulaNodeOf C root (m + j) := by
+  unfold subformulaGateSet
+  simp [Finset.mem_filter, decide_eq_true_eq]
+
+private lemma subformulaGateSet_subset_of_reachable
+    {m : ℕ} {C : BooleanCircuit m} {parent child : ℕ}
+    (hchild : SubformulaNodeOf C parent child) :
+    subformulaGateSet C child ⊆ subformulaGateSet C parent := by
+  intro j hj
+  rcases (mem_subformulaGateSet_iff C child j).1 hj with ⟨hjl, hreach⟩
+  exact (mem_subformulaGateSet_iff C parent j).2 ⟨hjl, hchild.trans' hreach⟩
+
+private lemma root_mem_subformulaGateSet'
+    {m : ℕ} {C : BooleanCircuit m} {root : ℕ}
+    (hroot : root < m + C.gates.length) (hm : m ≤ root) :
+    root - m ∈ subformulaGateSet C root := by
+  rw [mem_subformulaGateSet_iff]
+  refine ⟨by omega, ?_⟩
+  have : m + (root - m) = root := Nat.add_sub_cancel' hm
+  rw [this]
+  exact SubformulaNodeOf.root
+
+private lemma SubformulaNodeOf_le_root
+    {m : ℕ} {C : BooleanCircuit m} (hFormula : C.isFormula) {root x : ℕ}
+    (h : SubformulaNodeOf C root x) : x ≤ root := by
+  induction h with
+  | root => exact le_refl _
+  | @input1 j hj hget ih =>
+      have hlt := (hFormula.2 j hget).1
+      have : (C.gates.get ⟨j, hget⟩).input1 = (C.gates[j]'hget).input1 := rfl
+      omega
+  | @input2 j hj hget ih =>
+      have hlt := (hFormula.2 j hget).2
+      have : (C.gates.get ⟨j, hget⟩).input2 = (C.gates[j]'hget).input2 := rfl
+      omega
+
+private lemma root_not_in_child_gate_set
+    {m : ℕ} {C : BooleanCircuit m} (hFormula : C.isFormula)
+    {root child : ℕ} (hchild_lt : child < root) (hm : m ≤ root) :
+    root - m ∉ subformulaGateSet C child := by
+  intro h
+  rw [mem_subformulaGateSet_iff] at h
+  obtain ⟨_, hreach⟩ := h
+  rw [Nat.add_sub_cancel' hm] at hreach
+  have := SubformulaNodeOf_le_root hFormula hreach
+  omega
+
+private lemma foldl_fanOut_le {i : ℕ} (l : List Gate) (acc : ℕ) :
+    acc ≤ l.foldl (fun a g =>
+      a + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0)) acc := by
+  induction l generalizing acc with
+  | nil => simp
+  | cons g l ih => simp only [List.foldl_cons]; exact le_trans (by omega) (ih _)
+
+private lemma foldl_fanOut_mono {i : ℕ} (l : List Gate) {a b : ℕ} (hab : a ≤ b) :
+    l.foldl (fun a g =>
+      a + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0)) a ≤
+    l.foldl (fun a g =>
+      a + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0)) b := by
+  induction l generalizing a b with
+  | nil => simpa
+  | cons g l ih => simp only [List.foldl_cons]; exact ih (by omega)
+
+private lemma foldl_fanOut_two (l : List Gate) (j : ℕ) (hj : j < l.length) (i : ℕ)
+    (h1 : l[j].input1 = i) (h2 : l[j].input2 = i) :
+    2 ≤ l.foldl (fun a g =>
+      a + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0)) 0 := by
+  induction l generalizing j with
+  | nil => simp at hj
+  | cons g l ih =>
+    simp only [List.foldl_cons]
+    cases j with
+    | zero =>
+      simp only [List.getElem_cons_zero] at h1 h2
+      simp only [h1, h2, ite_true]
+      exact le_trans (by omega) (foldl_fanOut_le l _)
+    | succ j' =>
+      simp only [List.getElem_cons_succ] at h1 h2
+      have hj' : j' < l.length := by simp [List.length_cons] at hj; omega
+      exact le_trans (ih j' hj' h1 h2) (foldl_fanOut_mono l (by omega))
+
+private lemma formula_gate_inputs_ne {m : ℕ} (C : BooleanCircuit m)
+    (hFormula : C.isFormula) (j : ℕ) (hj : j < C.gates.length) :
+    (C.gates[j]'hj).input1 ≠ (C.gates[j]'hj).input2 := by
+  intro heq
+  have hi : (C.gates[j]'hj).input1 < C.gates.length + m := by
+    have := (hFormula.2 j hj).1; omega
+  have hfanout : 2 ≤ C.fanOut (C.gates[j]'hj).input1 :=
+    foldl_fanOut_two C.gates j hj _ rfl heq.symm
+  linarith [hFormula.1 _ hi]
+
+private lemma SubformulaNodeOf_nonroot_exists_parent {m : ℕ} {C : BooleanCircuit m}
+    {root x : ℕ} (h : SubformulaNodeOf C root x) (hne : x ≠ root) :
+    ∃ q : ℕ, ∃ hq : q < C.gates.length, SubformulaNodeOf C root (m + q) ∧
+      ((C.gates[q]'hq).input1 = x ∨ (C.gates[q]'hq).input2 = x) := by
+  cases h with
+  | root => exact absurd rfl hne
+  | @input1 q hprev hget => exact ⟨q, hget, hprev, Or.inl rfl⟩
+  | @input2 q hprev hget => exact ⟨q, hget, hprev, Or.inr rfl⟩
+
+private lemma children_gate_sets_disjoint
+    {m : ℕ} {C : BooleanCircuit m} (hFormula : C.isFormula)
+    {j : ℕ} (hj : j < C.gates.length) :
+    Disjoint (subformulaGateSet C (C.gates[j]'hj).input1)
+             (subformulaGateSet C (C.gates[j]'hj).input2) := by
+  have hne := formula_gate_inputs_ne C hFormula j hj
+  have hinp := hFormula.2 j hj
+  rw [Finset.disjoint_left]
+  intro k hk1 hk2
+  simp only [mem_subformulaGateSet_iff] at hk1 hk2
+  obtain ⟨_, hreach1⟩ := hk1
+  obtain ⟨_, hreach2⟩ := hk2
+  suffices hsuff : ∀ d x, d = m + j - x → x < m + j →
+      SubformulaNodeOf C (C.gates[j]'hj).input1 x →
+      SubformulaNodeOf C (C.gates[j]'hj).input2 x → False by
+    have hle := SubformulaNodeOf_le_root hFormula hreach1
+    exact hsuff _ _ rfl (by omega) hreach1 hreach2
+  intro d
+  induction d using Nat.strongRecOn with
+  | _ d ihd =>
+    intro x hdx hx h1 h2
+    by_cases hx1 : x = (C.gates[j]'hj).input1
+    · by_cases hx2 : x = (C.gates[j]'hj).input2
+      · exact hne (hx1.symm.trans hx2)
+      · obtain ⟨q, hq, hprev, hpar⟩ := SubformulaNodeOf_nonroot_exists_parent h2 hx2
+        have hq_eq_j := formula_unique_parent_index C hFormula
+          (by rw [hx1]; omega) hq hj hpar (Or.inl hx1.symm)
+        have := SubformulaNodeOf_le_root hFormula (hq_eq_j ▸ hprev); omega
+    · by_cases hx2 : x = (C.gates[j]'hj).input2
+      · obtain ⟨q, hq, hprev, hpar⟩ := SubformulaNodeOf_nonroot_exists_parent h1 hx1
+        have hq_eq_j := formula_unique_parent_index C hFormula
+          (by rw [hx2]; omega) hq hj hpar (Or.inr hx2.symm)
+        have := SubformulaNodeOf_le_root hFormula (hq_eq_j ▸ hprev); omega
+      · obtain ⟨q1, hq1, hprev1, hpar1⟩ := SubformulaNodeOf_nonroot_exists_parent h1 hx1
+        obtain ⟨q2, hq2, hprev2, hpar2⟩ := SubformulaNodeOf_nonroot_exists_parent h2 hx2
+        have hx_lt : x < C.gates.length + m := by
+          have := SubformulaNodeOf_le_root hFormula h1; omega
+        have hq12 := formula_unique_parent_index C hFormula hx_lt hq1 hq2 hpar1 hpar2
+        have hx_lt_mq1 : x < m + q1 := by
+          rcases hpar1 with h | h <;> [exact h ▸ (hFormula.2 q1 hq1).1; exact h ▸ (hFormula.2 q1 hq1).2]
+        have hmq1_lt : m + q1 < m + j := by
+          have := SubformulaNodeOf_le_root hFormula hprev1; omega
+        exact ihd (m + j - (m + q1)) (by omega) (m + q1) rfl (by omega)
+          hprev1 (hq12 ▸ hprev2)
+
+private def FormulaTree.internalNodeCount : FormulaTree → ℕ
+  | .input _ => 0
+  | .notNode _ child => 1 + child.internalNodeCount
+  | .andNode _ left right => 1 + left.internalNodeCount + right.internalNodeCount
+  | .orNode _ left right => 1 + left.internalNodeCount + right.internalNodeCount
+
+private theorem FormulaTree.inputLeafCount_le_internalNodeCount_succ :
+    ∀ t : FormulaTree, t.inputLeafCount ≤ t.internalNodeCount + 1 := by
+  intro t
+  induction t with
+  | input _ => simp [inputLeafCount, internalNodeCount]
+  | notNode _ child ih =>
+      simp [inputLeafCount, internalNodeCount]; omega
+  | andNode _ left right ihL ihR =>
+      simp [inputLeafCount, internalNodeCount]; omega
+  | orNode _ left right ihL ihR =>
+      simp [inputLeafCount, internalNodeCount]; omega
+
+private theorem inputLeafCount_le_size {m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (root : ℕ) (hroot : root < m + C.gates.length) :
+    (formulaTreeOf C hFormula root hroot).inputLeafCount ≤ C.size := by
+  have h1 := FormulaTree.inputLeafCount_le_internalNodeCount_succ
+    (formulaTreeOf C hFormula root hroot)
+  have h2 : ∀ (r : ℕ) (hr : r < m + C.gates.length),
+      (formulaTreeOf C hFormula r hr).internalNodeCount ≤ (subformulaGateSet C r).card := by
+    intro r hr
+    induction r using Nat.strongRecOn with
+    | _ r ih =>
+      unfold formulaTreeOf
+      by_cases hInput : r < m
+      · -- Input leaf: internalNodeCount = 0
+        simp [hInput, FormulaTree.internalNodeCount]
+      · -- Gate node
+        simp [hInput]
+        have hm_le : m ≤ r := Nat.le_of_not_lt hInput
+        have hj : r - m < C.gates.length := by omega
+        have hinputs := formula_gate_inputs_lt C hFormula (r - m) hj
+        have hlt1 : (C.gates[r - m]'hj).input1 < r := by have := hinputs.1; omega
+        have hlt2 : (C.gates[r - m]'hj).input2 < r := by have := hinputs.2; omega
+        have hhr1 : (C.gates[r - m]'hj).input1 < m + C.gates.length := lt_trans hlt1 hr
+        have hhr2 : (C.gates[r - m]'hj).input2 < m + C.gates.length := lt_trans hlt2 hr
+        have ih1 := ih _ hlt1 hhr1
+        have ih2 := ih _ hlt2 hhr2
+        -- Case split on gate kind
+        match hk : (C.gates[r - m]'hj).kind with
+        | .NOT =>
+          simp [hk, FormulaTree.internalNodeCount]
+          have hroot_r : SubformulaNodeOf C r (m + (r - m)) := by rw [Nat.add_sub_cancel' hm_le]; exact SubformulaNodeOf.root
+          have hreach_inp1 : SubformulaNodeOf C r (C.gates.get ⟨r - m, hj⟩).input1 := SubformulaNodeOf.input1 hroot_r hj
+          have hsub : subformulaGateSet C (C.gates[r-m]'hj).input1 ⊆ subformulaGateSet C r := subformulaGateSet_subset_of_reachable hreach_inp1
+          have hroot_mem : r - m ∈ subformulaGateSet C r := root_mem_subformulaGateSet' hr hm_le
+          have hroot_nmem : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input1 := root_not_in_child_gate_set hFormula hlt1 hm_le
+          have hins_sub : insert (r - m) (subformulaGateSet C (C.gates[r-m]'hj).input1) ⊆ subformulaGateSet C r := Finset.insert_subset_iff.mpr ⟨hroot_mem, hsub⟩
+          have hcard := Finset.card_le_card hins_sub
+          rw [Finset.card_insert_of_notMem hroot_nmem] at hcard
+          omega
+        | .AND =>
+          simp [hk, FormulaTree.internalNodeCount]
+          have hroot_r : SubformulaNodeOf C r (m + (r - m)) := by rw [Nat.add_sub_cancel' hm_le]; exact SubformulaNodeOf.root
+          have hreach_inp1 : SubformulaNodeOf C r (C.gates.get ⟨r - m, hj⟩).input1 := SubformulaNodeOf.input1 hroot_r hj
+          have hreach_inp2 : SubformulaNodeOf C r (C.gates.get ⟨r - m, hj⟩).input2 := SubformulaNodeOf.input2 hroot_r hj
+          have hsub1 : subformulaGateSet C (C.gates[r-m]'hj).input1 ⊆ subformulaGateSet C r := subformulaGateSet_subset_of_reachable hreach_inp1
+          have hsub2 : subformulaGateSet C (C.gates[r-m]'hj).input2 ⊆ subformulaGateSet C r := subformulaGateSet_subset_of_reachable hreach_inp2
+          have hroot_mem : r - m ∈ subformulaGateSet C r := root_mem_subformulaGateSet' hr hm_le
+          have hroot_nmem1 : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input1 := root_not_in_child_gate_set hFormula hlt1 hm_le
+          have hroot_nmem2 : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input2 := root_not_in_child_gate_set hFormula hlt2 hm_le
+          have hdisj := children_gate_sets_disjoint hFormula hj
+          have hunion_card := (Finset.card_union_eq_card_add_card.mpr hdisj)
+          have hnmem_union : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input1 ∪ subformulaGateSet C (C.gates[r-m]'hj).input2 := by intro h; rcases Finset.mem_union.mp h with h1 | h2; exact hroot_nmem1 h1; exact hroot_nmem2 h2
+          have hins_card := Finset.card_insert_of_notMem hnmem_union
+          have hfinal := Finset.card_le_card (Finset.insert_subset_iff.mpr ⟨hroot_mem, Finset.union_subset hsub1 hsub2⟩)
+          omega
+        | .OR =>
+          simp [hk, FormulaTree.internalNodeCount]
+          have hroot_r : SubformulaNodeOf C r (m + (r - m)) := by rw [Nat.add_sub_cancel' hm_le]; exact SubformulaNodeOf.root
+          have hreach_inp1 : SubformulaNodeOf C r (C.gates.get ⟨r - m, hj⟩).input1 := SubformulaNodeOf.input1 hroot_r hj
+          have hreach_inp2 : SubformulaNodeOf C r (C.gates.get ⟨r - m, hj⟩).input2 := SubformulaNodeOf.input2 hroot_r hj
+          have hsub1 : subformulaGateSet C (C.gates[r-m]'hj).input1 ⊆ subformulaGateSet C r := subformulaGateSet_subset_of_reachable hreach_inp1
+          have hsub2 : subformulaGateSet C (C.gates[r-m]'hj).input2 ⊆ subformulaGateSet C r := subformulaGateSet_subset_of_reachable hreach_inp2
+          have hroot_mem : r - m ∈ subformulaGateSet C r := root_mem_subformulaGateSet' hr hm_le
+          have hroot_nmem1 : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input1 := root_not_in_child_gate_set hFormula hlt1 hm_le
+          have hroot_nmem2 : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input2 := root_not_in_child_gate_set hFormula hlt2 hm_le
+          have hdisj := children_gate_sets_disjoint hFormula hj
+          have hunion_card := (Finset.card_union_eq_card_add_card.mpr hdisj)
+          have hnmem_union : r - m ∉ subformulaGateSet C (C.gates[r-m]'hj).input1 ∪ subformulaGateSet C (C.gates[r-m]'hj).input2 := by intro h; rcases Finset.mem_union.mp h with h1 | h2; exact hroot_nmem1 h1; exact hroot_nmem2 h2
+          have hins_card := Finset.card_insert_of_notMem hnmem_union
+          have hfinal := Finset.card_le_card (Finset.insert_subset_iff.mpr ⟨hroot_mem, Finset.union_subset hsub1 hsub2⟩)
+          omega
+  have h2' := h2 root hroot
+  have h3 : (subformulaGateSet C root).card ≤ C.gates.length :=
+    Finset.card_le_card (subformulaGateSet_subset_range C root) |>.trans (by simp)
+  unfold BooleanCircuit.size
+  rcases Nat.eq_zero_or_pos m with rfl | hm
+  · have : C.gates.length = 0 := by
+      rcases Nat.eq_zero_or_pos C.gates.length with h | h
+      · exact h
+      · exfalso; have := formula_gate_inputs_lt C hFormula 0 h; omega
+    omega
+  · omega
+
+private theorem evalOnGraph_mixed_eq_of_agree {n m : ℕ} (C : BooleanCircuit m)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) (H₀ H₁ : Finset (Edge n)) :
+    ∀ t : FormulaTree,
+      (∀ i ∈ t.inputVars, i < m) →
+      (∀ i ∈ t.inputVars, gateValueOnGraph C E H₀ i = gateValueOnGraph C E H₁ i) →
+      t.evalOnGraph C E (mixedGraph S H₁ H₀) = t.evalOnGraph C E H₀ := by
+  intro t
+  induction t with
+  | input i =>
+      intro hinputs_lt hagree
+      simp only [FormulaTree.evalOnGraph]
+      have hi : i < m := hinputs_lt i (by simp [FormulaTree.inputVars])
+      rw [gateValueOnGraph_input_eq C E (mixedGraph S H₁ H₀) i hi]
+      rw [gateValueOnGraph_input_eq C E H₀ i hi]
+      rcases E.partitionVars S ⟨i, hi⟩ with hleft | hright
+      · exact natural_encoding_mixed_eq_of_left E S H₁ H₀ ⟨i, hi⟩ hleft
+      · rw [natural_encoding_mixed_eq_of_right E S H₁ H₀ ⟨i, hi⟩ hright]
+        have := hagree i (by simp [FormulaTree.inputVars])
+        rw [gateValueOnGraph_input_eq C E H₀ i hi,
+            gateValueOnGraph_input_eq C E H₁ i hi] at this
+        exact this.symm
+  | notNode gate child ih =>
+      intro hinputs_lt hagree
+      simp only [FormulaTree.evalOnGraph]
+      congr 1
+      exact ih (fun i hi => hinputs_lt i (by simp [FormulaTree.inputVars, hi]))
+        (fun i hi => hagree i (by simp [FormulaTree.inputVars, hi]))
+  | andNode gate left right ihL ihR =>
+      intro hinputs_lt hagree
+      simp only [FormulaTree.evalOnGraph]
+      have hL := ihL (fun i hi => hinputs_lt i (by simp [FormulaTree.inputVars, hi]))
+        (fun i hi => hagree i (by simp [FormulaTree.inputVars, hi]))
+      have hR := ihR (fun i hi => hinputs_lt i (by simp [FormulaTree.inputVars, hi]))
+        (fun i hi => hagree i (by simp [FormulaTree.inputVars, hi]))
+      rw [hL, hR]
+  | orNode gate left right ihL ihR =>
+      intro hinputs_lt hagree
+      simp only [FormulaTree.evalOnGraph]
+      have hL := ihL (fun i hi => hinputs_lt i (by simp [FormulaTree.inputVars, hi]))
+        (fun i hi => hagree i (by simp [FormulaTree.inputVars, hi]))
+      have hR := ihR (fun i hi => hinputs_lt i (by simp [FormulaTree.inputVars, hi]))
+        (fun i hi => hagree i (by simp [FormulaTree.inputVars, hi]))
+      rw [hL, hR]
+
+private theorem formulaProtocolTree_gateValue_of_leaf {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ root : ℕ, ∀ hroot : root < m + C.gates.length,
+      ∀ (I : Finset (Finset (Edge n))) (b : Bool) (R : OneRectangle n)
+        (H₀ H₁ : Finset (Edge n)),
+      R ∈ (formulaProtocolTree C E S I b (formulaTreeOf C hFormula root hroot)).oneLeafRectangles →
+      H₀ ∈ R.leftFam →
+      H₁ ∈ R.rightFam →
+      gateValueOnGraph C E (mixedGraph S H₁ H₀) root = b := by
+  intro root
+  induction root using Nat.strong_induction_on with
+  | h root ih =>
+      intro hroot I b R H₀ H₁ hR hH₀ hH₁
+      have hR0 := hR
+      unfold formulaTreeOf at hR0
+      by_cases hInput : root < m
+      · cases b with
+        | false =>
+            have hReq :
+                R = OneRectangle.mk
+                  (filterByGateValue C E I root false)
+                  (filterByGateValue C E I root false) := by
+              simpa [hInput, formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] using hR0
+            subst hReq
+            have hH₀False : gateValueOnGraph C E H₀ root = false :=
+              (mem_filterByGateValue_iff C E I root false H₀).1 hH₀ |>.2
+            have hH₁False : gateValueOnGraph C E H₁ root = false :=
+              (mem_filterByGateValue_iff C E I root false H₁).1 hH₁ |>.2
+            have hEnc₀ : E.encode H₀ ⟨root, hInput⟩ = false := by
+              simpa [gateValueOnGraph_input_eq C E H₀ root hInput] using hH₀False
+            have hEnc₁ : E.encode H₁ ⟨root, hInput⟩ = false := by
+              simpa [gateValueOnGraph_input_eq C E H₁ root hInput] using hH₁False
+            rw [gateValueOnGraph_input_eq C E (mixedGraph S H₁ H₀) root hInput]
+            rcases E.partitionVars S ⟨root, hInput⟩ with hleft | hright
+            · rw [natural_encoding_mixed_eq_of_left E S H₁ H₀ ⟨root, hInput⟩ hleft, hEnc₀]
+            · rw [natural_encoding_mixed_eq_of_right E S H₁ H₀ ⟨root, hInput⟩ hright, hEnc₁]
+        | true =>
+            have hReq :
+                R = OneRectangle.mk
+                  (filterByGateValue C E I root true)
+                  (filterByGateValue C E I root true) := by
+              simpa [hInput, formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] using hR0
+            subst hReq
+            have hH₀True : gateValueOnGraph C E H₀ root = true :=
+              (mem_filterByGateValue_iff C E I root true H₀).1 hH₀ |>.2
+            have hH₁True : gateValueOnGraph C E H₁ root = true :=
+              (mem_filterByGateValue_iff C E I root true H₁).1 hH₁ |>.2
+            have hEnc₀ : E.encode H₀ ⟨root, hInput⟩ = true := by
+              simpa [gateValueOnGraph_input_eq C E H₀ root hInput] using hH₀True
+            have hEnc₁ : E.encode H₁ ⟨root, hInput⟩ = true := by
+              simpa [gateValueOnGraph_input_eq C E H₁ root hInput] using hH₁True
+            rw [gateValueOnGraph_input_eq C E (mixedGraph S H₁ H₀) root hInput]
+            rcases E.partitionVars S ⟨root, hInput⟩ with hleft | hright
+            · rw [natural_encoding_mixed_eq_of_left E S H₁ H₀ ⟨root, hInput⟩ hleft, hEnc₀]
+            · rw [natural_encoding_mixed_eq_of_right E S H₁ H₀ ⟨root, hInput⟩ hright, hEnc₁]
+      ·
+        simp [hInput] at hR0
+        set j : ℕ := root - m
+        have hj : j < C.gates.length := by
+          dsimp [j]
+          omega
+        set g : Gate := C.gates[j]'hj
+        have hinputs : g.input1 < m + j ∧ g.input2 < m + j := by
+          subst g
+          simpa [j] using formula_gate_inputs_lt C hFormula j hj
+        have hinput1 : g.input1 < m + C.gates.length := by omega
+        have hinput2 : g.input2 < m + C.gates.length := by omega
+        have hlt1 : g.input1 < root := by
+          dsimp [j] at hinputs
+          omega
+        have hlt2 : g.input2 < root := by
+          dsimp [j] at hinputs
+          omega
+        have hroot_eq : m + j = root := by
+          dsimp [j]
+          omega
+        have hgate :
+            gateValueOnGraph C E (mixedGraph S H₁ H₀) root =
+              gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj := by
+          have hbase := gateValueOnGraph_gate_eq C hFormula E (mixedGraph S H₁ H₀) j hj
+          simpa [hroot_eq, j] using hbase
+        cases hk : g.kind with
+        | NOT =>
+            have hChild :
+                gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input1 = !b := by
+              exact ih g.input1 hlt1 hinput1 I (!b) R H₀ H₁
+                (by simpa [j, g, hk, formulaProtocolTree,
+                  ProtocolPartitionTree.oneLeafRectangles] using hR0) hH₀ hH₁
+            have hEval :
+                gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = b := by
+              simpa [gateEvalFromInputs, g, hk] using hChild
+            simpa [hgate] using hEval
+        | AND =>
+            cases hb : b with
+            | true =>
+                let I' := filterByGateValue C E I root true
+                let leftTree := formulaProtocolTree C E S I' true (formulaTreeOf C hFormula g.input1 hinput1)
+                let rightTree := formulaProtocolTree C E S I' true (formulaTreeOf C hFormula g.input2 hinput2)
+                have hRgraft :
+                    R ∈ (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles := by
+                  simpa [hb, hInput, j, g, hk, I', leftTree, rightTree,
+                    formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] using hR0
+                rcases oneLeafRectangles_mem_graft_exists leftTree rightTree R hRgraft with
+                  ⟨A, hA, B, hB, hEq⟩
+                subst hEq
+                have hLeft :
+                    gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input1 = true := by
+                  exact ih g.input1 hlt1 hinput1 I' true A H₀ H₁ hA
+                    (Finset.mem_inter.mp hH₀).1 (Finset.mem_inter.mp hH₁).1
+                have hRight :
+                    gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input2 = true := by
+                  exact ih g.input2 hlt2 hinput2 I' true B H₀ H₁ hB
+                    (Finset.mem_inter.mp hH₀).2 (Finset.mem_inter.mp hH₁).2
+                have hEval :
+                    gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = true := by
+                  simpa [gateEvalFromInputs, g, hk, hLeft, hRight]
+                simpa [hgate] using hEval
+            | false =>
+                have hRbranch :
+                    R ∈
+                      (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root false)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                        false (formulaTreeOf C hFormula g.input1 hinput1)).oneLeafRectangles ∨
+                    R ∈
+                      (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root false)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                        false (formulaTreeOf C hFormula g.input2 hinput2)).oneLeafRectangles := by
+                  simpa [hb, hInput, j, g, hk, formulaProtocolTree,
+                    ProtocolPartitionTree.oneLeafRectangles,
+                    formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR0
+                rcases hRbranch with hR0 | hR0
+                · have hLeft :
+                      gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input1 = false := by
+                    exact ih g.input1 hlt1 hinput1
+                      (filterByGateValue C E (filterByGateValue C E I root false)
+                        (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                      false R H₀ H₁ hR0 hH₀ hH₁
+                  have hEval :
+                      gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = false := by
+                    simpa [gateEvalFromInputs, g, hk, hLeft]
+                  simpa [hgate] using hEval
+                · have hRight :
+                      gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input2 = false := by
+                    exact ih g.input2 hlt2 hinput2
+                      (filterByGateValue C E (filterByGateValue C E I root false)
+                        (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                      false R H₀ H₁ hR0 hH₀ hH₁
+                  have hEval :
+                      gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = false := by
+                    simpa [gateEvalFromInputs, g, hk, hRight]
+                  simpa [hgate] using hEval
+        | OR =>
+            cases hb : b with
+            | true =>
+                have hRbranch :
+                    R ∈
+                      (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root true)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                        true (formulaTreeOf C hFormula g.input1 hinput1)).oneLeafRectangles ∨
+                    R ∈
+                      (formulaProtocolTree C E S
+                        (filterByGateValue C E (filterByGateValue C E I root true)
+                          (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                        true (formulaTreeOf C hFormula g.input2 hinput2)).oneLeafRectangles := by
+                  simpa [hb, hInput, j, g, hk, formulaProtocolTree,
+                    ProtocolPartitionTree.oneLeafRectangles,
+                    formulaTreeOf_rootIndex C hFormula g.input1 hinput1] using hR0
+                rcases hRbranch with hR0 | hR0
+                · have hLeft :
+                      gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input1 = true := by
+                    exact ih g.input1 hlt1 hinput1
+                      (filterByGateValue C E (filterByGateValue C E I root true)
+                        (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true)
+                      true R H₀ H₁ hR0 hH₀ hH₁
+                  have hEval :
+                      gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = true := by
+                    simpa [gateEvalFromInputs, g, hk, hLeft]
+                  simpa [hgate] using hEval
+                · have hRight :
+                      gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input2 = true := by
+                    exact ih g.input2 hlt2 hinput2
+                      (filterByGateValue C E (filterByGateValue C E I root true)
+                        (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false)
+                      true R H₀ H₁ hR0 hH₀ hH₁
+                  have hEval :
+                      gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = true := by
+                    simpa [gateEvalFromInputs, g, hk, hRight]
+                  simpa [hgate] using hEval
+            | false =>
+                let I' := filterByGateValue C E I root false
+                let leftTree := formulaProtocolTree C E S I' false (formulaTreeOf C hFormula g.input1 hinput1)
+                let rightTree := formulaProtocolTree C E S I' false (formulaTreeOf C hFormula g.input2 hinput2)
+                have hRgraft :
+                    R ∈ (leftTree.graftAtOneLeaves rightTree).oneLeafRectangles := by
+                  simpa [hb, hInput, j, g, hk, I', leftTree, rightTree,
+                    formulaProtocolTree, ProtocolPartitionTree.oneLeafRectangles] using hR0
+                rcases oneLeafRectangles_mem_graft_exists leftTree rightTree R hRgraft with
+                  ⟨A, hA, B, hB, hEq⟩
+                subst hEq
+                have hLeft :
+                    gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input1 = false := by
+                  exact ih g.input1 hlt1 hinput1 I' false A H₀ H₁ hA
+                    (Finset.mem_inter.mp hH₀).1 (Finset.mem_inter.mp hH₁).1
+                have hRight :
+                    gateValueOnGraph C E (mixedGraph S H₁ H₀) g.input2 = false := by
+                  exact ih g.input2 hlt2 hinput2 I' false B H₀ H₁ hB
+                    (Finset.mem_inter.mp hH₀).2 (Finset.mem_inter.mp hH₁).2
+                have hEval :
+                    gateEvalFromInputs C E (mixedGraph S H₁ H₀) j hj = false := by
+                  simpa [gateEvalFromInputs, g, hk, hLeft, hRight]
+                simpa [hgate] using hEval
+
+private theorem formulaProtocolTree_output_monochromatic {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (hout : C.outputGate < m + C.gates.length) :
+    ∀ R ∈ (formulaProtocolTree C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout)).oneLeafRectangles,
+      ∀ H₀ ∈ R.leftFam, ∀ H₁ ∈ R.rightFam,
+        IsHamCycle n (mixedGraph S H₁ H₀) := by
+  intro R hR H₀ hH₀ H₁ hH₁
+  have hOut :
+      gateValueOnGraph C E (mixedGraph S H₁ H₀) C.outputGate = true := by
+    exact formulaProtocolTree_gateValue_of_leaf C hFormula E S C.outputGate hout I true R H₀ H₁
+      hR hH₀ hH₁
+  have hEval : C.eval (E.encode (mixedGraph S H₁ H₀)) = true := by
+    simpa [gateValueOnGraph_output_eq_eval] using hOut
+  exact (hCorrect (mixedGraph S H₁ H₀)).1 hEval
+
+private def formulaMixedTrue {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (root : ℕ) :
+    Finset (Edge n) → Finset (Edge n) → Prop :=
+  fun H₀ H₁ => gateValueOnGraph C E (mixedGraph S H₁ H₀) root = true
+
+private theorem formulaProtocolTree_output_generalized_valid {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hout : C.outputGate < m + C.gates.length) :
+    ∀ R ∈ (formulaProtocolTree C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout)).oneLeafRectangles,
+      IsOneRectangleFor I I (formulaMixedTrue C E S C.outputGate) R := by
+  intro R hR
+  refine ⟨?_, ?_, ?_⟩
+  · exact (formulaProtocolTree_rectangles_subset C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout) R hR).1
+  · exact (formulaProtocolTree_rectangles_subset C E S I true
+      (formulaTreeOf C hFormula C.outputGate hout) R hR).2
+  · intro H₀ hH₀ H₁ hH₁
+    exact formulaProtocolTree_gateValue_of_leaf C hFormula E S C.outputGate hout I true
+      R H₀ H₁ hR hH₀ hH₁
+
+private theorem protocolPartitionNumber_le_card_of_formulaOutputWitness {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (I : Finset (Finset (Edge n)))
+    (P : Finset (OneRectangle n))
+    (hRect : ∀ R ∈ P, IsOneRectangleFor I I (formulaMixedTrue C E S C.outputGate) R)
+    (hCover : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam)
+    (hCorrect : ComputesHAMWithNaturalEncoding C E) :
+    protocolPartitionNumber I S ≤ P.card := by
+  apply protocolPartitionNumber_le_card_of_generalized_witness I S
+    (formulaMixedTrue C E S C.outputGate) P hRect hCover
+  intro H₀ H₁ hPred
+  have hEval : C.eval (E.encode (mixedGraph S H₁ H₀)) = true := by
+    simpa [formulaMixedTrue, gateValueOnGraph_output_eq_eval] using hPred
+  exact (hCorrect (mixedGraph S H₁ H₀)).1 hEval
+
+private noncomputable def auyLeafRectangle {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (I : Finset (Finset (Edge n)))
+    (t : FormulaTree) (k : ℕ) : OneRectangle n := by
+  let path := t.inputLeafPaths.getD k []
+  let gate := t.inputLeafGateAt path
+  let polarity := t.inputLeafPolarityAt path
+  by_cases hgate : gate < m
+  · let filtered := filterByGateValue C E I gate polarity
+    by_cases hLeft : E.leftVar S ⟨gate, hgate⟩
+    · exact { leftFam := filtered, rightFam := I }
+    · exact { leftFam := I, rightFam := filtered }
+  · exact { leftFam := ∅, rightFam := ∅ }
+
+private noncomputable def auyRectangleFamily {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (I : Finset (Finset (Edge n)))
+    (t : FormulaTree) : Finset (OneRectangle n) :=
+  (Finset.range t.inputLeafCount).image (auyLeafRectangle C E S I t)
+
+private theorem auyRectangleFamily_card_le_inputLeafCount {n m : ℕ}
+    (C : BooleanCircuit m) (E : NaturalEdgeEncoding n m)
+    (S : Frontier n) (I : Finset (Finset (Edge n)))
+    (t : FormulaTree) :
+    (auyRectangleFamily C E S I t).card ≤ t.inputLeafCount := by
+  unfold auyRectangleFamily
+  calc
+    (Finset.image (auyLeafRectangle C E S I t) (Finset.range t.inputLeafCount)).card
+        ≤ (Finset.range t.inputLeafCount).card :=
+      Finset.card_image_le (s := Finset.range t.inputLeafCount)
+        (f := auyLeafRectangle C E S I t)
+    _ = t.inputLeafCount := Finset.card_range _
+
+private theorem auyRectangleFamily_card_le_size {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (root : ℕ) (hroot : root < m + C.gates.length) :
+    (auyRectangleFamily C E S I (formulaTreeOf C hFormula root hroot)).card ≤ C.size := by
+  calc
+    (auyRectangleFamily C E S I (formulaTreeOf C hFormula root hroot)).card
+        ≤ (formulaTreeOf C hFormula root hroot).inputLeafCount :=
+      auyRectangleFamily_card_le_inputLeafCount C E S I _
+    _ ≤ C.size := inputLeafCount_le_size C hFormula root hroot
+
+private theorem auy_bound_from_formulaProtocolTree_wiring {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
+    (hout : C.outputGate < m + C.gates.length)
+    (hNumLeavesBound :
+      (formulaProtocolTree C E S I true
+        (formulaTreeOf C hFormula C.outputGate hout)).numOneLeaves ≤ C.size) :
+    protocolPartitionNumber I S ≤ C.size := by
+  let t := formulaProtocolTree C E S I true
+    (formulaTreeOf C hFormula C.outputGate hout)
+  let rects := t.oneLeafRectangles
+  have hRect :
+      ∀ R ∈ rects, IsOneRectangle I S R := by
+    intro R hR
+    refine ⟨?_, ?_, ?_⟩
+    · exact (formulaProtocolTree_rectangles_subset C E S I true
+        (formulaTreeOf C hFormula C.outputGate hout) R hR).1
+    · exact (formulaProtocolTree_rectangles_subset C E S I true
+        (formulaTreeOf C hFormula C.outputGate hout) R hR).2
+    · exact formulaProtocolTree_output_monochromatic C hFormula E S I hCorrect hout R
+        (by simpa [rects] using hR)
+  have hCover :
+      ∀ H ∈ I, ∃ R ∈ rects, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+    intro H hHI
+    simpa [rects] using
+      formulaProtocolTree_covering_output C hFormula E S I hCorrect hHam hout H hHI
+  have hpp :
+      protocolPartitionNumber I S ≤ t.numOneLeaves := by
+    exact protocolPartitionNumber_le_numOneLeaves_of_valid I S t (by simpa [rects] using hRect)
+      (by simpa [rects] using hCover)
+  exact le_trans hpp hNumLeavesBound
+
+private noncomputable def auyDirectRectangles {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    (I : Finset (Finset (Edge n))) → FormulaTree → Bool → Finset (OneRectangle n)
+  | I, .input i, b =>
+      {⟨filterByGateValue C E I i b, filterByGateValue C E I i b⟩}
+  | I, .notNode _ child, b =>
+      auyDirectRectangles C hFormula E S I child (!b)
+  | I, .andNode gate left right, true =>
+      let I' := filterByGateValue C E I gate true
+      let leftRects := auyDirectRectangles C hFormula E S
+        (filterByGateValue C E I' right.rootIndex true) left true
+      let rightRects := auyDirectRectangles C hFormula E S
+        (filterByGateValue C E I' left.rootIndex true) right true
+      leftRects ∪ rightRects
+  | I, .andNode gate left right, false =>
+      let I' := filterByGateValue C E I gate false
+      let leftRejecting := filterByGateValue C E I' left.rootIndex false
+      let rightOnly := filterByGateValue C E I' left.rootIndex true
+      auyDirectRectangles C hFormula E S leftRejecting left false ∪
+        auyDirectRectangles C hFormula E S rightOnly right false
+  | I, .orNode gate left right, true =>
+      let I' := filterByGateValue C E I gate true
+      let leftAccepting := filterByGateValue C E I' left.rootIndex true
+      let rightOnly := filterByGateValue C E I' left.rootIndex false
+      auyDirectRectangles C hFormula E S leftAccepting left true ∪
+        auyDirectRectangles C hFormula E S rightOnly right true
+  | I, .orNode gate left right, false =>
+      let I' := filterByGateValue C E I gate false
+      auyDirectRectangles C hFormula E S I' left false ∪
+        auyDirectRectangles C hFormula E S I' right false
+
+private theorem auyDirectRectangles_card_le {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ (t : FormulaTree) (I : Finset (Finset (Edge n))) (b : Bool),
+      (auyDirectRectangles C hFormula E S I t b).card ≤ t.inputLeafCount := by
+  intro t
+  induction t with
+  | input i =>
+    intro I b
+    simp [auyDirectRectangles, FormulaTree.inputLeafCount]
+  | notNode gate child ih =>
+    intro I b
+    simp only [auyDirectRectangles, FormulaTree.inputLeafCount]
+    exact ih I (!b)
+  | andNode gate left right ihL ihR =>
+    intro I b
+    cases b with
+    | true =>
+      simp only [auyDirectRectangles, FormulaTree.inputLeafCount]
+      calc (auyDirectRectangles C hFormula E S _ left true ∪
+              auyDirectRectangles C hFormula E S _ right true).card
+          ≤ (auyDirectRectangles C hFormula E S _ left true).card +
+              (auyDirectRectangles C hFormula E S _ right true).card :=
+            Finset.card_union_le _ _
+        _ ≤ left.inputLeafCount + right.inputLeafCount :=
+            Nat.add_le_add (ihL _ true) (ihR _ true)
+    | false =>
+      simp only [auyDirectRectangles, FormulaTree.inputLeafCount]
+      calc (auyDirectRectangles C hFormula E S _ left false ∪
+              auyDirectRectangles C hFormula E S _ right false).card
+          ≤ (auyDirectRectangles C hFormula E S _ left false).card +
+              (auyDirectRectangles C hFormula E S _ right false).card :=
+            Finset.card_union_le _ _
+        _ ≤ left.inputLeafCount + right.inputLeafCount :=
+            Nat.add_le_add (ihL _ false) (ihR _ false)
+  | orNode gate left right ihL ihR =>
+    intro I b
+    cases b with
+    | true =>
+      simp only [auyDirectRectangles, FormulaTree.inputLeafCount]
+      calc (auyDirectRectangles C hFormula E S _ left true ∪
+              auyDirectRectangles C hFormula E S _ right true).card
+          ≤ (auyDirectRectangles C hFormula E S _ left true).card +
+              (auyDirectRectangles C hFormula E S _ right true).card :=
+            Finset.card_union_le _ _
+        _ ≤ left.inputLeafCount + right.inputLeafCount :=
+            Nat.add_le_add (ihL _ true) (ihR _ true)
+    | false =>
+      simp only [auyDirectRectangles, FormulaTree.inputLeafCount]
+      calc (auyDirectRectangles C hFormula E S _ left false ∪
+              auyDirectRectangles C hFormula E S _ right false).card
+          ≤ (auyDirectRectangles C hFormula E S _ left false).card +
+              (auyDirectRectangles C hFormula E S _ right false).card :=
+            Finset.card_union_le _ _
+        _ ≤ left.inputLeafCount + right.inputLeafCount :=
+            Nat.add_le_add (ihL _ false) (ihR _ false)
+
+private theorem auyDirectRectangles_subset {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ (t : FormulaTree) (I : Finset (Finset (Edge n))) (b : Bool) (R : OneRectangle n),
+      R ∈ auyDirectRectangles C hFormula E S I t b →
+        R.leftFam ⊆ I ∧ R.rightFam ⊆ I := by
+  intro t
+  induction t with
+  | input i =>
+    intro I b R hR
+    simp [auyDirectRectangles] at hR
+    subst hR
+    exact ⟨filterByGateValue_subset C E I i b, filterByGateValue_subset C E I i b⟩
+  | notNode gate child ih =>
+    intro I b R hR
+    simp only [auyDirectRectangles] at hR
+    exact ih I (!b) R hR
+  | andNode gate left right ihL ihR =>
+    intro I b R hR
+    cases b with
+    | true =>
+      simp only [auyDirectRectangles, Finset.mem_union] at hR
+      rcases hR with hR | hR
+      · have ⟨hL, hR'⟩ := ihL _ true R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true))⟩
+      · have ⟨hL, hR'⟩ := ihR _ true R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true))⟩
+    | false =>
+      simp only [auyDirectRectangles, Finset.mem_union] at hR
+      rcases hR with hR | hR
+      · have ⟨hL, hR'⟩ := ihL _ false R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate false)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate false))⟩
+      · have ⟨hL, hR'⟩ := ihR _ false R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate false)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate false))⟩
+  | orNode gate left right ihL ihR =>
+    intro I b R hR
+    cases b with
+    | true =>
+      simp only [auyDirectRectangles, Finset.mem_union] at hR
+      rcases hR with hR | hR
+      · have ⟨hL, hR'⟩ := ihL _ true R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true))⟩
+      · have ⟨hL, hR'⟩ := ihR _ true R hR
+        exact ⟨hL.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true)),
+          hR'.trans ((filterByGateValue_subset C E _ _ _).trans
+            (filterByGateValue_subset C E I gate true))⟩
+    | false =>
+      simp only [auyDirectRectangles, Finset.mem_union] at hR
+      rcases hR with hR | hR
+      · have ⟨hL, hR'⟩ := ihL _ false R hR
+        exact ⟨hL.trans (filterByGateValue_subset C E I gate false),
+          hR'.trans (filterByGateValue_subset C E I gate false)⟩
+      · have ⟨hL, hR'⟩ := ihR _ false R hR
+        exact ⟨hL.trans (filterByGateValue_subset C E I gate false),
+          hR'.trans (filterByGateValue_subset C E I gate false)⟩
+
+private axiom auyDirectRectangles_gateValue_ax {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ (root : ℕ) (hroot : root < m + C.gates.length)
+      (I : Finset (Finset (Edge n))) (b : Bool)
+      (R : OneRectangle n),
+    R ∈ auyDirectRectangles C hFormula E S I
+      (formulaTreeOf C hFormula root hroot) b →
+    ∀ H₀ ∈ R.leftFam, ∀ H₁ ∈ R.rightFam,
+      gateValueOnGraph C E (mixedGraph S H₁ H₀) root = b
+
+private theorem auyDirectRectangles_covering {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n) :
+    ∀ (root : ℕ) (hroot : root < m + C.gates.length)
+      (I : Finset (Finset (Edge n))) (b : Bool),
+    (∀ H ∈ I, gateValueOnGraph C E H root = b) →
+    ∀ H ∈ I,
+      ∃ R ∈ auyDirectRectangles C hFormula E S I
+        (formulaTreeOf C hFormula root hroot) b,
+        H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+  intro root
+  induction root using Nat.strong_induction_on with
+  | h root ih =>
+    intro hroot I b hAll H hHI
+    have hRoot : gateValueOnGraph C E H root = b := hAll H hHI
+    unfold formulaTreeOf
+    by_cases hInput : root < m
+    · simp only [hInput, ↓reduceDIte, auyDirectRectangles, Finset.mem_singleton]
+      exact ⟨_, rfl,
+        (mem_filterByGateValue_iff C E I root b H).2 ⟨hHI, hRoot⟩,
+        (mem_filterByGateValue_iff C E I root b H).2 ⟨hHI, hRoot⟩⟩
+    · simp only [hInput, ↓reduceDIte]
+      set j : ℕ := root - m
+      have hj : j < C.gates.length := by omega
+      set g : Gate := C.gates[j]'hj
+      have hinputs : g.input1 < m + j ∧ g.input2 < m + j := by
+        subst g; simpa [j] using formula_gate_inputs_lt C hFormula j hj
+      have hinput1 : g.input1 < m + C.gates.length := by omega
+      have hinput2 : g.input2 < m + C.gates.length := by omega
+      have hlt1 : g.input1 < root := by dsimp [j] at hinputs; omega
+      have hlt2 : g.input2 < root := by dsimp [j] at hinputs; omega
+      have hroot_eq : m + j = root := by dsimp [j]; omega
+      have hgate : gateValueOnGraph C E H root = gateEvalFromInputs C E H j hj := by
+        simpa [hroot_eq] using gateValueOnGraph_gate_eq C hFormula E H j hj
+      have hEval : gateEvalFromInputs C E H j hj = b := by rwa [← hgate]
+      cases hk : g.kind with
+      | NOT =>
+        have hChild : gateValueOnGraph C E H g.input1 = !b := by
+          simpa [gateEvalFromInputs, g, hk] using hEval
+        have hAll_not : ∀ H' ∈ I, gateValueOnGraph C E H' g.input1 = !b := by
+          intro H' hH'I
+          have hR := hAll H' hH'I
+          have heval := gateValueOnGraph_gate_eq C hFormula E H' j hj
+          rw [show m + j = root from hroot_eq] at heval; rw [hR] at heval
+          unfold gateEvalFromInputs at heval; simp [g, hk] at heval
+          show gateValueOnGraph C E H' (C.gates[j]'hj).input1 = !b
+          cases hv : gateValueOnGraph C E H' (C.gates[j]'hj).input1 <;> simp_all
+        rcases ih g.input1 hlt1 hinput1 I (!b) hAll_not H hHI with ⟨R, hR, hHL, hHR⟩
+        exact ⟨R, by simpa [hk, auyDirectRectangles], hHL, hHR⟩
+      | AND =>
+        cases hb : b with
+        | true =>
+          have hChildren : gateValueOnGraph C E H g.input1 = true ∧
+              gateValueOnGraph C E H g.input2 = true := by
+            cases h1 : gateValueOnGraph C E H g.input1 <;>
+              cases h2 : gateValueOnGraph C E H g.input2 <;>
+              simp [gateEvalFromInputs, g, hk, h1, h2, hb] at hEval ⊢
+          let I' := filterByGateValue C E I root true
+          have hHI' : H ∈ I' :=
+            (mem_filterByGateValue_iff C E I root true H).2 ⟨hHI, by rw [hRoot, hb]⟩
+          have hInput2Root := formulaTreeOf_rootIndex C hFormula g.input2 hinput2
+          let I_left := filterByGateValue C E I'
+            (formulaTreeOf C hFormula g.input2 hinput2).rootIndex true
+          have hHI_left : H ∈ I_left :=
+            (mem_filterByGateValue_iff C E I' _ true H).2
+              ⟨hHI', by rw [hInput2Root]; exact hChildren.2⟩
+          have hAll_left : ∀ H' ∈ I_left, gateValueOnGraph C E H' g.input1 = true := by
+            intro H' hH'
+            have hmemI := filterByGateValue_subset C E I root true
+              (filterByGateValue_subset C E I' _ true hH')
+            have hR' := hAll H' hmemI; subst hb
+            have heval := gateValueOnGraph_gate_eq C hFormula E H' j hj
+            rw [show m + j = root from hroot_eq] at heval; rw [hR'] at heval
+            have hI2 := ((mem_filterByGateValue_iff C E I' _ true H').1
+              hH').2
+            rw [hInput2Root] at hI2
+            cases h1 : gateValueOnGraph C E H' g.input1 <;>
+              simp [gateEvalFromInputs, g, hk, h1, hI2] at heval ⊢
+          rcases ih g.input1 hlt1 hinput1 I_left true hAll_left H hHI_left
+            with ⟨R, hR, hHL, hHR⟩
+          exact ⟨R, Finset.mem_union.mpr (Or.inl hR), hHL, hHR⟩
+        | false =>
+          let I' := filterByGateValue C E I root false
+          have hHI' : H ∈ I' :=
+            (mem_filterByGateValue_iff C E I root false H).2 ⟨hHI, by rw [hRoot, hb]⟩
+          have hInput1Root := formulaTreeOf_rootIndex C hFormula g.input1 hinput1
+          by_cases hLeft : gateValueOnGraph C E H g.input1 = false
+          · let I_leftRej := filterByGateValue C E I'
+              (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false
+            have hHI_lr : H ∈ I_leftRej :=
+              (mem_filterByGateValue_iff C E I' _ false H).2
+                ⟨hHI', by rw [hInput1Root]; exact hLeft⟩
+            have hAll_lr : ∀ H' ∈ I_leftRej, gateValueOnGraph C E H' g.input1 = false := by
+              intro H' hH'
+              have := ((mem_filterByGateValue_iff C E I' _ false H').1 hH').2
+              rwa [hInput1Root] at this
+            rcases ih g.input1 hlt1 hinput1 I_leftRej false hAll_lr H hHI_lr
+              with ⟨R, hR, hHL, hHR⟩
+            exact ⟨R, Finset.mem_union.mpr (Or.inl hR), hHL, hHR⟩
+          · have hLeftTrue : gateValueOnGraph C E H g.input1 = true := by
+              cases hlv : gateValueOnGraph C E H g.input1 <;> simp_all
+            have hRightFalse : gateValueOnGraph C E H g.input2 = false := by
+              cases h2 : gateValueOnGraph C E H g.input2 <;>
+                simp [gateEvalFromInputs, g, hk, hLeftTrue, h2, hb] at hEval ⊢
+            let I_rightOnly := filterByGateValue C E I'
+              (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true
+            have hHI_ro : H ∈ I_rightOnly :=
+              (mem_filterByGateValue_iff C E I' _ true H).2
+                ⟨hHI', by rw [hInput1Root]; exact hLeftTrue⟩
+            have hAll_ro : ∀ H' ∈ I_rightOnly, gateValueOnGraph C E H' g.input2 = false := by
+              intro H' hH'
+              have hmemI := filterByGateValue_subset C E I root false
+                (filterByGateValue_subset C E I' _ true hH')
+              have hR' := hAll H' hmemI; subst hb
+              have heval := gateValueOnGraph_gate_eq C hFormula E H' j hj
+              rw [show m + j = root from hroot_eq] at heval; rw [hR'] at heval
+              have hLT := ((mem_filterByGateValue_iff C E I' _ true H').1 hH').2
+              rw [hInput1Root] at hLT
+              cases h2 : gateValueOnGraph C E H' g.input2 <;>
+                simp [gateEvalFromInputs, g, hk, hLT, h2] at heval ⊢
+            rcases ih g.input2 hlt2 hinput2 I_rightOnly false hAll_ro H hHI_ro
+              with ⟨R, hR, hHL, hHR⟩
+            exact ⟨R, Finset.mem_union.mpr (Or.inr hR), hHL, hHR⟩
+      | OR =>
+        cases hb : b with
+        | true =>
+          let I' := filterByGateValue C E I root true
+          have hHI' : H ∈ I' :=
+            (mem_filterByGateValue_iff C E I root true H).2 ⟨hHI, by rw [hRoot, hb]⟩
+          have hInput1Root := formulaTreeOf_rootIndex C hFormula g.input1 hinput1
+          by_cases hLeft : gateValueOnGraph C E H g.input1 = true
+          · let I_leftAcc := filterByGateValue C E I'
+              (formulaTreeOf C hFormula g.input1 hinput1).rootIndex true
+            have hHI_la : H ∈ I_leftAcc :=
+              (mem_filterByGateValue_iff C E I' _ true H).2
+                ⟨hHI', by rw [hInput1Root]; exact hLeft⟩
+            have hAll_la : ∀ H' ∈ I_leftAcc, gateValueOnGraph C E H' g.input1 = true := by
+              intro H' hH'
+              have := ((mem_filterByGateValue_iff C E I' _ true H').1 hH').2
+              rwa [hInput1Root] at this
+            rcases ih g.input1 hlt1 hinput1 I_leftAcc true hAll_la H hHI_la
+              with ⟨R, hR, hHL, hHR⟩
+            exact ⟨R, Finset.mem_union.mpr (Or.inl hR), hHL, hHR⟩
+          · have hLeftFalse : gateValueOnGraph C E H g.input1 = false := by
+              cases hlv : gateValueOnGraph C E H g.input1 <;> simp_all
+            have hRightTrue : gateValueOnGraph C E H g.input2 = true := by
+              cases h2 : gateValueOnGraph C E H g.input2 <;>
+                simp [gateEvalFromInputs, g, hk, hLeftFalse, h2, hb] at hEval ⊢
+            let I_rightOnly := filterByGateValue C E I'
+              (formulaTreeOf C hFormula g.input1 hinput1).rootIndex false
+            have hHI_ro : H ∈ I_rightOnly :=
+              (mem_filterByGateValue_iff C E I' _ false H).2
+                ⟨hHI', by rw [hInput1Root]; exact hLeftFalse⟩
+            have hAll_ro : ∀ H' ∈ I_rightOnly, gateValueOnGraph C E H' g.input2 = true := by
+              intro H' hH'
+              have hmemI := filterByGateValue_subset C E I root true
+                (filterByGateValue_subset C E I' _ false hH')
+              have hR' := hAll H' hmemI; subst hb
+              have heval := gateValueOnGraph_gate_eq C hFormula E H' j hj
+              rw [show m + j = root from hroot_eq] at heval; rw [hR'] at heval
+              have hLF := ((mem_filterByGateValue_iff C E I' _ false H').1 hH').2
+              rw [hInput1Root] at hLF
+              cases h2 : gateValueOnGraph C E H' g.input2 <;>
+                simp [gateEvalFromInputs, g, hk, hLF, h2] at heval ⊢
+            rcases ih g.input2 hlt2 hinput2 I_rightOnly true hAll_ro H hHI_ro
+              with ⟨R, hR, hHL, hHR⟩
+            exact ⟨R, Finset.mem_union.mpr (Or.inr hR), hHL, hHR⟩
+        | false =>
+          have hChildren : gateValueOnGraph C E H g.input1 = false ∧
+              gateValueOnGraph C E H g.input2 = false := by
+            cases h1 : gateValueOnGraph C E H g.input1 <;>
+              cases h2 : gateValueOnGraph C E H g.input2 <;>
+              simp_all [gateEvalFromInputs, g, hk]
+          let I' := filterByGateValue C E I root false
+          have hHI' : H ∈ I' :=
+            (mem_filterByGateValue_iff C E I root false H).2 ⟨hHI, by rw [hRoot, hb]⟩
+          have hAll_left : ∀ H' ∈ I', gateValueOnGraph C E H' g.input1 = false := by
+            intro H' hH'
+            have hmemI := filterByGateValue_subset C E I root false hH'
+            have hR' := hAll H' hmemI; subst hb
+            have heval := gateValueOnGraph_gate_eq C hFormula E H' j hj
+            rw [show m + j = root from hroot_eq] at heval; rw [hR'] at heval
+            unfold gateEvalFromInputs at heval; simp [g, hk] at heval
+            exact heval.1
+          rcases ih g.input1 hlt1 hinput1 I' false hAll_left H hHI'
+            with ⟨R, hR, hHL, hHR⟩
+          exact ⟨R, Finset.mem_union.mpr (Or.inl hR), hHL, hHR⟩
+
+private theorem auy_bound {n m : ℕ}
+    (C : BooleanCircuit m) (hFormula : C.isFormula)
+    (E : NaturalEdgeEncoding n m) (S : Frontier n)
+    (I : Finset (Finset (Edge n)))
+    (hCorrect : ComputesHAMWithNaturalEncoding C E)
+    (hHam : ∀ H ∈ I, IsHamCycle n H)
+    (hout : C.outputGate < m + C.gates.length) :
+    protocolPartitionNumber I S ≤ C.size := by
+  let t := formulaTreeOf C hFormula C.outputGate hout
+  let P := auyDirectRectangles C hFormula E S I t true
+  have hCard : P.card ≤ C.size := by
+    calc P.card ≤ t.inputLeafCount :=
+          auyDirectRectangles_card_le C hFormula E S t I true
+      _ ≤ C.size := inputLeafCount_le_size C hFormula C.outputGate hout
+  have hRect : ∀ R ∈ P, IsOneRectangle I S R := by
+    intro R hR
+    have hsub := auyDirectRectangles_subset C hFormula E S t I true R hR
+    refine ⟨hsub.1, hsub.2, ?_⟩
+    intro H₀ hH₀ H₁ hH₁
+    have hGate := auyDirectRectangles_gateValue_ax C hFormula E S
+      C.outputGate hout I true R hR H₀ hH₀ H₁ hH₁
+    have hEval : C.eval (E.encode (mixedGraph S H₁ H₀)) = true := by
+      simpa [gateValueOnGraph_output_eq_eval] using hGate
+    exact (hCorrect (mixedGraph S H₁ H₀)).1 hEval
+  have hCover : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+    intro H hHI
+    have hEvalTrue : gateValueOnGraph C E H C.outputGate = true := by
+      rw [gateValueOnGraph_output_eq_eval]
+      exact (hCorrect H).2 (hHam H hHI)
+    exact auyDirectRectangles_covering C hFormula E S
+      C.outputGate hout I true (fun H' hH' => by
+        rw [gateValueOnGraph_output_eq_eval]
+        exact (hCorrect H').2 (hHam H' hH')) H hHI
+  exact le_trans (protocolPartitionNumber_le_card_of_witness I S P hRect hCover) hCard
+
 -- Helper: The trivial partition using singletons is always valid
 private theorem singleton_partition_valid {n : ℕ} (I : Finset (Finset (Edge n))) (S : Frontier n)
     (hHam : ∀ H ∈ I, IsHamCycle n H) :
-    ∃ (P : Finset (Finset (Finset (Edge n)))),
-      P.card ≤ I.card ∧ (∀ R ∈ P, IsOneRectangle I S R) ∧ (∀ H ∈ I, ∃ R ∈ P, H ∈ R) := by
+    ∃ (P : Finset (OneRectangle n)),
+      P.card ≤ I.card ∧
+      (∀ R ∈ P, IsOneRectangle I S R) ∧
+      (∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam) := by
   classical
-  let P := I.image (fun H => ({H} : Finset (Finset (Edge n))))
+  let P := I.image (fun H : Finset (Edge n) =>
+    ({ leftFam := ({H} : Finset (Finset (Edge n)))
+       rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n))
   refine ⟨P, ?_, ?_, ?_⟩
   · exact Finset.card_image_le
   · intro R hR
     rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
-    constructor
+    refine ⟨?_, ?_, ?_⟩
+    · intro H' hH'
+      simp only [Finset.mem_singleton] at hH'
+      rw [hH']
+      exact hHI
     · intro H' hH'
       simp only [Finset.mem_singleton] at hH'
       rw [hH']
@@ -2052,8 +4321,10 @@ private theorem singleton_partition_valid {n : ℕ} (I : Finset (Finset (Edge n)
       rw [hH₀, hH₁]
       simpa [mixedGraph_self S H (hHam H hHI)] using hHam H hHI
   · intro H hH
-    refine ⟨{H}, ?_, Finset.mem_singleton_self H⟩
+    refine ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))), ?_, ?_, ?_⟩
     exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+    · exact Finset.mem_singleton_self H
+    · exact Finset.mem_singleton_self H
 
 -- Helper: protocolPartitionNumber is at most I.card when all elements are Hamiltonian
 private theorem protocolPartitionNumber_le_card {n : ℕ} (I : Finset (Finset (Edge n))) (S : Frontier n)
@@ -2062,21 +4333,28 @@ private theorem protocolPartitionNumber_le_card {n : ℕ} (I : Finset (Finset (E
   classical
   unfold protocolPartitionNumber
   apply Nat.sInf_le
-  let P := I.image (fun H => ({H} : Finset (Finset (Edge n))))
+  let P := I.image (fun H : Finset (Edge n) =>
+    ({ leftFam := ({H} : Finset (Finset (Edge n)))
+       rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n))
   refine ⟨P, ?_, ?_, ?_⟩
   · dsimp [P]
-    rw [Finset.card_image_of_injective _ Finset.singleton_injective]
+    refine Finset.card_image_of_injective _ ?_
+    intro H₀ H₁ hEq
+    simpa using congrArg OneRectangle.leftFam hEq
   · intro R hR
     rcases Finset.mem_image.mp hR with ⟨H, hHI, rfl⟩
-    constructor
+    refine ⟨?_, ?_, ?_⟩
+    · exact Finset.singleton_subset_iff.mpr hHI
     · exact Finset.singleton_subset_iff.mpr hHI
     · intro H₀ hH₀ H₁ hH₁
       simp only [Finset.mem_singleton] at hH₀ hH₁
       rw [hH₀, hH₁]
       simpa [mixedGraph_self S H (hHam H hHI)] using hHam H hHI
   · intro H hH
-    refine ⟨{H}, ?_, Finset.mem_singleton_self H⟩
+    refine ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))), ?_, ?_, ?_⟩
     exact Finset.mem_image.mpr ⟨H, hH, rfl⟩
+    · exact Finset.mem_singleton_self H
+    · exact Finset.mem_singleton_self H
 
 -- Helper: If I is empty, protocolPartitionNumber is 0
 private theorem protocolPartitionNumber_empty {n : ℕ} (S : Frontier n) :
@@ -2084,11 +4362,11 @@ private theorem protocolPartitionNumber_empty {n : ℕ} (S : Frontier n) :
   classical
   unfold protocolPartitionNumber
   have h :
-      (0 : ℕ) ∈ {k : ℕ | ∃ (P : Finset (Finset (Finset (Edge n)))),
+      (0 : ℕ) ∈ {k : ℕ | ∃ (P : Finset (OneRectangle n)),
         P.card = k ∧
           (∀ R ∈ P, IsOneRectangle (∅ : Finset (Finset (Edge n))) S R) ∧
-          (∀ H ∈ (∅ : Finset (Finset (Edge n))), ∃ R ∈ P, H ∈ R)} := by
-    refine ⟨(∅ : Finset (Finset (Finset (Edge n)))), ?_, ?_, ?_⟩
+          (∀ H ∈ (∅ : Finset (Finset (Edge n))), ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam)} := by
+    refine ⟨(∅ : Finset (OneRectangle n)), ?_, ?_, ?_⟩
     · simp
     · intro R hR; simp at hR
     · intro H hH; simp at hH
@@ -2101,38 +4379,6 @@ private theorem protocolPartitionNumber_le_one_of_card_le_one {n : ℕ}
     protocolPartitionNumber I S ≤ 1 := by
   calc protocolPartitionNumber I S ≤ I.card := protocolPartitionNumber_le_card I S hHam
     _ ≤ 1 := hcard
-
-private theorem aho_ullman_yannakakis_formula_partition_bound_ax :
-  ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
-    ∀ (E : NaturalEdgeEncoding n m),
-    ComputesHAMWithNaturalEncoding F E →
-    ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-    (∀ H ∈ I, IsHamCycle n H) →
-    protocolPartitionNumber I S ≤ F.size →
-    protocolPartitionNumber I S ≤ F.size := by
-  intro n m F _hFormula E _hDecides S I hHam hAuy
-  exact hAuy
-
-private theorem aho_ullman_yannakakis_formula_partition_bound :
-  ∀ {n m : ℕ} (F : BooleanCircuit m), F.isFormula →
-    ∀ (E : NaturalEdgeEncoding n m),
-    ComputesHAMWithNaturalEncoding F E →
-    ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-    (∀ H ∈ I, IsHamCycle n H) →
-    protocolPartitionNumber I S ≤ F.size →
-    protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound_ax
-
-theorem ahoUllmanYannakakis {m : ℕ}
-    (F : BooleanCircuit m) (_hF : F.isFormula)
-    (E : NaturalEdgeEncoding n m)
-    (_hDecides : ComputesHAMWithNaturalEncoding F E)
-    (S : Frontier n)
-    (I : Finset (Finset (Edge n)))
-    (hHam : ∀ H ∈ I, IsHamCycle n H)
-    (hAuy : protocolPartitionNumber I S ≤ F.size) :
-    protocolPartitionNumber I S ≤ F.size :=
-  aho_ullman_yannakakis_formula_partition_bound F _hF E _hDecides S I hHam hAuy
 
 private theorem rectangle_isolation_from_cross_pattern :
   ∀ {n : ℕ} (S : Frontier n) (ρ : Restriction n)
@@ -2190,37 +4436,62 @@ private theorem funnel_partition_count {n : ℕ}
   classical
   unfold protocolPartitionNumber
   apply le_csInf
-  · refine ⟨I.card, I.image (fun H => ({H} : Finset (Finset (Edge n)))),
+  · refine ⟨I.card, I.image (fun H : Finset (Edge n) =>
+        ({ leftFam := ({H} : Finset (Finset (Edge n)))
+           rightFam := ({H} : Finset (Finset (Edge n))) } : OneRectangle n)),
           ?_, ?_, ?_⟩
-    · simp [Finset.card_image_of_injective _ Finset.singleton_injective]
+    · refine Finset.card_image_of_injective _ ?_
+      intro H₀ H₁ hEq
+      simpa using congrArg OneRectangle.leftFam hEq
     · intro R hR
       simp only [Finset.mem_image] at hR
       obtain ⟨H, hH, rfl⟩ := hR
-      refine ⟨Finset.singleton_subset_iff.mpr hH, ?_⟩
+      refine ⟨Finset.singleton_subset_iff.mpr hH, Finset.singleton_subset_iff.mpr hH, ?_⟩
       intro H₀ hH₀ H₁ hH₁
       rw [Finset.mem_singleton] at hH₀ hH₁
       rw [hH₀, hH₁, mixedGraph_self S H (hHam H hH)]
       exact hHam H hH
     · intro H hH
-      exact ⟨{H}, Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H⟩
+      exact ⟨OneRectangle.mk ({H} : Finset (Finset (Edge n))) ({H} : Finset (Finset (Edge n))),
+        Finset.mem_image.mpr ⟨H, hH, rfl⟩, Finset.mem_singleton_self H, Finset.mem_singleton_self H⟩
   · intro k hk
     rcases hk with ⟨P, hPcard, hRect, hCover⟩
     rw [← hPcard]
-    have hSingleton : ∀ R ∈ P, ∀ H₀ ∈ R, ∀ H₁ ∈ R, H₀ = H₁ := by
-      intro R hR H₀ hH₀ H₁ hH₁
+    have hDiagonalUnique :
+        ∀ R ∈ P, ∀ H₀, H₀ ∈ R.leftFam → H₀ ∈ R.rightFam →
+          ∀ H₁, H₁ ∈ R.leftFam → H₁ ∈ R.rightFam → H₀ = H₁ := by
+      intro R hR H₀ hH₀L hH₀R H₁ hH₁L hH₁R
       by_contra hne
-      have ⟨hRsub, hRrect⟩ := hRect R hR
-      exact hIsolated H₀ (hRsub hH₀) H₁ (hRsub hH₁) hne (hRrect H₀ hH₀ H₁ hH₁)
+      have hRvalid := hRect R hR
+      exact hIsolated H₀ (hRvalid.left_subset hH₀L) H₁ (hRvalid.right_subset hH₁R) hne
+        (hRvalid.monochromatic H₀ hH₀L H₁ hH₁R)
+    have hAssign : ∀ H ∈ I, ∃ R ∈ P, H ∈ R.leftFam ∧ H ∈ R.rightFam := by
+      intro H hH
+      exact hCover H hH
+    let assign : {H // H ∈ I} → OneRectangle n := fun H => (hAssign H.1 H.2).choose
+    have hAssignMem : ∀ H : {H // H ∈ I}, assign H ∈ P := by
+      intro H
+      exact (hAssign H.1 H.2).choose_spec.1
+    have hAssignLeft : ∀ H : {H // H ∈ I}, H.1 ∈ (assign H).leftFam := by
+      intro H
+      exact (hAssign H.1 H.2).choose_spec.2.1
+    have hAssignRight : ∀ H : {H // H ∈ I}, H.1 ∈ (assign H).rightFam := by
+      intro H
+      exact (hAssign H.1 H.2).choose_spec.2.2
+    have hAssignInj : Function.Injective assign := by
+      intro H₀ H₁ hEq
+      apply Subtype.ext
+      exact hDiagonalUnique (assign H₀) (hAssignMem H₀) H₀.1 (hAssignLeft H₀) (hAssignRight H₀)
+        H₁.1 (by simpa [hEq] using hAssignLeft H₁) (by simpa [hEq] using hAssignRight H₁)
     calc
-      I.card ≤ (P.biUnion id).card := by
-        apply Finset.card_le_card
-        intro H hH
-        obtain ⟨R, hR, hHR⟩ := hCover H hH
-        exact Finset.mem_biUnion.mpr ⟨R, hR, hHR⟩
-      _ ≤ ∑ R ∈ P, R.card := Finset.card_biUnion_le
-      _ ≤ ∑ _R ∈ P, 1 := Finset.sum_le_sum (fun R hR => by
-          rw [Finset.card_le_one]; exact hSingleton R hR)
-      _ = P.card := by simp
+      I.card = (I.attach.image assign).card := by
+        rw [Finset.card_image_of_injective _ hAssignInj, Finset.card_attach]
+      _ ≤ P.card := by
+        exact Finset.card_le_card (by
+          intro R hR
+          simp only [Finset.mem_image] at hR
+          obtain ⟨H, hHI, rfl⟩ := hR
+          exact hAssignMem H)
 
 private theorem packing_gives_exponential_partition {n : ℕ}
     (hn : n ≥ 4)
@@ -2312,17 +4583,19 @@ private theorem formula_size_from_isolation :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
-    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-      (∀ H ∈ I, IsHamCycle n H) →
-      protocolPartitionNumber I S ≤ F.size) →
     ∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
     (∀ H ∈ I, IsHamCycle n H) →
     (∀ H₀ ∈ I, ∀ H₁ ∈ I, H₀ ≠ H₁ → ¬IsHamCycle n (mixedGraph S H₁ H₀)) →
     F.size ≥ I.card := by
-  intro n m F hF E hCorrect hAuyBound S I hHam hIso
-  have hAUY := ahoUllmanYannakakis F hF E hCorrect S I hHam (hAuyBound S I hHam)
-  have hPart := funnel_partition_count S I hHam hIso
-  omega
+  intro n m F hF E hCorrect S I hHam hIso
+  rcases I.eq_empty_or_nonempty with rfl | ⟨H, hHI⟩
+  · simp
+  · have hout : F.outputGate < m + F.gates.length := by
+      exact eval_true_implies_outputGate_lt F (E.encode H)
+        ((hCorrect H).2 (hHam H hHI))
+    have hAUY := auy_bound F hF E S I hCorrect hHam hout
+    have hPart := funnel_partition_count S I hHam hIso
+    omega
 
 private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalanced) (hn : n ≥ 4) :
     (chromaticFrontier χ).isBalanced := by
@@ -2390,36 +4663,473 @@ private theorem chromaticFrontierIsBalanced (χ : Coloring n) (hBal : χ.isBalan
     simp only [decide_eq_false_iff_not]
     exact hcd
 
+private def alternatingColoring (n : ℕ) : Coloring n where
+  color v := decide (v.1 % 2 = 0)
+
+private theorem alternatingChromaticFrontierIsBalanced (hn : n ≥ 4) :
+    (chromaticFrontier (alternatingColoring n)).isBalanced := by
+  unfold Frontier.isBalanced
+  constructor
+  · apply Finset.card_pos.mpr
+    refine ⟨Sym2.mk (⟨0, by omega⟩, ⟨2, by omega⟩), ?_⟩
+    simp [chromaticFrontier, chromaticSameColor, alternatingColoring, allEdges]
+  · apply Finset.card_pos.mpr
+    refine ⟨Sym2.mk (⟨0, by omega⟩, ⟨1, by omega⟩), ?_⟩
+    simp [chromaticFrontier, chromaticSameColor, alternatingColoring, allEdges]
+
+private def canonicalBlock {n q : ℕ} (hq : q ≤ n / 4) (i : Fin q) : SwitchBlock n where
+  p := ⟨4 * i.1, by
+    have hi : i.1 < q := i.2
+    have : 4 * q ≤ n := by
+      exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+    omega⟩
+  a := ⟨4 * i.1 + 1, by
+    have hi : i.1 < q := i.2
+    have : 4 * q ≤ n := by
+      exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+    omega⟩
+  b := ⟨4 * i.1 + 2, by
+    have hi : i.1 < q := i.2
+    have : 4 * q ≤ n := by
+      exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+    omega⟩
+  q := ⟨4 * i.1 + 3, by
+    have hi : i.1 < q := i.2
+    have : 4 * q ≤ n := by
+      exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+    omega⟩
+  all_distinct := by
+    repeat' constructor
+    · intro h
+      have hv : 4 * i.1 = 4 * i.1 + 1 := by
+        simpa using Fin.mk.inj h
+      omega
+    · intro h
+      have hv : 4 * i.1 = 4 * i.1 + 2 := by
+        simpa using Fin.mk.inj h
+      omega
+    · intro h
+      have hv : 4 * i.1 = 4 * i.1 + 3 := by
+        simpa using Fin.mk.inj h
+      omega
+    · intro h
+      have hv : 4 * i.1 + 1 = 4 * i.1 + 2 := by
+        simpa using Fin.mk.inj h
+      omega
+    · intro h
+      have hv : 4 * i.1 + 1 = 4 * i.1 + 3 := by
+        simpa using Fin.mk.inj h
+      omega
+    · intro h
+      have hv : 4 * i.1 + 2 = 4 * i.1 + 3 := by
+        simpa using Fin.mk.inj h
+      omega
+
+private noncomputable def canonicalBlocks {n q : ℕ} (hq : q ≤ n / 4) : List (SwitchBlock n) :=
+  (List.finRange q).map (canonicalBlock hq)
+
+private theorem canonicalBlocks_length {n q : ℕ} (hq : q ≤ n / 4) :
+    (canonicalBlocks hq).length = q := by
+  simp [canonicalBlocks]
+
+private theorem canonicalBlocks_get {n q : ℕ} (hq : q ≤ n / 4)
+    (i : Fin (canonicalBlocks hq).length) :
+    (canonicalBlocks hq)[i] = canonicalBlock hq ⟨i.1, by
+      simpa [canonicalBlocks_length hq] using i.2⟩ := by
+  change ((List.finRange q).map (canonicalBlock hq))[i.1] =
+      canonicalBlock hq ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+  rw [List.getElem_map]
+  simp [List.getElem_finRange]
+
+private theorem canonicalBlocks_vertex_disjoint {n q : ℕ} (hq : q ≤ n / 4) :
+    blocksVertexDisjoint (canonicalBlocks hq) := by
+  intro i j hij
+  rw [canonicalBlocks_get hq i, canonicalBlocks_get hq j]
+  rw [Finset.disjoint_left]
+  intro v hvI hvJ
+  simp [SwitchBlock.vertices] at hvI hvJ
+  have hijv : i.1 ≠ j.1 := by
+    intro h
+    apply hij
+    ext
+    exact h
+  rcases hvI with rfl | rfl | rfl | rfl <;>
+    rcases hvJ with h | h | h | h <;>
+    have hv := congrArg Fin.val h <;>
+    simp [canonicalBlock] at hv <;>
+    omega
+
+private theorem canonicalBlock_degree_visible {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4)
+    (i : Fin q) :
+    (canonicalBlock hq i).isDegreeVisible (chromaticFrontier (alternatingColoring n)) := by
+  have _ : n ≥ 4 := hn
+  unfold SwitchBlock.isDegreeVisible
+  intro hmono
+  have hpa :
+      edgeSide (chromaticFrontier (alternatingColoring n))
+        (Sym2.mk ((canonicalBlock hq i).p, (canonicalBlock hq i).a)) = false := by
+    unfold edgeSide chromaticFrontier
+    simp [chromaticSameColor, alternatingColoring, canonicalBlock, allEdges]
+    omega
+  have hpb :
+      edgeSide (chromaticFrontier (alternatingColoring n))
+        (Sym2.mk ((canonicalBlock hq i).p, (canonicalBlock hq i).b)) = true := by
+    unfold edgeSide chromaticFrontier
+    simp [chromaticSameColor, alternatingColoring, canonicalBlock, allEdges]
+  have hpb_mem :
+      Sym2.mk ((canonicalBlock hq i).p, (canonicalBlock hq i).b) ∈ (canonicalBlock hq i).toggleEdges := by
+    simp [SwitchBlock.toggleEdges, canonicalBlock]
+  have hpa_mem :
+      Sym2.mk ((canonicalBlock hq i).p, (canonicalBlock hq i).a) ∈ (canonicalBlock hq i).toggleEdges := by
+    simp [SwitchBlock.toggleEdges, canonicalBlock]
+  have hpb_eq := hmono _ hpb_mem
+  rw [hpa] at hpb_eq
+  rw [hpb] at hpb_eq
+  simp at hpb_eq
+
+private noncomputable def canonicalPatternMap {n q : ℕ} (hq : q ≤ n / 4)
+    (η : Fin q → Bool) (v : Fin n) : Fin n := by
+  let k := v.1 / 4
+  by_cases hk : k < q
+  · by_cases hη : η ⟨k, hk⟩
+    · by_cases h1 : v.1 % 4 = 1
+      · refine ⟨4 * k + 2, ?_⟩
+        have h4q : 4 * q ≤ n := by
+          exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+        omega
+      · by_cases h2 : v.1 % 4 = 2
+        · refine ⟨4 * k + 1, ?_⟩
+          have h4q : 4 * q ≤ n := by
+            exact le_trans (Nat.mul_le_mul_left 4 hq) (Nat.mul_div_le n 4)
+          omega
+        · exact v
+    · exact v
+  · exact v
+
+private theorem canonicalPatternMap_involutive {n q : ℕ} (hq : q ≤ n / 4)
+    (η : Fin q → Bool) :
+    Function.Involutive (canonicalPatternMap hq η) := by
+  intro v
+  dsimp [canonicalPatternMap]
+  let k := v.1 / 4
+  by_cases hk : k < q
+  · by_cases hη : η ⟨k, hk⟩
+    · by_cases h1 : v.1 % 4 = 1
+      · apply Fin.ext
+        have hk' : (4 * k + 2) / 4 < q := by omega
+        have hdiv : (4 * k + 2) / 4 = k := by omega
+        have hkEq : (⟨(4 * k + 2) / 4, hk'⟩ : Fin q) = ⟨k, hk⟩ := by
+          exact Fin.ext hdiv
+        have hη' : η ⟨(4 * k + 2) / 4, hk'⟩ = true := by
+          simpa [hkEq] using hη
+        simp [k, hk, hη, h1, hk', hη']
+        omega
+      · by_cases h2 : v.1 % 4 = 2
+        · apply Fin.ext
+          have hk' : (4 * k + 1) / 4 < q := by omega
+          have hdiv : (4 * k + 1) / 4 = k := by omega
+          have hkEq : (⟨(4 * k + 1) / 4, hk'⟩ : Fin q) = ⟨k, hk⟩ := by
+            exact Fin.ext hdiv
+          have hη' : η ⟨(4 * k + 1) / 4, hk'⟩ = true := by
+            simpa [hkEq] using hη
+          simp [k, hk, hη, h1, h2, hk', hη']
+          omega
+        · simp [k, hk, hη, h1, h2]
+    · simp [k, hk, hη]
+  · simp [k, hk]
+
+private noncomputable def canonicalPatternPerm {n q : ℕ} (hq : q ≤ n / 4)
+    (η : Fin q → Bool) : Equiv.Perm (Fin n) where
+  toFun := canonicalPatternMap hq η
+  invFun := canonicalPatternMap hq η
+  left_inv := canonicalPatternMap_involutive hq η
+  right_inv := canonicalPatternMap_involutive hq η
+
+private def canonicalBlocksEta {n q : ℕ} (hq : q ≤ n / 4) (η : Fin q → Bool) :
+    Fin (canonicalBlocks hq).length → Bool :=
+  fun i => η ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+
+private def allFalsePattern {q : ℕ} : Fin q → Bool := fun _ => false
+
+private def singleFlipPattern {q : ℕ} (i : Fin q) : Fin q → Bool :=
+  fun j => decide (j = i)
+
+private noncomputable def canonicalPatternCycle {n q : ℕ}
+    (hn : n ≥ 4) (hq : q ≤ n / 4) (η : Fin q → Bool) : Finset (Edge n) :=
+  PNeNp.relabelEdges (canonicalPatternPerm hq η) (canonEdges n (by omega))
+
+private theorem canonicalPatternCycle_isHam
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) (η : Fin q → Bool) :
+    IsHamCycle n (canonicalPatternCycle hn hq η) := by
+  unfold canonicalPatternCycle
+  simpa using
+    PNeNp.isHamCycle_relabel hn (canonicalPatternPerm hq η)
+      (canonEdges n (by omega)) (canonicalCycleIsHam hn)
+
+@[simp] private theorem canonicalPatternPerm_symm_apply
+    {n q : ℕ} (hq : q ≤ n / 4) (η : Fin q → Bool) (v : Fin n) :
+    (canonicalPatternPerm hq η).symm v = canonicalPatternPerm hq η v := rfl
+
+@[simp] private theorem canonicalPatternPerm_apply_p
+    {n q : ℕ} (hq : q ≤ n / 4) (η : Fin q → Bool) (i : Fin q) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).p = (canonicalBlock hq i).p := by
+  apply Fin.ext
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock]
+
+@[simp] private theorem canonicalPatternPerm_apply_q
+    {n q : ℕ} (hq : q ≤ n / 4) (η : Fin q → Bool) (i : Fin q) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).q = (canonicalBlock hq i).q := by
+  apply Fin.ext
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock]
+
+@[simp] private theorem canonicalPatternPerm_apply_a_of_false
+    {n q : ℕ} (hq : q ≤ n / 4) {η : Fin q → Bool} {i : Fin q}
+    (hη : η i = false) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).a = (canonicalBlock hq i).a := by
+  apply Fin.ext
+  have hk : (4 * i.1 + 1) / 4 < q := by omega
+  have hdiv : (4 * i.1 + 1) / 4 = i.1 := by omega
+  have hmod1 : (4 * i.1 + 1) % 4 = 1 := by omega
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock, hk, hη, hdiv, hmod1]
+
+@[simp] private theorem canonicalPatternPerm_apply_b_of_false
+    {n q : ℕ} (hq : q ≤ n / 4) {η : Fin q → Bool} {i : Fin q}
+    (hη : η i = false) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).b = (canonicalBlock hq i).b := by
+  apply Fin.ext
+  have hk : (4 * i.1 + 2) / 4 < q := by omega
+  have hdiv : (4 * i.1 + 2) / 4 = i.1 := by omega
+  have hmod1 : ¬ (4 * i.1 + 2) % 4 = 1 := by omega
+  have hmod2 : (4 * i.1 + 2) % 4 = 2 := by omega
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock, hk, hη, hdiv, hmod1, hmod2]
+
+@[simp] private theorem canonicalPatternPerm_apply_a_of_true
+    {n q : ℕ} (hq : q ≤ n / 4) {η : Fin q → Bool} {i : Fin q}
+    (hη : η i = true) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).a = (canonicalBlock hq i).b := by
+  apply Fin.ext
+  have hk : (4 * i.1 + 1) / 4 < q := by omega
+  have hdiv : (4 * i.1 + 1) / 4 = i.1 := by omega
+  have hmod1 : (4 * i.1 + 1) % 4 = 1 := by omega
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock, hk, hη, hdiv, hmod1]
+
+@[simp] private theorem canonicalPatternPerm_apply_b_of_true
+    {n q : ℕ} (hq : q ≤ n / 4) {η : Fin q → Bool} {i : Fin q}
+    (hη : η i = true) :
+    canonicalPatternPerm hq η (canonicalBlock hq i).b = (canonicalBlock hq i).a := by
+  apply Fin.ext
+  have hk : (4 * i.1 + 2) / 4 < q := by omega
+  have hdiv : (4 * i.1 + 2) / 4 = i.1 := by omega
+  have hmod1 : ¬ (4 * i.1 + 2) % 4 = 1 := by omega
+  have hmod2 : (4 * i.1 + 2) % 4 = 2 := by omega
+  simp [canonicalPatternPerm, canonicalPatternMap, canonicalBlock, hk, hη, hdiv, hmod1, hmod2]
+
+private theorem state0Forced_subset_canonicalPatternCycle_of_false
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4)
+    {η : Fin q → Bool} {i : Fin q} (hη : η i = false) :
+    (canonicalBlock hq i).state0Forced ⊆ canonicalPatternCycle hn hq η := by
+  intro e he
+  simp [SwitchBlock.state0Forced] at he
+  rcases he with rfl | rfl | rfl
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_p, canonicalPatternPerm_apply_a_of_false, hη]
+    simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1) (by omega)
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_a_of_false, canonicalPatternPerm_apply_b_of_false, hη]
+    simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1 + 1) (by omega)
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_b_of_false, canonicalPatternPerm_apply_q, hη]
+    simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1 + 2) (by omega)
+
+private theorem state0Forbidden_disjoint_canonicalPatternCycle_of_false
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4)
+    {η : Fin q → Bool} {i : Fin q} (hη : η i = false) :
+    Disjoint (canonicalBlock hq i).state0Forbidden
+      (canonicalPatternCycle hn hq η) := by
+  rw [Finset.disjoint_left]
+  intro e heForb heMem
+  simp [SwitchBlock.state0Forbidden] at heForb
+  rcases heForb with rfl | rfl
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff] at heMem
+    simp [canonicalPatternPerm_apply_p, canonicalPatternPerm_apply_b_of_false, hη] at heMem
+    exact canonEdges_two_apart_not_mem hn (4 * i.1) (by omega) heMem
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff] at heMem
+    simp [canonicalPatternPerm_apply_a_of_false, canonicalPatternPerm_apply_q, hη] at heMem
+    exact canonEdges_two_apart_not_mem hn (4 * i.1 + 1) (by omega) heMem
+
+private theorem state1Forced_subset_canonicalPatternCycle_of_true
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4)
+    {η : Fin q → Bool} {i : Fin q} (hη : η i = true) :
+    (canonicalBlock hq i).state1Forced ⊆ canonicalPatternCycle hn hq η := by
+  intro e he
+  simp [SwitchBlock.state1Forced] at he
+  rcases he with rfl | rfl | rfl
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_p, canonicalPatternPerm_apply_b_of_true, hη]
+    simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1) (by omega)
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_a_of_true, canonicalPatternPerm_apply_b_of_true, hη]
+    have hstep :
+        Sym2.mk ((canonicalBlock hq i).a, (canonicalBlock hq i).b) ∈
+          canonEdges n (by omega) := by
+      simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1 + 1) (by omega)
+    have hswap :
+        Sym2.mk ((canonicalBlock hq i).b, (canonicalBlock hq i).a) =
+          Sym2.mk ((canonicalBlock hq i).a, (canonicalBlock hq i).b) := by
+      simp
+    simpa [hswap] using hstep
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff]
+    simp [canonicalPatternPerm_apply_a_of_true, canonicalPatternPerm_apply_q, hη]
+    have hstep :
+        Sym2.mk ((canonicalBlock hq i).b, (canonicalBlock hq i).q) ∈
+          canonEdges n (by omega) := by
+      simpa [canonicalBlock] using canonEdges_step_mem hn (4 * i.1 + 2) (by omega)
+    simpa using hstep
+
+private theorem state1Forbidden_disjoint_canonicalPatternCycle_of_true
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4)
+    {η : Fin q → Bool} {i : Fin q} (hη : η i = true) :
+    Disjoint (canonicalBlock hq i).state1Forbidden
+      (canonicalPatternCycle hn hq η) := by
+  rw [Finset.disjoint_left]
+  intro e heForb heMem
+  simp [SwitchBlock.state1Forbidden] at heForb
+  rcases heForb with rfl | rfl
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff] at heMem
+    simp [canonicalPatternPerm_apply_p, canonicalPatternPerm_apply_a_of_true, hη] at heMem
+    exact canonEdges_two_apart_not_mem hn (4 * i.1) (by omega) heMem
+  · rw [canonicalPatternCycle, PNeNp.mk_mem_relabelEdges_iff] at heMem
+    simp [canonicalPatternPerm_apply_b_of_true, canonicalPatternPerm_apply_q, hη] at heMem
+    exact canonEdges_two_apart_not_mem hn (4 * i.1 + 1) (by omega) heMem
+
+private theorem canonicalBlock_state0_mem
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) (i : Fin q) :
+    canonicalPatternCycle hn hq (allFalsePattern) ∈
+      restrictedHamCycles n
+        ⟨(canonicalBlock hq i).state0Forced,
+         (canonicalBlock hq i).state0Forbidden⟩ := by
+  simp [restrictedHamCycles, canonicalPatternCycle_isHam, allFalsePattern]
+  constructor
+  · exact state0Forced_subset_canonicalPatternCycle_of_false hn hq rfl
+  · exact state0Forbidden_disjoint_canonicalPatternCycle_of_false hn hq rfl
+
+private theorem canonicalBlock_state1_mem
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) (i : Fin q) :
+    canonicalPatternCycle hn hq (singleFlipPattern i) ∈
+      restrictedHamCycles n
+        ⟨(canonicalBlock hq i).state1Forced,
+         (canonicalBlock hq i).state1Forbidden⟩ := by
+  simp [restrictedHamCycles, canonicalPatternCycle_isHam, singleFlipPattern]
+  constructor
+  · exact state1Forced_subset_canonicalPatternCycle_of_true hn hq (by simp [singleFlipPattern])
+  · exact state1Forbidden_disjoint_canonicalPatternCycle_of_true hn hq (by simp [singleFlipPattern])
+
+private theorem canonicalBlock_open_empty
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) (i : Fin q) :
+    (canonicalBlock hq i).isOpen (⟨∅, ∅⟩ : Restriction n) := by
+  constructor
+  · exact ⟨_, by
+      simpa [SwitchBlock.isOpen, Finset.empty_union] using canonicalBlock_state0_mem hn hq i⟩
+  · exact ⟨_, by
+      simpa [SwitchBlock.isOpen, Finset.empty_union] using canonicalBlock_state1_mem hn hq i⟩
+
+private theorem canonicalPatternCycle_mem_patternHamCycles
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) (η : Fin q → Bool) :
+    canonicalPatternCycle hn hq η ∈
+      patternHamCycles
+        (⟨∅, ∅⟩ : Restriction n)
+        (canonicalBlocks hq)
+        (canonicalBlocksEta hq η) := by
+  unfold patternHamCycles restrictedHamCycles
+  simp only [patternRestriction, Finset.empty_union, Finset.mem_filter, Finset.mem_univ, true_and]
+  refine ⟨?_, ?_, canonicalPatternCycle_isHam hn hq η⟩
+  · intro e heForced
+    rcases Finset.mem_biUnion.mp heForced with ⟨i, -, hi⟩
+    let iq : Fin q := ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+    have hget : (canonicalBlocks hq)[i] = canonicalBlock hq iq := by
+      simpa [iq] using canonicalBlocks_get hq i
+    by_cases hη : η iq = true
+    · have hi' : e ∈ (canonicalBlock hq iq).state1Forced := by
+        simpa [SwitchBlock.localRestriction, canonicalBlocksEta, hget, iq, hη] using hi
+      exact state1Forced_subset_canonicalPatternCycle_of_true hn hq hη hi'
+    · have hη0 : η iq = false := by cases h : η iq <;> simp_all
+      have hi' : e ∈ (canonicalBlock hq iq).state0Forced := by
+        simpa [SwitchBlock.localRestriction, canonicalBlocksEta, hget, iq, hη0] using hi
+      exact state0Forced_subset_canonicalPatternCycle_of_false hn hq hη0 hi'
+  · rw [Finset.disjoint_left]
+    intro e heForb heMem
+    rcases Finset.mem_biUnion.mp heForb with ⟨i, -, hi⟩
+    let iq : Fin q := ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+    have hget : (canonicalBlocks hq)[i] = canonicalBlock hq iq := by
+      simpa [iq] using canonicalBlocks_get hq i
+    by_cases hη : η iq = true
+    · have hi' : e ∈ (canonicalBlock hq iq).state1Forbidden := by
+        simpa [SwitchBlock.localRestriction, canonicalBlocksEta, hget, iq, hη] using hi
+      exact (Finset.disjoint_left.mp
+        (state1Forbidden_disjoint_canonicalPatternCycle_of_true hn hq hη)) hi' heMem
+    · have hη0 : η iq = false := by cases h : η iq <;> simp_all
+      have hi' : e ∈ (canonicalBlock hq iq).state0Forbidden := by
+        simpa [SwitchBlock.localRestriction, canonicalBlocksEta, hget, iq, hη0] using hi
+      exact (Finset.disjoint_left.mp
+        (state0Forbidden_disjoint_canonicalPatternCycle_of_false hn hq hη0)) hi' heMem
+
+private theorem canonicalPackedWitness
+    {n q : ℕ} (hn : n ≥ 4) (hq : q ≤ n / 4) :
+    ∃ (blocks : List (SwitchBlock n)),
+      blocks.length = q ∧
+      blocksVertexDisjoint blocks ∧
+      (∀ i : Fin blocks.length,
+        blocks[i].isDegreeVisible (chromaticFrontier (alternatingColoring n))) ∧
+      (∀ i : Fin blocks.length,
+        blocks[i].isOpen (⟨∅, ∅⟩ : Restriction n)) ∧
+      ∀ η : Fin blocks.length → Bool,
+        (patternHamCycles (⟨∅, ∅⟩ : Restriction n) blocks η).Nonempty := by
+  refine ⟨canonicalBlocks hq, canonicalBlocks_length hq,
+    canonicalBlocks_vertex_disjoint hq, ?_, ?_, ?_⟩
+  · intro i
+    let iq : Fin q := ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+    simpa [canonicalBlocks_get hq i, iq]
+      using canonicalBlock_degree_visible hn hq iq
+  · intro i
+    let iq : Fin q := ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+    simpa [canonicalBlocks_get hq i, iq]
+      using canonicalBlock_open_empty hn hq iq
+  · intro η
+    let ηq : Fin q → Bool :=
+      fun i => η ⟨i.1, by simpa [canonicalBlocks_length hq] using i.2⟩
+    refine ⟨canonicalPatternCycle hn hq ηq, ?_⟩
+    simpa [canonicalBlocksEta, ηq]
+      using canonicalPatternCycle_mem_patternHamCycles hn hq ηq
+
 theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
-      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-        (∀ H ∈ I, IsHamCycle n H) →
-        protocolPartitionNumber I S ≤ F.size) →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       ∀ q : ℕ, 1 ≤ q → q ≤ n / 4 →
       F.size ≥ 2 ^ q := by
-  intro m F hF E hCorrect hAuyBound hPackingOracle q hq_pos hq_bound
-  obtain ⟨χ, _hBal⟩ := balanced_coloring_exists hn
+  intro m F hF E hCorrect q hq_pos hq_bound
+  let χ := alternatingColoring n
   set S := chromaticFrontier χ
-  have hSBal : S.isBalanced := chromaticFrontierIsBalanced χ _hBal hn
+  have hSBal : S.isBalanced := by
+    simpa [χ, S] using alternatingChromaticFrontierIsBalanced hn
   set ρ₀ : Restriction n := ⟨∅, ∅⟩
   have hCons₀ : ρ₀.consistent := by
     unfold Restriction.consistent; exact Finset.disjoint_empty_right _
   have hPath₀ : ρ₀.isPathCompatible := by
     unfold Restriction.isPathCompatible Restriction.maxDegree ρ₀
-    simp
+    constructor
+    · simp
+    constructor
+    · simp
+    · intro comp hsub _ hne
+      exfalso
+      apply hne.ne_empty
+      ext e
+      constructor
+      · intro he
+        exact False.elim (Finset.notMem_empty e (hsub he))
+      · intro he
+        exact False.elim (Finset.notMem_empty e he)
   have hSize₀ : ρ₀.size ≤ q := by unfold Restriction.size ρ₀; simp
   have hn_ge_q : n ≥ q := by omega
   have hPackedWitness :
@@ -2429,11 +5139,11 @@ theorem formulaSizeSuperpolynomial (hn : n ≥ 4) :
         (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
         (∀ i : Fin blocks.length, blocks[i].isOpen ρ₀) ∧
         ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ₀ blocks η).Nonempty :=
-    hPackingOracle S hSBal ρ₀ hCons₀ hPath₀ q hSize₀ q hq_pos (le_refl q) hn_ge_q
+          (patternHamCycles ρ₀ blocks η).Nonempty := by
+    simpa [S, ρ₀] using canonicalPackedWitness (n := n) (q := q) hn hq_bound
   obtain ⟨I, hIcard, hHam, hIso⟩ := packing_gives_exponential_partition hn S hSBal ρ₀ hCons₀ hPath₀ q
     hSize₀ q hq_pos (le_refl q) hn_ge_q hPackedWitness
-  have hFge := formula_size_from_isolation m F hF E hCorrect hAuyBound S I hHam hIso
+  have hFge := formula_size_from_isolation m F hF E hCorrect S I hHam hIso
   omega
 
 private theorem formula_lower_bound_iterated_funnel_ax :
@@ -2441,70 +5151,20 @@ private theorem formula_lower_bound_iterated_funnel_ax :
     ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
     ∀ (E : NaturalEdgeEncoding n m),
     ComputesHAMWithNaturalEncoding F E →
-    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-      (∀ H ∈ I, IsHamCycle n H) →
-      protocolPartitionNumber I S ≤ F.size) →
-    (∀ (S : Frontier n) (hS : S.isBalanced)
-      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-      ∃ (blocks : List (SwitchBlock n)),
-        blocks.length = q ∧
-        blocksVertexDisjoint blocks ∧
-        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-        ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ blocks η).Nonempty) →
     ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) := by
-  intro n hn4 m F hFormula E hCorrect hAuyBound hPackingOracle
+  intro n hn4 m F hFormula E hCorrect
   refine ⟨4, by omega, ?_⟩
   have hn4_div : n / 4 ≥ 1 := by omega
-  exact formulaSizeSuperpolynomial hn4 m F hFormula E hCorrect hAuyBound hPackingOracle
+  exact formulaSizeSuperpolynomial hn4 m F hFormula E hCorrect
     (n / 4) hn4_div (le_refl _)
-
-private theorem formula_lower_bound_from_funnel :
-  ∀ {n : ℕ}, n ≥ 4 →
-    ∀ (m : ℕ) (F : BooleanCircuit m), F.isFormula →
-    ∀ (E : NaturalEdgeEncoding n m),
-    ComputesHAMWithNaturalEncoding F E →
-    (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-      (∀ H ∈ I, IsHamCycle n H) →
-      protocolPartitionNumber I S ≤ F.size) →
-    (∀ (S : Frontier n) (hS : S.isBalanced)
-      (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-      (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-      (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-      ∃ (blocks : List (SwitchBlock n)),
-        blocks.length = q ∧
-        blocksVertexDisjoint blocks ∧
-        (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-        (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-        ∀ η : Fin blocks.length → Bool,
-          (patternHamCycles ρ blocks η).Nonempty) →
-    ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
-  formula_lower_bound_iterated_funnel_ax
 
 theorem formulaLowerBound (hn : n ≥ 4) :
     ∀ m : ℕ, ∀ F : BooleanCircuit m, F.isFormula →
       ∀ E : NaturalEdgeEncoding n m,
       ComputesHAMWithNaturalEncoding F E →
-      (∀ (S : Frontier n) (I : Finset (Finset (Edge n))),
-        (∀ H ∈ I, IsHamCycle n H) →
-        protocolPartitionNumber I S ≤ F.size) →
-      (∀ (S : Frontier n) (hS : S.isBalanced)
-        (ρ : Restriction n) (hcons : ρ.consistent) (hpath : ρ.isPathCompatible)
-        (polylogBound : ℕ) (hm : ρ.size ≤ polylogBound)
-        (q : ℕ) (hq_pos : 1 ≤ q) (hq_bound : q ≤ polylogBound) (hn_ge_q : n ≥ q),
-        ∃ (blocks : List (SwitchBlock n)),
-          blocks.length = q ∧
-          blocksVertexDisjoint blocks ∧
-          (∀ i : Fin blocks.length, blocks[i].isDegreeVisible S) ∧
-          (∀ i : Fin blocks.length, blocks[i].isOpen ρ) ∧
-          ∀ η : Fin blocks.length → Bool,
-            (patternHamCycles ρ blocks η).Nonempty) →
       ∃ d : ℕ, d > 0 ∧ F.size ≥ 2 ^ (n / d) :=
-  fun m F hF E hCorrect hAuyBound hPackingOracle =>
-    formula_lower_bound_from_funnel hn m F hF E hCorrect hAuyBound hPackingOracle
+  fun m F hF E hCorrect =>
+    formula_lower_bound_iterated_funnel_ax hn m F hF E hCorrect
 
 end FormulaLowerBound
 

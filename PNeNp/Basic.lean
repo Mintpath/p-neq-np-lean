@@ -38,7 +38,7 @@ structure BooleanCircuit (numInputs : ℕ) where
   outputGate : ℕ
 
 def BooleanCircuit.size {m : ℕ} (C : BooleanCircuit m) : ℕ :=
-  C.gates.length
+  m + C.gates.length
 
 noncomputable def BooleanCircuit.eval {m : ℕ} (C : BooleanCircuit m)
     (input : Fin m → Bool) : Bool :=
@@ -54,7 +54,8 @@ noncomputable def BooleanCircuit.eval {m : ℕ} (C : BooleanCircuit m)
   values.getD (C.outputGate) false
 
 def BooleanCircuit.fanOut {m : ℕ} (C : BooleanCircuit m) (i : ℕ) : ℕ :=
-  (C.gates.filter fun g => g.input1 = i ∨ g.input2 = i).length
+  C.gates.foldl (init := 0) fun acc g =>
+    acc + (if g.input1 = i then 1 else 0) + (if g.input2 = i then 1 else 0)
 
 def BooleanCircuit.isFormula {m : ℕ} (C : BooleanCircuit m) : Prop :=
   (∀ i : ℕ, i < C.gates.length + m → C.fanOut i ≤ 1) ∧

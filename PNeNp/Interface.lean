@@ -512,7 +512,7 @@ private lemma leftSubgraph_component_is_path
   have he_left : e ∈ S.leftEdges := H_sub_left he_H
   exact Finset.disjoint_left.mp S.disjoint he_left he_right
 
-private lemma vertexDegreeIn_mono (n : ℕ) (A B : Finset (Edge n)) (hAB : A ⊆ B) (v : Fin n) :
+lemma vertexDegreeIn_mono (n : ℕ) (A B : Finset (Edge n)) (hAB : A ⊆ B) (v : Fin n) :
     vertexDegreeIn n A v ≤ vertexDegreeIn n B v := by
   unfold vertexDegreeIn
   exact Finset.card_le_card (Finset.filter_subset_filter _ hAB)
@@ -535,7 +535,7 @@ private lemma vertexDegreeIn_comp_eq_of_maximal (n : ℕ)
     have := hmax e hdiff v he.2
     omega
 
-private lemma deg1_vertex_exists_unique_edge
+lemma deg1_vertex_exists_unique_edge
     (n : ℕ) (comp : Finset (Edge n)) (v : Fin n)
     (hdeg1 : vertexDegreeIn n comp v = 1) :
     ∃! e, e ∈ comp ∧ v ∈ e := by
@@ -548,7 +548,7 @@ private lemma deg1_vertex_exists_unique_edge
     have : e' ∈ Finset.filter (fun e => v ∈ e) comp := Finset.mem_filter.mpr ⟨he'1, he'2⟩
     rw [he] at this; exact Finset.mem_singleton.mp this⟩
 
-private lemma deg1_other_endpoint
+lemma deg1_other_endpoint
     (n : ℕ) (comp : Finset (Edge n)) (v : Fin n)
     (hdeg1 : vertexDegreeIn n comp v = 1) (hnoloops : ∀ e ∈ comp, ¬ e.IsDiag) :
     ∃ w : Fin n, w ≠ v ∧ ∃ e ∈ comp, v ∈ e ∧ w ∈ e := by
@@ -564,7 +564,7 @@ private lemma filter_erase_eq {α : Type*} [DecidableEq α] {s : Finset α}
   exact ⟨fun ⟨⟨hne, hx⟩, hp⟩ => ⟨hne, hx, hp⟩,
          fun ⟨hne, hx, hp⟩ => ⟨⟨hne, hx⟩, hp⟩⟩
 
-private lemma erase_edge_deg (n : ℕ) (comp : Finset (Edge n)) (e : Edge n)
+lemma erase_edge_deg (n : ℕ) (comp : Finset (Edge n)) (e : Edge n)
     (he : e ∈ comp) (v : Fin n) :
     vertexDegreeIn n (comp.erase e) v =
       if v ∈ e then vertexDegreeIn n comp v - 1 else vertexDegreeIn n comp v := by
@@ -577,7 +577,7 @@ private lemma erase_edge_deg (n : ℕ) (comp : Finset (Edge n)) (e : Edge n)
     exact ⟨fun ⟨⟨_, hx⟩, hv⟩ => ⟨hx, hv⟩,
            fun ⟨hx, hv⟩ => ⟨⟨fun h => hve (h ▸ hv), hx⟩, hv⟩⟩
 
-private lemma deg1_unique_edge_eq (n : ℕ) (comp : Finset (Edge n)) (v : Fin n)
+lemma deg1_unique_edge_eq (n : ℕ) (comp : Finset (Edge n)) (v : Fin n)
     (hdeg1 : vertexDegreeIn n comp v = 1) (e' : Edge n) (he' : e' ∈ comp) (hve' : v ∈ e') :
     ∀ e'' ∈ comp, v ∈ e'' → e'' = e' := by
   intro e'' he'' hve''
@@ -658,7 +658,7 @@ private lemma walk_avoids_deg1_aux (n : ℕ) (comp : Finset (Edge n)) (v : Fin n
         have hadj_erase : (edgeSetToGraph n (comp.erase e)).Adj x c := ⟨hne_xc, hmem_erase⟩
         exact hadj_erase.reachable.trans (ih rest hrest_len hcv hy)
 
-private lemma leaf_removal_connected (n : ℕ) (comp : Finset (Edge n))
+lemma leaf_removal_connected (n : ℕ) (comp : Finset (Edge n))
     (hconn : IsIncidentConnected n comp) (v : Fin n)
     (hdeg1 : vertexDegreeIn n comp v = 1)
     (e : Edge n) (he : e ∈ comp) (hve : v ∈ e) :
@@ -694,7 +694,7 @@ private lemma reachable_from_deg0_eq (n : ℕ) (edges : Finset (Edge n))
       exact ⟨Sym2.mk (u, w), Finset.mem_filter.mpr ⟨hadj.2, Sym2.mem_mk_left u w⟩⟩
     omega
 
-private lemma sum_vertexDegrees_eq_twice_card
+lemma sum_vertexDegrees_eq_twice_card
     (n : ℕ) (comp : Finset (Edge n))
     (hnoloops : ∀ e ∈ comp, ¬ e.IsDiag) :
     ∑ v ∈ (Finset.univ : Finset (Fin n)), vertexDegreeIn n comp v = 2 * comp.card := by
@@ -893,7 +893,7 @@ private lemma incident_vertices_le_edges_plus_one
         omega
   exact key comp.card comp (le_refl _) hconn hdeg_le2 hpath hnoloops
 
-private lemma connected_maxdeg2_not_cycle_exactly2_deg1
+lemma connected_maxdeg2_not_cycle_exactly2_deg1
     (n : ℕ) (comp : Finset (Edge n))
     (_hne : comp.Nonempty)
     (hconn : IsIncidentConnected n comp)
@@ -978,7 +978,7 @@ private lemma connected_maxdeg2_not_cycle_exactly2_deg1
     rw [hV_card] at hle; omega
   omega
 
-private lemma finset_card_eq_two {α : Type*} [DecidableEq α]
+lemma finset_card_eq_two {α : Type*} [DecidableEq α]
     (S : Finset α) (hcard : S.card = 2) :
     ∃ a b : α, a ≠ b ∧ a ∈ S ∧ b ∈ S ∧ S = {a, b} := by
   have hne : S.Nonempty := Finset.card_pos.mp (by omega)
@@ -1080,7 +1080,7 @@ private lemma path_component_has_two_deg1_vertices
   exact this
 
 open Classical in
-private noncomputable def edgeComponentOf (n : ℕ) (edges : Finset (Edge n))
+noncomputable def edgeComponentOf (n : ℕ) (edges : Finset (Edge n))
     (u : Fin n) : Finset (Edge n) :=
   edges.filter fun e =>
     ∃ v : Fin n, v ∈ e ∧ (edgeSetToGraph n edges).Reachable u v
@@ -1093,7 +1093,7 @@ private lemma edgeComponentOf_mem (n : ℕ) (edges : Finset (Edge n))
   simp only [Finset.mem_filter]
   exact ⟨he, v, hv, hreach⟩
 
-private lemma edgeComponentOf_sub (n : ℕ) (edges : Finset (Edge n)) (u : Fin n) :
+lemma edgeComponentOf_sub (n : ℕ) (edges : Finset (Edge n)) (u : Fin n) :
     edgeComponentOf n edges u ⊆ edges := by
   intro e he
   unfold edgeComponentOf at he
@@ -1142,7 +1142,7 @@ private lemma reachable_from_u_in_component (n : ℕ) (edges : Finset (Edge n))
       (SimpleGraph.reachable_iff_reflTransGen _ _).mpr hprev
     exact ⟨hmem, _, Sym2.mem_mk_left _ _, hprev_reach⟩
 
-private lemma edgeComponentOf_incident_connected (n : ℕ) (edges : Finset (Edge n))
+lemma edgeComponentOf_incident_connected (n : ℕ) (edges : Finset (Edge n))
     (u : Fin n) (_hu : ∃ e ∈ edges, u ∈ e) :
     IsIncidentConnected n (edgeComponentOf n edges u) := by
   intro v w hv_inc hw_inc
@@ -1153,20 +1153,20 @@ private lemma edgeComponentOf_incident_connected (n : ℕ) (edges : Finset (Edge
   exact (reachable_from_u_in_component n edges u v hv_reach).symm.trans
     (reachable_from_u_in_component n edges u w hw_reach)
 
-private lemma edgeComponentOf_nonempty (n : ℕ) (edges : Finset (Edge n))
+lemma edgeComponentOf_nonempty (n : ℕ) (edges : Finset (Edge n))
     (u : Fin n) (hu : ∃ e ∈ edges, u ∈ e) :
     (edgeComponentOf n edges u).Nonempty := by
   obtain ⟨e, he, hue⟩ := hu
   exact ⟨e, edgeComponentOf_mem n edges u e he u hue (SimpleGraph.Reachable.refl u)⟩
 
-private lemma edgeComponentOf_degree_le (n : ℕ) (edges : Finset (Edge n))
+lemma edgeComponentOf_degree_le (n : ℕ) (edges : Finset (Edge n))
     (u v : Fin n) :
     vertexDegreeIn n (edgeComponentOf n edges u) v ≤ vertexDegreeIn n edges v := by
   unfold vertexDegreeIn
   apply Finset.card_le_card
   exact Finset.filter_subset_filter _ (edgeComponentOf_sub n edges u)
 
-private lemma edgeComponentOf_degree_eq (n : ℕ) (edges : Finset (Edge n))
+lemma edgeComponentOf_degree_eq (n : ℕ) (edges : Finset (Edge n))
     (u v : Fin n) (hreach : (edgeSetToGraph n edges).Reachable u v) :
     vertexDegreeIn n (edgeComponentOf n edges u) v = vertexDegreeIn n edges v := by
   unfold vertexDegreeIn
